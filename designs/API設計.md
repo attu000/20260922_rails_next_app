@@ -46,7 +46,7 @@
 | DELETE | 消す | DELETE /api/session（ログアウト） |
 
 - URL の先頭は `/api/`。バージョン（`/api/v1/` など）は付けない
-  - Next.js の rewrites で、`/api/` で始まるものは Rails へ、それ以外は Next.js の画面へ振り分ける
+  - Next.js の rewrites で、`/api/` で始まるものと、アイコンの `/rails/active_storage/…` を Rails へ、それ以外を Next.js の画面へ振り分ける（本書3-1 の注意点5、9-3）
   - バージョンは、自分では直せない利用者がいる公開 API のためのもの。今回の利用者は同じリポジトリの Next.js だけで、同時に直せるので不要
 - Next.js の Route Handlers（ルートハンドラー。Next.js 自身の `/api` の機能）は使わない
 
@@ -110,6 +110,9 @@
 - どちらの側でも、画面を開いたら最初に /api/me を呼ぶ（16-1-7 の合言葉をそろえるため）。違うのは結果の扱いだけ
 - ログイン画面へ移すときは、開こうとしていたページを `?return_to=/company/students/5` のように付け、ログイン後にそこへ戻す
   - return_to は `/` で始まるアプリ内のパスだけ受け付ける（本書6-5 C10 の通知のリンクと同じ考え方）
+  - **さらに、ログインした人の種別と先頭が合っているときだけ使う**（企業なら `/company/`、学生なら `/student/`）。合わなければ捨てて、種別ごとのホームへ送る
+    - return_to は URL の `?` の後ろなので、利用者が自由に書き換えられる。行き先は「書かれていたパス」ではなく「ログインした人の種別」から決める
+    - これは見た目のための処理。書き換えられても他人のデータは見えない（Rails が 403 で断る）
 - main 側の画面では、どの API から 401 が返ってきても、ログイン画面へ移す（別のタブでログアウトした場合など）
   - auth 側では、401 は「未ログインという普通の状態」として扱い、移動しない。ログイン画面へ移す処理がログイン画面自身にかかり、移動が繰り返されるのを防ぐため
 - Next.js のミドルウェア（ページを開く前に割り込む仕組み）は使わない。Cookie があるかしか分からず、正しくログインしているかは結局 Rails に聞く必要があるため
@@ -156,6 +159,10 @@
 - 判定も Rails で行い、結果を返す。画面側に同じ判定を書かない
   - 稼働条件の一致、カルチャーの一致・ずれ・近さ（16-3 ⑲・㉓）
   - 今押せる操作（16-3 ㉓ の available_actions）、メッセージを送れるか（16-3 ㊲ の can_send）
+  - やりとりの状態のタグ（16-3 ㉑・㉒・形D の tag）、学生から見た状態（形E の my_status）
+- **迷ったときは Rails 側で計算して返す。画面側では計算しない**
+  - Rails と Next.js は言語が違うので、同じ判定を両方に書くと必ず2通りの実装になり、型でも守られない
+  - 特に「複数の列の組み合わせに付けた名前」（例：発生元が応募 × 状態が未マッチ ＝「未対応応募」）は、どの選択肢にも存在しない言葉なので、必ず Rails が計算して返す
 - 理由：画面側にも同じ表や判定を書くと、片方だけ直して食い違う（例：継続期間に選択肢を足したのに画面に出てこない、押せるのにエラーになるボタンができる）ため
 - 割り切り：画面を開くときに、取りに行く回数が1回増える。選択肢はほとんど変わらないデータなので、一度取ったら使い回す
 
@@ -172,7 +179,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | 403 | してはいけない | 種別が違う入口を呼んだ。CSRF の合言葉がない・違う | 「この操作はできません」 |
 | 404 | 見つからない | 存在しない番号。見てよい範囲の外の番号（下の決まり） | 「見つかりません」 |
 | 409 | 今の状態ではできない | 掲載中でない募集へのスカウト。応募済みの募集への応募。マッチしていない相手へのメッセージ | 「この操作は今はできません」と出し、最新の状態を読み直す |
-| 422 | 入力が正しくない | 必須の項目が未入力。パスワードが短い。登録済みのメールアドレス | 項目ごとにエラーを表示 |
+| 422 | 入力が正しくない | 必須の項目が未入力。パスワードが短い。登録済みのメールアドレス。**必須のパラメータがない**（㉒でおすすめ順なのに募集の番号がない、など） | 項目ごとにエラーを表示 |
 | 429 | 回数が多すぎる | ログインの回数制限（本書3-3 D-2） | 「しばらくしてからお試しください」 |
 | 500 | サーバーの不具合 | 想定外のエラー | 「エラーが起きました」 |
 
@@ -228,6 +235,19 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 }
 ```
 
+- 検索の窓口（⑱ 募集検索・㉒ 学生検索）だけは、条件に合う件数も返す。条件で結果を減らさず、合致／合致外の2群に分けて並べるため（本書7-3）
+
+```json
+{
+  "items": [{ "matched": true }],
+  "pagination": { "page": 1, "per_page": 20, "total_count": 1240, "matched_count": 38, "total_pages": 62 }
+}
+```
+
+- matched：その1件が、指定した条件を**全部**満たしていれば true。判定は Rails が行う（本書16-1-9）
+- matched_count：条件に合う件数。画面は「条件に合う38件／全1,240件」のように出す
+- 並び順は、合致（matched が true）の群がすべて先、そのあとに合致外の群。どちらの群も、画面で選んだ並び順で並ぶ
+- ページ分けは2つの群を通して振る。画面は、matched が true から false に変わるところに「ここから条件に合いません」の区切りを出す（合致が0件なら、区切りが先頭に来る）
 - ページ分けしない一覧も `items` で包んで返す（`pagination` は付けない）
 - ページ分けする一覧：16-3 ⑱（募集検索）、㉑（候補者）、㉒（学生検索）、㉞（募集管理）、㉟（スカウト管理）、㊱・㊴（スレッド一覧）、㊷（通知）
 - ページ分けしない一覧：16-3 ⑪（自社の募集）、⑳ の募集、ポップアップ（㉕・㉝。最大5件）、㊲・㊵ のメッセージ
@@ -367,7 +387,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 見送りを取り消す | ㉘ POST /api/company/candidacies/:id/undo_decline | スカウト由来の見送りを戻す |
 | | 合格として保存 | ㉙ POST /api/company/candidacies/:id/pass | |
 | | 不合格として保存 | ㉚ POST /api/company/candidacies/:id/fail | |
-| | メッセージを送る | `/company/messages?student_id=[id]` | 画面の移動だけ |
+| | この学生とのメッセージ（㉓ の has_message_thread が true のとき） | `/company/messages?student_id=[id]` | 画面の移動だけ。募集タブの外に置く |
 | C7 メッセージ管理 | 画面の URL | `/company/messages` | `?student_id=`（開くスレッド） |
 | | 開いたとき・ページ送り | ㊱ GET /api/company/message_threads | スレッド一覧 |
 | | 開いたとき（student_id があるとき）・スレッドを選んだとき | ㊲ GET /api/company/students/:id/message_thread | その学生とのチャット |
@@ -421,12 +441,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 応募の完了後 | ㉝ GET /api/student/job_postings/:id/similar_job_postings | 「この募集に似た募集」のポップアップ |
 | | ポップアップの募集 | `/student/job_postings/[その募集id]` | 画面の移動だけ |
 | | マッチする（マッチ理由を選ぶ） | ㉜ POST /api/student/candidacies/:id/match | スカウトにマッチする |
-| | メッセージへ | `/student/messages?company_id=[id]` | 画面の移動だけ |
+| | この企業とのメッセージ（⑲ の has_message_thread が true のとき） | `/student/messages?company_id=[id]` | 画面の移動だけ |
 | | 会社名 | `/student/companies/[id]` | 画面の移動だけ |
 | S7 企業詳細 | 画面の URL | `/student/companies/[id]` | |
 | | 開いたとき | ⑦ GET /api/options | 業種・人数の表示名 |
 | | 開いたとき | ⑳ GET /api/student/companies/:id | 企業のプロフィールと掲載中の募集 |
 | | 募集を押す | `/student/job_postings/[id]` | 画面の移動だけ |
+| | この企業とのメッセージ（⑳ の has_message_thread が true のとき） | `/student/messages?company_id=[id]` | 画面の移動だけ |
 | S8 ログイン | 画面の URL | `/student/login` | |
 | | 開いたとき | ③ GET /api/me | C8 と同じ |
 | | ログイン | ① POST /api/session | → return_to、なければ `/student/job_postings`（企業アカウントなら `/company/job_postings`） |
@@ -575,6 +596,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "status": "published",
   "candidacy": {
     "id": 34, "origin": "application", "status": "unmatched",
+    "tag": "pending_application",
     "reasons": ["business", "culture"], "matched_at": null
   },
   "available_actions": ["match", "decline"]
@@ -583,9 +605,12 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 - candidacy：その学生とのやりとり。なければ null
 - candidacy.reasons：応募理由・マッチ理由（C6 の♥印に使う）。値は応募理由の英語の名前（本書8-5 candidacy_reasons）
-- available_actions：今この募集で押せるボタン。`scout`、`match`、`decline`、`undo_decline`、`pass`、`fail`、`send_message` のどれか
-  - 画面は、ここに入っているボタンだけを出す。判定は Rails の1か所で行い、本書17-2 の状態遷移表と同じ内容にする
-  - 判定の案は、16-3-6 の「状態を変える操作」の表のとおり
+- candidacy.tag：やりとりの状態のタグ。**Rails が計算する**。`pending_application`（未対応応募）、`scouted`（スカウト済み）、`matched`（マッチ）、`declined`（見送り）、`passed`（合格）、`failed`（不合格）のどれか
+  - 日本語は⑦の enums の candidacy_tag。㉑・㉒ と同じ値を使う
+  - 「未対応応募」は発生元と状態の組み合わせに付けた名前で、どの選択肢にも存在しない言葉なので、画面側では組み立てない（16-1-9）
+- available_actions：今この募集で押せるボタン。`scout`、`match`、`decline`、`undo_decline`、`pass`、`fail` のどれか
+  - 画面は、ここに入っているボタンだけを出す。判定は Rails の1か所で行う。**正は本書17-2-1 の状態遷移表**（窓口ごとの条件は16-3-6）
+  - メッセージのボタンは募集ごとではなく相手ごとなので、ここには入れない。㉓ の has_message_thread を使う（本書17-2-3）
 
 **形E：学生から見た、募集とのやりとりの状態**（⑲の一部。㉛・㉜の返事）
 
@@ -593,7 +618,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 { "my_status": "applied", "my_candidacy_id": 34 }
 ```
 
-- my_status：`none`（関係なし）、`applied`（応募済み）、`scouted`（スカウトあり）、`matched`（マッチ済み）のどれか。本書8-7 の計算のとおり（見送り・合格・不合格は見せない）
+- my_status：`none`（関係なし）、`applied`（応募済み）、`scouted`（スカウトあり）、`matched`（マッチ済み）のどれか。**Rails が計算する**。本書8-7 の計算のとおり（見送り・合格・不合格は見せない）
+  - 日本語は⑦の enums の my_status
 - my_candidacy_id：やりとりの番号。関係がなければ null
 
 #### 16-3-3. まとまり1：共通（ログイン、新規登録、選択肢）
@@ -666,7 +692,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 必須の○は、データベースで空欄を許さない項目と、登録に欠かせない項目だけ。ステップ2は「あとで入力する」で飛ばせる（本書17-3-5）
 - 返すもの：201、形A。自動でログインした状態になる
 - 主なエラー：422（項目ごと。登録済みのメールアドレスを含む）。画面側は、エラーのある項目を含む最初のステップに戻して表示する
-- 処理：users、company_profiles、company_industries を1つのトランザクションで作る
+- 処理：users、sessions（自動でログインした状態にする）、company_profiles、company_industries を1つのトランザクションで作る
   - アイコンは含めない。登録が成功した直後に、画面が⑩へ送る
   - アイコンの保存に失敗しても、登録は取り消さない。「アイコンを保存できませんでした。あとで会社情報から登録してください」と出して、ホームへ進む
 - 裏側のジョブ：なし
@@ -678,15 +704,16 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 使える人：誰でも
 - 送るもの：全ステップの入力を1つにまとめる。student_profiles の列はそのままの名前で、付属テーブルは次の名前の配列で送る
 
-| ステップ | 項目 |
-| --- | --- |
-| 1 | email、password、password_confirmation、terms_agreed（ここまで⑤と同じ）、name（必須） |
-| 2 | university_id、faculty_id、department_id、grade、graduation_year、prefecture_id、activity_status |
-| 3 | interested_job_middle_category_ids（興味のある職種）、interested_industry_ids（興味のある業界）、job_hunting_prefecture_ids（就活希望エリア） |
-| 4 | skills（プログラミング歴）、links（外部リンク）、certifications（資格） |
-| 5 | work_days_per_week、work_hours_per_day、duration_months、available_from、can_full_remote、can_partial_remote、can_onsite、commutable_prefecture_ids（出社できる都道府県）、work_note |
-| 6 | personality_pace、personality_novelty、personality_collaboration、personality_decision、personality_atmosphere |
-| 7 | self_pr_strength、self_pr_weakness、self_pr_future |
+| ステップ | 項目 | 必須 |
+| --- | --- | --- |
+| 1 | email、password、password_confirmation、terms_agreed（ここまで⑤と同じ）、name（氏名） | ○（すべて） |
+| 2 | **activity_status（活動状況）** | **○** |
+| 2 | university_id、faculty_id、department_id、grade、graduation_year、prefecture_id | |
+| 3 | interested_job_middle_category_ids（興味のある職種）、interested_industry_ids（興味のある業界）、job_hunting_prefecture_ids（就活希望エリア） | |
+| 4 | skills（プログラミング歴）、links（外部リンク）、certifications（資格） | |
+| 5 | work_days_per_week、work_hours_per_day、duration_months、available_from、can_full_remote、can_partial_remote、can_onsite、commutable_prefecture_ids（出社できる都道府県）、work_note | |
+| 6 | personality_pace、personality_novelty、personality_collaboration、personality_decision、personality_atmosphere | |
+| 7 | self_pr_strength、self_pr_weakness、self_pr_future | |
 
 送り方の例（一部）
 
@@ -712,12 +739,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 ```
 
 - 決まり
+  - **必須はステップ1のすべてと、ステップ2の activity_status（活動状況）だけ**（本書17-3-5）。これ以外は省いてよい
   - 省いた項目は空欄か既定値（勤務形態の3つは true、性格は 0）になる
   - skills の各要素は、technology_id か other_name のどちらか一方だけ（本書8-5 の CHECK と同じ）。level は必須
   - available_from は、月の1日の日付で送る
   - 数値や選択肢の範囲は、テーブル定義（本書8-5）と⑦に従う
 - 返すもの・主なエラー：⑤と同じ
-- 処理：users、student_profiles、付属テーブル7つを1つのトランザクションで作る。アイコンは⑤と同じ扱いで、⑰へ送る
+- 処理：users、sessions（自動でログインした状態にする）、student_profiles、付属テーブル7つを1つのトランザクションで作る。アイコンは⑤と同じ扱いで、⑰へ送る
 - 裏側のジョブ：登録の完了後、その学生の似た学生リストを作る（本書7-5）【強み】
 - 段階タグ：【コア】
 
@@ -729,7 +757,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 | まとまり | 中身 |
 | --- | --- |
-| enums | 画面に出す選択肢すべて：grade、activity_status、employee_size、skill_level、job_posting_status、work_style、purpose、hiring_possibility、candidacy_reason、candidacy_status、technology_category、work_process_stage、last_active_range |
+| enums | 画面に出す選択肢すべて：grade、activity_status、employee_size、skill_level、job_posting_status、work_style、purpose、hiring_possibility、candidacy_reason、candidacy_status、**candidacy_tag**、**my_status**、technology_category、work_process_stage、last_active_range |
 | work_conditions | 稼働条件の数値の選択肢（週の日数、1日の時間、継続期間。本書5-6） |
 | culture_axes | 性格・カルチャーの5軸の名前と、両端の説明（本書5-5） |
 | masters | 職種（大分類の中に中分類）、工程（主に使う大分類つき）、技術、業界、都道府県、大学、学部（中に学科） |
@@ -778,6 +806,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 ```
 
 - 大学を全件入れても数十KB程度。大学が多くて選びにくい場合は、画面側で文字を入れて絞り込む（全件を持っているので画面側だけでできる）
+- 学生に見せない項目の選択肢（purpose、hiring_possibility、candidacy_status の declined／passed／failed）も含まれるが、**値そのものは返さない**ので問題にならない。窓口を種別ごとに分けないのは、「一度取ったら使い回す」（16-1-9）を保つため
 - 段階タグ：【コア】
 
 #### 16-3-4. まとまり2：企業のプロフィールと募集
@@ -876,6 +905,10 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "requirements": "…",
   "purpose": "both",
   "hiring_possibility": "possible",
+  "target_grades": ["undergrad_3", "undergrad_4"],
+  "target_graduation_year_from": 2027,
+  "target_graduation_year_to": 2029,
+  "target_other": null,
   "main_job_middle_category_ids": [2],
   "related_job_middle_category_ids": [3],
   "main_work_process_ids": [5],
@@ -887,6 +920,10 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 - 職種と工程は、「主な／関連する」「メインで担当する／関われる」で配列を分けて返す（フォームの入力欄とそのまま対応させるため）
 - about・business_description が空欄なら、null のまま返す。画面側は、⑧の企業プロフィールの値を薄く表示する
+- 求める人材（学生には見せない）
+  - target_grades：求める学年。grade の選択肢の名前の配列（複数選択、任意）
+  - target_graduation_year_from／target_graduation_year_to：求める卒業年度の範囲。片方だけの指定もできる（本書17-3-4）
+  - target_other：その他の特徴（文章、任意）
 - 段階タグ：【コア】
 
 **⑬ POST /api/company/job_postings（募集の新規作成）**
@@ -946,14 +983,14 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 画面・操作：S2 の表示、条件・並び順の変更、ページ送り
 - 使える人：学生
 
-| 送るもの | 型 | 画面の条件 | 絞り込みの決まり |
+| 送るもの | 型 | 画面の条件 | 合致の決まり（これを満たせば matched が true） |
 | --- | --- | --- | --- |
-| q | 文字列 | ① フリーワード | 次のどこかに、部分一致で含まれる募集：タイトル、インターンですること、必須要件、歓迎要件、使用技術の補足、会社名、使用技術の名前。空白で区切ると「すべてを含む」 |
+| q | 文字列 | ① フリーワード | 次のどこかに、部分一致で含まれる募集：タイトル、インターンですること、必須要件、歓迎要件、使用技術の補足、会社名、使用技術の名前。空白で区切ると「すべてを含む」。実装は SQL の LIKE（本書9-6） |
 | prefecture_ids[] | 数値の配列 | ② 勤務地 | 勤務地がどれかに当てはまる募集。フルリモートの募集は、勤務地に関係なく含める |
 | work_days_per_week | 数値 | ③ 週の日数 | 募集の「週○日以上」が、この値以下 |
 | work_hours_per_day | 数値 | ③ 1日の時間 | 募集の「1日○時間以上」が、この値以下 |
 | duration_months | 数値 | ③ 継続期間 | 募集の「最低○ヶ月以上」が、この値以下 |
-| available_from | 日付 | ③ 開始時期 | 募集が随時（空欄）か、募集の開始月がこの日以降 |
+| available_from | 日付 | ③ 開始時期 | 募集が随時（空欄）か、**募集の開始月が今月より前**か、募集の開始月がこの日以降（本書5-6） |
 | work_styles[] | 選択肢の名前の配列 | ③ 勤務形態 | 募集の勤務形態が、この中に含まれる |
 | weekend_ok | 真偽値 | ③ 土日OK | true なら、土日OK の募集だけ |
 | industry_ids[] | 数値の配列 | ④ 業界 | 企業の業種のどれか1つが一致 |
@@ -963,17 +1000,21 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | sort | `recommended`／`newest` | 並び順 | 省略時は recommended |
 | page | 数値 | ページ | 省略時は1 |
 
-- 出すのは、掲載中の募集だけ
-- 条件を指定した項目が未入力の募集は、結果に出さない（本書5-10）。ただし、開始時期の空欄は「随時」として常に一致させる
+- 出すのは、掲載中の募集だけ（これは除外。利用者が指定した条件ではないため。本書7-3）
+- **条件で結果を減らさない。** 指定した条件を全部満たすものが matched＝true、1つでも外れたら false。どちらも返す（本書7-3）
+  - 条件を指定した項目が未入力の募集は、matched＝false にする（結果には出る。本書5-10）
+  - 開始時期の空欄は「随時」として常に合致させる
+  - 条件を1つも指定しなければ、すべて matched＝true
 - 並び順
   - recommended（おすすめ順）：f(募集, 学生) の高い順（本書7章）。点数が同じなら新着順。プロフィールがほとんど空の学生でも分岐せず、そのままおすすめ順で出す
   - newest（新着順）：最初に掲載した日時の新しい順
-  - おすすめ順は並び順だけを変え、絞り込みは送られた条件だけで行う（見えない絞り込みはかけない。本書7-3）
+  - 並び順に関係なく、matched＝true の群がすべて先、そのあとに false の群。どちらの群の中も、この並び順で並べる
+  - 合致外の群を「何個の条件に合っていたか」で並べ替えることはしない（作りを単純にするため。本書7-3）
 - 画面側の動き（S2 の稼働条件のボタン）
   - おすすめ順のとき：⑮の稼働条件（入力済みの項目だけ）に合わせて、週の日数、1日の時間、継続期間、開始時期、勤務形態、勤務地（出社できる都道府県）のボタンを自動で選ぶ。手動で選び直せる
   - 新着順に切り替えたとき：稼働条件のボタンをすべてオフにする。おすすめ順に戻したら、もう一度自動で選ぶ
   - ボタンの選択肢は、稼働条件の共通形式（本書5-6）と同じ
-- 返すもの：200。items は形B、pagination あり
+- 返すもの：200。items は形B に `matched`（真偽値）を加えたもの、pagination に matched_count あり（16-1-11）
 - 段階タグ：【コア】（おすすめ順とボタンの自動選択、「企画・設計から関われる」は【強み】。稼働条件の手動の選択、土日OK、業界、フルスタックのルールは【仕上げ】）
 
 **⑲ GET /api/student/job_postings/:id（募集詳細）**
@@ -996,15 +1037,19 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
     { "axis": "novelty", "job_posting_value": 2, "my_value": 0, "result": "not_judged" }
   ],
   "my_status": "scouted",
-  "my_candidacy_id": 34
+  "my_candidacy_id": 34,
+  "has_message_thread": true
 }
 ```
 
 - 上の例のほかに、⑫と同じ名前で次の項目も返す：稼働条件（min_work_days_per_week、min_work_hours_per_day、min_duration_months、start_month、work_style、work_style_note、prefecture_id、work_location_note、weekend_ok、work_note）、hourly_wage、culture_ の5つ、requirements、preferred_requirements、technology_note、職種・工程・使用技術の配列、published_at
-- 返さない項目：status（代わりに is_open）、purpose、hiring_possibility、target_grade、target_graduation_year、target_other（学生に見せない項目）
+- 返さない項目：status（代わりに is_open）、purpose、hiring_possibility、target_grades、target_graduation_year_from、target_graduation_year_to、target_other（学生に見せない項目）
 - about・business_description：募集側が空欄なら、企業プロフィールの値を入れて返す（学生の画面では区別が要らないため）
 - culture_comparison：result は Rails が本書5-5 のルールで判定する。`match`（一致）、`mismatch`（ずれ）、`not_judged`（どちらかが中央なので判定しない）のどれか。㉓の比較と同じ部品を使う
 - my_status・my_candidacy_id：形E
+- has_message_thread：**その企業とのスレッドがあるか**。true なら画面に「この企業とのメッセージ」のボタンを出す（本書17-2-3）
+  - 送れるかどうか（can_send）とは別。スカウトが届いてまだマッチしていない相手でも、スカウト文を読みに行けるようにするため
+  - スレッドができるのは「スカウトを受けたとき」か「応募がマッチしたとき」（本書5-2）
 - 段階タグ：【コア】（culture_comparison は【強み】）
 
 **⑳ GET /api/student/companies/:id（企業詳細）**
@@ -1021,11 +1066,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "business_description": "受託開発と自社サービスの運営",
   "about": "エンジニアが半数を占める、30人ほどの会社です",
   "icon_url": null,
+  "has_message_thread": false,
   "job_postings": []
 }
 ```
 
 - job_postings：その企業の掲載中の募集。形B で、ページ分けしない
+- has_message_thread：その企業とのスレッドがあるか。true なら「この企業とのメッセージ」のボタンを出す（⑲と同じ判定。本書17-2-3）
 - 段階タグ：【コア】
 
 #### 16-3-6. まとまり4：学生検索・候補者・スカウト・応募・マッチ
@@ -1049,6 +1096,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
       "origin": "application",
       "status": "unmatched",
       "tag": "pending_application",
+      "unreplied": false,
       "created_at": "2026-09-21T09:00:00.000+09:00",
       "matched_at": null
     }
@@ -1057,26 +1105,27 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 }
 ```
 
-- tag（Rails が計算する）
+- tag（Rails が計算する）：やりとりの状態のタグ。値は6つ。㉒・形D と同じものを使い、日本語は⑦の enums の candidacy_tag で引く
   - `pending_application`（未対応応募）：応募で、未マッチ
   - `scouted`（スカウト済み）：スカウトで、未マッチ
-  - `unreplied`（未返信）：マッチ以降で、スレッドの最後の送信者が学生
-  - それ以外は null
+  - `matched`（マッチ）／`declined`（見送り）／`passed`（合格）／`failed`（不合格）：状態そのまま
+- unreplied（Rails が計算する）：マッチ以降で、スレッドの最後の送信者が学生なら true
+  - 状態とは別の軸（返事をしたかどうか）なので、tag に混ぜず項目を分ける
 - 理由：行には「誰が、どの段階か」が分かる最低限を載せる。並び順は単純で予想しやすい形にし、「対応が必要なものを上に並べる」は、タグで見分けられるので作らない
-- 段階タグ：【コア】（show_all は【強み】、unreplied のタグと行の学生情報・並び順は【仕上げ】）
+- 段階タグ：【コア】（show_all は【強み】、unreplied と行の学生情報・並び順は【仕上げ】）
 
 **㉒ GET /api/company/students（学生検索）**
 
 - 画面・操作：C5 の表示、条件・並び順の変更、ページ送り
 
-| 送るもの | 画面の条件 | 絞り込みの決まり |
+| 送るもの | 画面の条件 | 合致の決まり（これを満たせば matched が true） |
 | --- | --- | --- |
-| job_posting_id | 募集の選択 | 選ぶと、画面がその募集の稼働条件（入力済みの項目）で条件のボタンを自動で選ぶ（推薦検索。⑫で取る）。タグの基準と、おすすめ順にも使う |
-| q | フリーワード | 自己PR（3つの問い）、資格名、プログラミング歴の「その他」の名前に、部分一致で含まれる。空白で区切ると「すべてを含む」。名前と大学名は対象にしない |
+| job_posting_id | 募集の選択 | 選ぶと、画面がその募集の稼働条件（入力済みの項目）で条件のボタンを自動で選ぶ（推薦検索。⑫で取る）。タグの基準と、おすすめ順にも使う。これ自体は合致の条件ではない |
+| q | フリーワード | 自己PR（3つの問い）、資格名、プログラミング歴の「その他」の名前に、部分一致で含まれる。空白で区切ると「すべてを含む」。名前と大学名は対象にしない。実装は SQL の LIKE（本書9-6） |
 | work_days_per_week | 週の日数 | 学生の「週○日まで」が、この値以上 |
 | work_hours_per_day | 1日の時間 | 学生の「1日○時間まで」が、この値以上 |
 | duration_months | 継続期間 | 学生の「○ヶ月以上続けられる」が、この値以上 |
-| start_month | 開始時期 | 学生の開始可能月が、この月以前 |
+| start_month | 開始時期 | 学生の開始可能月が、この月以前。**この月が今月より前なら、条件として使わない**（全員合致。本書5-6） |
 | work_style | 勤務形態 | 学生がその勤務形態を「可能」にしている |
 | prefecture_id | 勤務地 | 学生の出社できる都道府県に含まれる（勤務形態がフルリモートのときは使わない） |
 | technology_ids[] | 使用技術 | 選んだ技術を、すべてプログラミング歴に持っている |
@@ -1089,16 +1138,20 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | page | ページ | 1ページ20件 |
 
 - 共通の決まり
-  - 最終活動日から30日以上たった学生は出さない（本書5-4）。活動状況が「今は探していない」の学生は外さない
-  - 条件を指定した項目が未入力の学生は、結果に出さない（本書5-10）
-  - おすすめ順は並び順だけを変え、絞り込みは送られた条件だけで行う（本書7-3）。自動で選ばれたボタンは、手動で外せる
-  - 性格は、絞り込みに使わない（本書2-4）
+  - 最終活動日から30日以上たった学生は出さない（本書5-4）。これは除外。利用者が指定した条件ではなく、全員に同じ基準が当たる区分のため（本書7-3・5-12）。活動状況が「今は探していない」の学生は外さない
+  - **条件で結果を減らさない。** 指定した条件を全部満たすものが matched＝true、1つでも外れたら false。どちらも返す（本書7-3）
+    - 条件を指定した項目が未入力の学生は、matched＝false にする（結果には出る。本書5-10）
+    - 条件を1つも指定しなければ、すべて matched＝true
+  - 並び順に関係なく、matched＝true の群がすべて先、そのあとに false の群
+  - 性格は、合致の判定に使わない（本書2-4）
   - おすすめ順以外の並び順を「最終活動が新しい順」にするのは、最近使っている学生ほど返信が来やすいため（本書2-3 の V3）
-- 返すもの：200。items は形C に次の2つを加えたもの、pagination あり
-  - candidacy：募集を選んだときの、その募集とのやりとり（`{ "id", "origin", "status" }`。なければ null）。募集を選ばないときは常に null
+  - sort が recommended なのに job_posting_id がないときは 422（16-1-10）
+- 返すもの：200。items は形C に次の3つを加えたもの、pagination に matched_count あり（16-1-11）
+  - matched：指定した条件を全部満たすか（真偽値）
+  - candidacy：募集を選んだときの、その募集とのやりとり（`{ "id", "origin", "status", "tag" }`。なければ null）。募集を選ばないときは常に null
   - candidacy_count：自社の募集とのやりとりの件数（募集を選ばないときのタグ用）
 - タグ（画面の表示）
-  - 募集を選んだとき：candidacy の状態に応じて、未対応応募、スカウト済み、マッチ、見送り、合格、不合格のタグを出す
+  - 募集を選んだとき：**candidacy.tag をそのまま出す**（⑦の candidacy_tag で日本語にする）。㉑・形D と同じ値で、画面側では組み立てない（16-1-9）
   - 募集を選ばないとき：candidacy_count が1以上なら「やりとりあり」のタグを出す
   - 応募済みの学生も含めるのは、同じ募集にすでに応募している学生にスカウトしようとすると、エラー（1つの募集×学生でやりとりは1件だけ）になるため
 - 段階タグ：【コア】（推薦検索・おすすめ順は【強み】、タグと最終活動の目安は【仕上げ】）
@@ -1111,11 +1164,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 ```json
 {
   "student": { "…⑮と同じ項目…": "…", "icon_url": null, "last_active_range": "within_7_days" },
+  "has_message_thread": true,
   "job_postings": [
     {
       "id": 12, "title": "自社サービスのバックエンド開発インターン", "status": "published",
       "candidacy": {
         "id": 34, "origin": "application", "status": "unmatched",
+        "tag": "pending_application",
         "reasons": ["business", "culture"], "matched_at": null
       },
       "available_actions": ["match", "decline"],
@@ -1136,6 +1191,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 ```
 
 - student：学生のプロフィールの全項目（マッチ前でもすべて見せる）
+- has_message_thread：**その学生とのスレッドがあるか**。募集ごとではなく学生ごとの値なので、job_postings の中ではなく外に置く
+  - true なら、どの募集タブを見ていても「この学生とのメッセージ」のボタンを出す（本書17-2-3、6-5 C6）
+  - 送れるかどうか（can_send）とは別。自分が送ったスカウト文を読み直せるようにするため
 - job_postings：自社の全募集（掲載中以外も含む）。各要素は形D に comparison を加えたもの。並び順は⑪と同じ。最初に選ぶタブは画面側が決める（遷移元の job_posting_id、なければ先頭）
 - comparison（Rails が計算する。⑲と同じ部品）
   - work_conditions：稼働条件の項目ごとに `match`（一致）、`mismatch`（不一致）、`not_judged`（どちらかが未入力）。照合のルールは本書5-6
@@ -1150,43 +1208,48 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 学生側の操作：200（応募は 201）。形E を返す
 - 今の状態ではできない操作は 409（例：企業がスカウトに「マッチする」を押した、掲載中でない募集に応募した）
 - 裏側のジョブは、トランザクションが確定したあとに動かす（本書7-5）
-- 「できる状態」は、本書6-5 C6・6-6 S6 の「状態ごとの操作」を書き直したもの（案）。正式な表は本書17-2 で作る
+- 「できる状態」は、本書17-2-1 の状態遷移表を窓口ごとに並べ直したもの。**正は17-2-1**（食い違ったら17-2-1 に合わせる）
 
-| 窓口 | 送るもの | できる状態（案） | 1つのトランザクションで行うこと | 裏側のジョブ |
+| 窓口 | 送るもの | できる状態（正は17-2-1） | 1つのトランザクションで行うこと | 裏側のジョブ |
 | --- | --- | --- | --- | --- |
 | ㉔ POST /api/company/scouts（スカウト） | job_posting_id、student_profile_id、body（スカウト文） | 募集が掲載中で、その募集×学生のやりとりがまだない | やりとり（スカウト・未マッチ）、スレッド（なければ）、メッセージ、スカウトメッセージを作る。スレッドの last_message_at を更新 | なし |
 | ㉖ POST /api/company/candidacies/:id/match（マッチ） | なし | 発生元が応募で、状態が未マッチか見送り。募集が掲載中 | 状態をマッチにし、matched_at を記録。スレッドを作る（なければ） | なし |
 | ㉗ POST /api/company/candidacies/:id/decline（見送り） | なし | 状態が未マッチ（発生元は問わない） | 状態を見送りにする | 似た募集を持つ他社への通知を作る（本書7-5） |
-| ㉘ POST /api/company/candidacies/:id/undo_decline（見送りの取り消し） | なし | 発生元がスカウトで、状態が見送り | 状態を未マッチに戻す | なし |
+| ㉘ POST /api/company/candidacies/:id/undo_decline（見送りの取り消し） | なし | 状態が見送り（**発生元は問わない**） | 状態を未マッチに戻す | なし |
 | ㉙ POST /api/company/candidacies/:id/pass（合格） | なし | 状態がマッチか不合格 | 状態を合格にする | なし |
 | ㉚ POST /api/company/candidacies/:id/fail（不合格） | なし | 状態がマッチか合格 | 状態を不合格にする | なし |
 | ㉛ POST /api/student/candidacies（応募） | job_posting_id、reasons（配列、最低1つ） | 募集が掲載中で、その募集とのやりとりがまだない | やりとり（応募・未マッチ）、応募理由、reason_mask を作る | 推薦の更新（本書7-5 の応募・マッチ時の手順） |
 | ㉜ POST /api/student/candidacies/:id/match（マッチ） | reasons（配列、最低1つ） | 発生元がスカウトで、状態が未マッチか見送り。募集が掲載中 | 状態をマッチにし、matched_at、応募理由、reason_mask を保存 | 推薦の更新（同上） |
 
 - reasons の値：business、industry、job_category、work_process、internship_details、culture、hourly_wage、work_conditions、technologies（本書8-5 candidacy_reasons）
-- 主なエラー：404（他社・他人のやりとり、見てよい範囲の外の募集）、409（上の「できる状態」でない）、422（スカウト文が空、応募理由が0個、など。長さの上限は本書17-3-2）
+- 主なエラー：404（他社・他人のやりとり、見てよい範囲の外の募集）、409（上の「できる状態」でない）、422（スカウト文が空、応募理由が0個、など。長さの上限は本書17-3-4）
 - ㉔ の student_profile_id は、すべての学生を指定できる
 - 段階タグ：㉔・㉖・㉛・㉜は【コア】、㉗〜㉚は【強み】
 
 **㉕ GET /api/company/students/:id/similar_students（この学生に似た学生）**
 
 - 画面・操作：C6 のスカウト送信後のポップアップ
-- 送るもの：job_posting_id（必須。スカウトに使った募集）
+- 送るもの：job_posting_id（必須。スカウトに使った募集）。なければ 422（16-1-10）
 - 返すもの：200。最大5人の形C（items で包む。ページ分けしない）
-- 選び方（本書7-3・7-5）：その学生の似た学生リストを score の高い順に見て、次に当てはまる学生を除いた上位5人。5人に満たなければ、ある分だけ
-  - その募集の稼働条件（入力済みの項目）に合わない学生（未入力の項目がある学生も、本書5-10 のとおり外す）
-  - 30日以上活動のない学生
-  - その募集とやりとりがある学生
+- 選び方（本書7-3・7-5）
+  1. その学生の似た学生リストを score の高い順に見る
+  2. 次の学生を**外す**：30日以上活動のない学生／その募集とやりとりがある学生
+  3. 残りのうち、その募集の稼働条件（入力済みの項目）に**合う学生から順に取る**
+  4. 5人に満たなければ、**合わない学生からも score 順に補充して**5人にする
+  5. それでも足りなければ、ある分だけ
+- 稼働条件で絞り切らないのは、学生が稼働条件を埋めていないことが多く、絞ると毎回同じ少数の相手しか出てこなくなるため（本書7-3）
 - 段階タグ：【強み】
 
 **㉝ GET /api/student/job_postings/:id/similar_job_postings（この募集に似た募集）**
 
 - 画面・操作：S6 の応募完了のポップアップ
 - 返すもの：200。最大5件の形B（items で包む。ページ分けしない）
-- 選び方：その募集の似た募集リストを score の高い順に見て、次に当てはまる募集を除いた上位5件。5件に満たなければ、ある分だけ
-  - 学生の入力済みの稼働条件に合わない募集
-  - 自分とやりとりがある募集
-  - 掲載中以外の募集
+- 選び方（㉕ と同じ形）
+  1. その募集の似た募集リストを score の高い順に見る
+  2. 次の募集を**外す**：掲載中以外の募集／自分とやりとりがある募集
+  3. 残りのうち、学生の入力済みの稼働条件に**合う募集から順に取る**
+  4. 5件に満たなければ、**合わない募集からも score 順に補充して**5件にする
+  5. それでも足りなければ、ある分だけ
 - 段階タグ：【強み】
 
 **㉞ GET /api/student/candidacies（募集管理）**
@@ -1255,16 +1318,18 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 - messages：古い順に全件返す。1組の会話は短い想定なので、ページ分けしない（Phase 8 の重さの点検で見直す）
 - is_mine：自分が送ったメッセージなら true（画面で左右に分けて出すため）
+  - メッセージ1件ずつにアイコンは持たせない。1対1の会話なので、自分のアイコンは③、相手のアイコンは partner.icon_url から取れる
 - scout：スカウト文のときだけ、どの募集のスカウトかを入れる（ふつうのメッセージなら null）
 - can_send：今送れるか。Rails が本書5-2 のルール（その企業×学生のやりとりに、マッチ・合格・不合格が1つでもあるか）で判定する。画面は、false なら入力欄を使えなくする
 - matched_job_postings：その相手とマッチしている募集（マッチ・合格・不合格のもの）。学生側にも同じ形で返し、合格・不合格の区別は見せない
+  - 画面の上部に名前を並べるだけで、**そこから学生詳細・募集詳細へ飛ぶ導線は作らない**（本書6-5 C7・6-6 S5）
 - 主なエラー：404（相手が存在しない、または、まだスレッドがない）
 - 段階タグ：【コア】（matched_job_postings は【仕上げ】）
 
 **㊳ POST /api/company/students/:id/message_thread/messages・㊶ POST /api/student/companies/:id/message_thread/messages（送信）**
 
 - 画面・操作：C7・S5 の送信
-- 送るもの：body（本文、必須。長さの上限は本書17-3-2）
+- 送るもの：body（本文、必須。長さの上限は本書17-3-4）
 - 返すもの：201。作ったメッセージ1件を、㊲の messages の1要素と同じ形で返す
 - 処理：メッセージを作り、スレッドの last_message_at を更新する（1つのトランザクション）
 - 主なエラー：404（スレッドがない）、409（can_send が false）、422（本文が空）
