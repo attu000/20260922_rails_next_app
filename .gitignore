@@ -36,3 +36,7 @@ Desktop.ini
 .idea/
 .vscode/
 *.swp
+
+
+# ------その他
+.ruby-version
