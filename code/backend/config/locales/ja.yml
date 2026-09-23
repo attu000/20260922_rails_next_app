@@ -8,3 +8,22 @@ ja:
       not_found: 見つかりません
       unprocessable: 入力内容を確認してください
       internal_server_error: エラーが起きました
+
+  # 項目名。エラーの文が「メールアドレスを入力してください」のように、項目名付きになる
+  activerecord:
+    attributes:
+      user:
+        email: メールアドレス
+        password: パスワード
+        password_confirmation: パスワード（確認）
+        role: 種別
+      company_profile:
+        name: 会社名
+      student_profile:
+        name: 氏名
+
+  # rails-i18n の標準の文言を、設計書の文言に合わせる（17-3-6）
+  errors:
+    messages:
+      # 標準は「はすでに存在します」
+      taken: はすでに登録されています
