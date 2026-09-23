@@ -1,0 +1,12 @@
+# 開発用のコンテナの作り方。code/docker-compose.yml の backend が使う。
+# 本番用は同じフォルダの Dockerfile（rails new が作ったもの）。
+# 詳しくは design/designs/技術構成.md の 3-1 A-7
+
+FROM ruby:3.4
+
+WORKDIR /app
+
+# Gemfile に書かれた部品（gem）を入れる。
+# アプリのコードはコピーしない。compose で手元のフォルダをそのまま見せるため
+COPY Gemfile Gemfile.lock ./
+RUN bundle install

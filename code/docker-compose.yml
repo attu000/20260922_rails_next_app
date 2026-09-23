@@ -1,0 +1,55 @@
+# 開発用のコンテナの設計図。code/ フォルダで `docker compose up -d` を実行して起動する。
+# 詳しくは design/designs/技術構成.md の 3-1 A-4
+
+# まとまりの名前。コンテナやボリュームの名前の頭に付く
+name: rails_next_test
+
+services:
+  # データベース（PostgreSQL）。Rails からは「db」という名前でつなぐ
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      # PostgreSQL 18 から保存場所が /var/lib/postgresql に変わった。
+      # 古い記事の /var/lib/postgresql/data に割り当てると、データが残らない
+      - postgres_data:/var/lib/postgresql
+    # ポートは外に開けない。つなぐのは同じ Docker の中の Rails だけのため
+    healthcheck:
+      # 受け付けられる状態かを5秒ごとに確かめる。Rails はこれを待ってから起動する
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Rails（API 専用）。ブラウザからは Next.js を通して呼ぶ（技術構成.md の 3-1 A-2）
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    # 前回の終わり方が悪いと残る「起動中」の印（server.pid）を消してから起動する。
+    # -b 0.0.0.0 で、コンテナの外からの接続も受け付ける
+    command: bash -c "rm -f tmp/pids/server.pid && bin/rails server -b 0.0.0.0 -p 3001"
+    ports:
+      # 127.0.0.1 を付けて、このパソコンからだけつながるようにする
+      - "127.0.0.1:3001:3001"
+    volumes:
+      # 手元のコードをそのまま見せる。書き換えるとすぐ反映される
+      - ./backend:/app
+      # 入れた部品（gem）の置き場所
+      - bundle_data:/usr/local/bundle
+    environment:
+      # Docker の中では、コンテナ名（db）がそのまま住所になる
+      DB_HOST: db
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    depends_on:
+      # データベースが準備完了（healthy）になってから起動する
+      db:
+        condition: service_healthy
+
+volumes:
+  # コンテナを消しても残るデータの保存場所
+  postgres_data:
+  bundle_data:
