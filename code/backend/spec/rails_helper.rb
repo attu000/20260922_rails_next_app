@@ -23,7 +23,8 @@ require 'rspec/rails'
 # directory. Alternatively, in the individual `*_spec.rb` files, manually
 # require only the support files necessary.
 #
-# Rails.root.glob('spec/support/**/*.rb').sort_by(&:to_s).each { |f| require f }
+# spec/support/ の下の共通の関数（合言葉を取る関数など）を読み込む
+Rails.root.glob('spec/support/**/*.rb').sort_by(&:to_s).each { |f| require f }
 
 # Ensures that the test database schema matches the current schema file.
 # If there are pending migrations it will invoke `db:test:prepare` to
@@ -72,4 +73,7 @@ RSpec.configure do |config|
 
   # テストの中で、FactoryBot.create(:user) を create(:user) と短く書けるようにする
   config.include FactoryBot::Syntax::Methods
+
+  # API のテスト（request spec）で、csrf_token と log_in_as を使えるようにする（spec/support/csrf_helper.rb）
+  config.include CsrfHelper, type: :request
 end
