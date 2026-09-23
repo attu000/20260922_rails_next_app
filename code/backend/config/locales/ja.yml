@@ -4,6 +4,7 @@ ja:
   api:
     errors:
       # エラーの返事の message（画面の上部に出す一言）
+      unauthorized: ログインしてください
       forbidden: この操作はできません
       not_found: 見つかりません
       unprocessable: 入力内容を確認してください
