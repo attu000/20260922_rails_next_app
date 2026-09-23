@@ -1,0 +1,11 @@
+# 開発用のコンテナの作り方。code/docker-compose.yml の frontend が使う。
+# 詳しくは design/designs/技術構成.md の 3-1 A-4・A-7
+
+FROM node:24
+
+WORKDIR /app
+
+# package-lock.json のとおりに、正確に部品を入れる。
+# アプリのコードはコピーしない。compose で手元のフォルダをそのまま見せるため
+COPY package.json package-lock.json ./
+RUN npm ci
