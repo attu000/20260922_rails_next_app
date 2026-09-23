@@ -12,6 +12,15 @@ gem "puma", ">= 5.0"
 # Use Active Model has_secure_password [https://guides.rubyonrails.org/active_model_basics.html#securepassword]
 # gem "bcrypt", "~> 3.1.7"
 
+# JSON の部品を 2 系に固定する。json 3.0 では、Rails 8.1.3.1 が Cookie（セッション）を読む処理が
+# ArgumentError で失敗し、Cookie を送り返すリクエストがすべて 500 になるため（rails/rails#58784）。
+# Rails 側の修正（rails/rails#58601）を含む版が出たら、この行は消す（技術構成.md の 3-1 A-6）
+gem "json", "< 3"
+
+# Rails の標準メッセージ（「を入力してください」など）を日本語にする
+# 詳しくは design/designs/権限_バリデーション.md の 17-3-6
+gem "rails-i18n", "~> 8.1"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 

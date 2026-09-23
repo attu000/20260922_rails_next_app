@@ -1,0 +1,10 @@
+# この API 独自の日本語の文言。Rails の標準メッセージ（「を入力してください」など）は rails-i18n が持っている。
+# 詳しくは design/designs/API設計.md の 16-1-10、権限_バリデーション.md の 17-3-6
+ja:
+  api:
+    errors:
+      # エラーの返事の message（画面の上部に出す一言）
+      forbidden: この操作はできません
+      not_found: 見つかりません
+      unprocessable: 入力内容を確認してください
+      internal_server_error: エラーが起きました

@@ -7,4 +7,8 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+
+  # /api/ の下の、ここより上のどれにも当てはまらない URL は、404 の形で返す（API設計.md の 16-1-10）。
+  # 上から順に当てはめるので、この行は必ずいちばん最後に置く
+  match "api/*path", to: "errors#not_found", via: :all
 end
