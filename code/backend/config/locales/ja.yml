@@ -5,7 +5,11 @@ ja:
     errors:
       # エラーの返事の message（画面の上部に出す一言）
       unauthorized: ログインしてください
+      # ログインの窓口で、メールアドレスかパスワードが違うとき（権限_バリデーション.md の 17-3-1）
+      login_failed: ログインができません
       forbidden: この操作はできません
+      # ログインの回数制限を超えたとき（429）
+      too_many_requests: しばらくしてからお試しください
       not_found: 見つかりません
       unprocessable: 入力内容を確認してください
       internal_server_error: エラーが起きました

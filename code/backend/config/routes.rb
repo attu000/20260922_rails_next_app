@@ -8,6 +8,15 @@ Rails.application.routes.draw do
   # Defines the root path route ("/")
   # root "posts#index"
 
+  # API（design/designs/API設計.md の 16-1）。すべて /api/ で始まる。
+  # defaults: { format: :json } で、ブラウザのアドレス欄から開いたときも JSON のテンプレートを使う
+  namespace :api, defaults: { format: :json } do
+    # ① POST /api/session（ログイン）、② DELETE /api/session（ログアウト）
+    resource :session, only: %i[create destroy]
+    # ③ GET /api/me（ログイン中の人）
+    get "me", to: "me#show"
+  end
+
   # /api/ の下の、ここより上のどれにも当てはまらない URL は、404 の形で返す（API設計.md の 16-1-10）。
   # 上から順に当てはめるので、この行は必ずいちばん最後に置く
   match "api/*path", to: "errors#not_found", via: :all
