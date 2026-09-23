@@ -182,6 +182,7 @@ rails_next_test/
 | 使う技術と、実装で守るルール | [技術構成.md](design/designs/技術構成.md) |
 | API の決まり | [API設計.md](design/designs/API設計.md)、[権限_バリデーション.md](design/designs/権限_バリデーション.md) |
 | 残っている論点 | [未決内容.md](design/designs/未決内容.md) |
+| 手元で動かすための環境（Docker・バージョン・回避策） | [開発環境.md](design/designs/開発環境.md) |
 
 ## 今回のスコープ外と、本番運用で必要になること
 
