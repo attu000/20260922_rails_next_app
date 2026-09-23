@@ -1,0 +1,17 @@
+# 改行コードの決まり。
+#
+# Windows は行の終わりを CRLF、Linux は LF で保存する。
+# Rails の起動スクリプト（bin/docker-entrypoint など）が CRLF のまま
+# Docker（Linux）の中に入ると、「not found」という分かりにくいエラーで止まる。
+# それを防ぐため、リポジトリの中も手元のファイルも LF にそろえる。
+
+* text=auto eol=lf
+
+# 中身を書き換えてはいけないファイル（改行の変換をしない）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.webp binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary

@@ -30,12 +30,26 @@ Phase 5 に入る前の「設計書の通し読みチェック」も完了しま
 
 ## フォルダの見方
 
+リポジトリ全体
+
 ```
-.
+rails_next_test/        … リポジトリのルート
+├── README.md           … 提出物の説明
+├── CLAUDE.md           … 実装フェーズの指示書
+├── design/             … このフォルダ（設計の記録）
+└── code/               … 実装
+    ├── backend/        … Rails
+    └── frontend/       … Next.js
+```
+
+このフォルダ（design/）の中身
+
+```
+design/
 ├── README.md      … このファイル
-├── CLAUDE.md      … 設計を手伝う AI（Claude）への指示書
+├── CLAUDE.md      … 設計書を更新するときの指示書
 ├── MEMO.md        … 作業用のメモ
-├── premise/       … 出発点の資料
+├── premise/       … 出発点の資料（Git 管理外）
 │   ├── 内容.md    … 作るもののシナリオと要件
 │   └── 進め方.md  … Phase 0〜8 の進め方の計画
 ├── designs/       … 設計書の本体（常に最新の状態に保つ）

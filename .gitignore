@@ -1,0 +1,38 @@
+# Git で管理しないものを書くファイル。
+# ここに書いたものは、コミットにも GitHub にも入らない。
+#
+# Rails と Next.js は、自分用の .gitignore を code/backend/ と code/frontend/ に作る。
+# このファイルには、プロジェクト全体に関わるものだけを書く。
+
+# ===== 秘密の情報（絶対に入れない） =====
+.env
+.env.*
+!.env.example
+**/config/master.key
+**/config/credentials/*.key
+*.pem
+
+# ===== 利用者がアップロードした画像（アイコン） =====
+# Active Storage が手元のディスクに保存するもの。
+# 詳しくは design/designs/技術構成.md の 9-3
+code/backend/storage/
+
+# ===== 動かしているときに作られるもの =====
+node_modules/
+code/backend/log/
+code/backend/tmp/
+code/frontend/.next/
+code/frontend/out/
+code/frontend/next-env.d.ts
+*-debug.log*
+
+# ===== AI（Claude Code）の個人設定 =====
+.claude/
+
+# ===== OS・エディタが勝手に作るもの =====
+Thumbs.db
+Desktop.ini
+.DS_Store
+.idea/
+.vscode/
+*.swp
