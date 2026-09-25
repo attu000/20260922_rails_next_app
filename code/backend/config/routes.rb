@@ -27,6 +27,11 @@ Rails.application.routes.draw do
         # ⑩ POST /api/company/profile/icon（企業のアイコン）
         resource :icon, only: :create, controller: "profile_icons"
       end
+
+      # ⑪ GET /api/company/job_postings（自社の募集の一覧）、⑫ GET /api/company/job_postings/:id（1件）、
+      # ⑬ POST /api/company/job_postings（新規作成）、⑭ PATCH /api/company/job_postings/:id（保存・状態の変更）。
+      # 募集は消さず、状態で管理するので、消す窓口（destroy）は作らない（16-3 ⑭）
+      resources :job_postings, only: %i[index show create update]
     end
   end
 

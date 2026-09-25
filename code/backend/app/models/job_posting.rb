@@ -113,6 +113,10 @@ class JobPosting < ApplicationRecord
       replace_job_categories(main_ids, related_ids) unless main_ids.nil?
       # 使用技術を、送られた一覧でまるごと置き換える（16-3 ⑭）。送られなかったら変えない
       self.technology_ids = technology_ids unless technology_ids.nil?
+      # 最終更新日は「企業が最後に保存した日」にする。
+      # Rails は本体の列が変わったときだけ updated_at を変えるので、職種や技術だけを直したときなど、
+      # 本体が変わらなかった場合は touch（updated_at だけを今にする）で更新する
+      touch unless saved_changes?
     end
     # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
