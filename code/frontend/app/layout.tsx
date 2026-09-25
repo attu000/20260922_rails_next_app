@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// 書体の名前は、shadcn/ui の globals.css が読む --font-sans にそろえる。
+// Geist には日本語の文字がないので、日本語の部分は OS の書体で出る
 const geistSans = Geist({
-  variable: "--font-geist-sans",
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 

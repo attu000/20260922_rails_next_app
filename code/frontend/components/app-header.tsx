@@ -1,10 +1,11 @@
 "use client";
 
 // ログイン後の画面のヘッダー。企業用・学生用で共通（design/designs/ページ設計.md の 6-2、API設計.md の 16-2-1）。
-// 見た目は最小限にしている。見た目の方針は Phase 6 の最初に決める
+// 見た目は、shadcn/ui の部品と標準の色で、最低限だけそろえている（細かい見た目は後回し）
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { loginPathFor, type Role } from "@/lib/auth";
 import { useMe } from "@/components/member-only";
@@ -39,28 +40,31 @@ export function AppHeader() {
   }
 
   return (
-    <header className="flex flex-wrap items-center gap-4 border-b px-4 py-3 text-sm">
-      <nav className="flex flex-wrap gap-4">
-        {TABS[me.role].map((tab) => (
-          <Link key={tab.href} href={tab.href} className="hover:underline">
-            {tab.label}
-          </Link>
-        ))}
-        {/* 通知は企業だけ。ベルの絵ではなく文字にしている（見た目は最小限）。
-            未読の件数は、通知の機能を作る Phase 6 までは null なので出ない */}
-        {me.role === "company" && (
-          <Link href="/company/notifications" className="hover:underline">
-            通知{me.unread_notifications_count ? `（${me.unread_notifications_count}）` : ""}
-          </Link>
-        )}
-      </nav>
+    <header className="border-b">
+      {/* 中身の幅と余白は、本文（ログイン後の枠の main）とそろえている */}
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-4 px-4 py-3 text-sm">
+        <nav className="flex flex-wrap gap-4">
+          {TABS[me.role].map((tab) => (
+            <Link key={tab.href} href={tab.href} className="hover:underline">
+              {tab.label}
+            </Link>
+          ))}
+          {/* 通知は企業だけ。ベルの絵ではなく文字にしている（見た目は最小限）。
+              未読の件数は、通知の機能を作る Phase 6 までは null なので出ない */}
+          {me.role === "company" && (
+            <Link href="/company/notifications" className="hover:underline">
+              通知{me.unread_notifications_count ? `（${me.unread_notifications_count}）` : ""}
+            </Link>
+          )}
+        </nav>
 
-      <div className="ml-auto flex items-center gap-4">
-        {/* 企業なら会社名、学生なら氏名 */}
-        <span>{me.name}</span>
-        <button type="button" onClick={handleLogout} className="underline">
-          ログアウト
-        </button>
+        <div className="ml-auto flex items-center gap-4">
+          {/* 企業なら会社名、学生なら氏名 */}
+          <span>{me.name}</span>
+          <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>
+            ログアウト
+          </Button>
+        </div>
       </div>
     </header>
   );

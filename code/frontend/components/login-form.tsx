@@ -2,11 +2,15 @@
 
 // ログインのフォーム。企業用（C8）・学生用（S8）で共通（design/designs/ページ設計.md の 6-5・6-6）。
 // 認証の処理は企業・学生で共通。ログインした人の種別で行き先を決める（企業用の画面から学生がログインしたら、学生のホームへ）。
-// 見た目は最小限にしている。見た目の方針は Phase 6 の最初に決める
+// 見た目は、shadcn/ui の部品と標準の色で、最低限だけそろえている（細かい見た目は後回し）
 
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { PageTitle } from "@/components/page-title";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
 import { destinationAfterLogin, loginPathFor, type Me, type Role } from "@/lib/auth";
 
@@ -65,44 +69,38 @@ export function LoginForm({ role }: { role: Role }) {
 
   return (
     <main className="mx-auto mt-16 max-w-sm space-y-6 px-4">
-      <h1 className="text-xl font-bold">{texts.title}</h1>
+      <PageTitle>{texts.title}</PageTitle>
 
       {/* noValidate：ブラウザの入力チェックを止める。
           ログイン画面では、失敗したら「ログインができません」とだけ出すと決めているため（権限_バリデーション.md の 17-3-1） */}
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
-        <div className="space-y-1">
-          <label htmlFor="email" className="block text-sm">
-            メールアドレス
-          </label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="email">メールアドレス</Label>
+          <Input
             id="email"
             type="email"
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="w-full rounded border px-3 py-2"
           />
         </div>
 
-        <div className="space-y-1">
-          <label htmlFor="password" className="block text-sm">
-            パスワード
-          </label>
-          <input
+        <div className="space-y-2">
+          <Label htmlFor="password">パスワード</Label>
+          <Input
             id="password"
             type="password"
             autoComplete="current-password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="w-full rounded border px-3 py-2"
           />
         </div>
 
-        {errorMessage && <p className="text-sm text-red-600">{errorMessage}</p>}
+        {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
-        <button type="submit" className="w-full rounded bg-gray-900 px-4 py-2 text-white">
+        <Button type="submit" className="w-full">
           {submitting ? "ログイン中…" : "ログイン"}
-        </button>
+        </Button>
       </form>
 
       <div className="space-y-2 text-sm">

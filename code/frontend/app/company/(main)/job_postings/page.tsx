@@ -2,11 +2,17 @@
 // Phase 5 では、ログイン後の移動先として置いている仮の画面。中身は Phase 6 で作る
 
 import type { Metadata } from "next";
+import { PageTitle } from "@/components/page-title";
 
 export const metadata: Metadata = {
   title: "募集一覧",
 };
 
 export default function CompanyJobPostingsPage() {
-  return <p className="text-sm">募集一覧（企業のホーム）は Phase 6 で作ります。</p>;
+  return (
+    <div className="space-y-4">
+      <PageTitle>募集一覧</PageTitle>
+      <p className="text-sm text-muted-foreground">募集一覧（企業のホーム）は Phase 6 で作ります。</p>
+    </div>
+  );
 }

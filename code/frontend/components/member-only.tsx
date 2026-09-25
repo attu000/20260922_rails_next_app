@@ -65,12 +65,12 @@ export function MemberOnly({ role, children }: { role: Role; children: ReactNode
 
   if (failed) {
     // 16-1-10 の 500 の文言
-    return <p className="p-8 text-sm text-red-600">エラーが起きました</p>;
+    return <p className="p-8 text-sm text-destructive">エラーが起きました</p>;
   }
 
   if (!me) {
     // 最初の確認が終わるまで（API設計.md の 16-1-1 の割り切り）
-    return <p className="p-8 text-sm text-gray-500">読み込み中…</p>;
+    return <p className="p-8 text-sm text-muted-foreground">読み込み中…</p>;
   }
 
   return <MeContext value={me}>{children}</MeContext>;

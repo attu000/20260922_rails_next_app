@@ -35,7 +35,7 @@ export function GuestOnly({ children }: { children: ReactNode }) {
 
   if (checking) {
     // 画面を開いた直後に一瞬出る（API設計.md の 16-1-1 の割り切り）
-    return <p className="p-8 text-sm text-gray-500">読み込み中…</p>;
+    return <p className="p-8 text-sm text-muted-foreground">読み込み中…</p>;
   }
 
   return <>{children}</>;

@@ -27,5 +27,5 @@ export default function TopPage() {
     };
   }, [router]);
 
-  return <p className="p-8 text-sm text-gray-500">読み込み中…</p>;
+  return <p className="p-8 text-sm text-muted-foreground">読み込み中…</p>;
 }
