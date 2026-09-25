@@ -32,7 +32,7 @@ function readCsrfToken(): string | null {
 
 type ApiFetchOptions = {
   method?: "GET" | "POST" | "PATCH" | "DELETE";
-  // 送る中身。JSON に直して送る
+  // 送る中身。FormData（画像などのファイル）ならそのまま、それ以外は JSON に直して送る
   body?: unknown;
 };
 
@@ -49,8 +49,14 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const { method = "GET", body } = options;
 
   const headers: Record<string, string> = {};
-  if (body !== undefined) {
+  let requestBody: BodyInit | undefined;
+  if (body instanceof FormData) {
+    // 画像などのファイルは multipart/form-data で送る（16-1-8。アイコンの 16-3 ⑩・⑰）。
+    // Content-Type は付けない。ブラウザが「multipart/form-data; boundary=…」を自動で付けるため
+    requestBody = body;
+  } else if (body !== undefined) {
     headers["Content-Type"] = "application/json";
+    requestBody = JSON.stringify(body);
   }
   // GET 以外を送るときは、合言葉をヘッダーに入れる（16-1-7）
   if (method !== "GET") {
@@ -63,7 +69,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const response = await fetch(path, {
     method,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: requestBody,
     // 同じ住所（Next.js の rewrites を通した Rails）への通信に Cookie を付ける。
     // fetch の標準の値と同じだが、技術構成.md の 3-1 A-2 の注意点3 をはっきりさせるために書く
     credentials: "same-origin",

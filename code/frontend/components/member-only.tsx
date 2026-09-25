@@ -2,25 +2,62 @@
 
 // ログイン後の画面の枠の中身。
 // 開いたら /api/me を呼び、未ログインならログイン画面へ（開こうとしていたページを return_to に付ける）、
-// 種別が違えば相手の種別のホームへ移す。ログイン中の人は、中の画面から useMe() で取り出せる。
+// 種別が違えば相手の種別のホームへ移す。中の画面からは、次の3つを使える。
+// - useMe()：ログイン中の人  - useRefreshMe()：それを取り直す  - useRedirectIfUnauthorized()：API の 401 でログイン画面へ移す
 // これは見た目のための振り分けで、守りは Rails が行う（design/designs/API設計.md の 16-1-6）
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { fetchMe, homePathFor, loginUrlWithReturnTo, type Me, type Role } from "@/lib/auth";
 
 // ログイン中の人を、枠の中のどの画面・部品からでも取り出せるようにする入れ物
 // （Django で、ビューが request.user をテンプレートに渡しておくのと同じ役割）
-const MeContext = createContext<Me | null>(null);
+// 中身は「ログイン中の人」と「それを取り直す関数」
+type MemberContextValue = {
+  me: Me;
+  refreshMe: () => Promise<void>;
+};
+
+const MeContext = createContext<MemberContextValue | null>(null);
+
+function useMemberContext(): MemberContextValue {
+  const value = useContext(MeContext);
+  if (!value) {
+    throw new Error("useMe などは MemberOnly の中でだけ使えます");
+  }
+  return value;
+}
 
 // ログイン中の人を取り出す。MemberOnly の中の画面・部品からだけ使える
 export function useMe(): Me {
-  const me = useContext(MeContext);
-  if (!me) {
-    throw new Error("useMe は MemberOnly の中でだけ使えます");
-  }
-  return me;
+  return useMemberContext().me;
+}
+
+// ログイン中の人（ヘッダーの名前・アイコン）を取り直す関数を取り出す。
+// 企業プロフィールで会社名やアイコンを保存した後に呼ぶ。
+// Next.js では画面を移らない限り共通の枠が作り直されないので、保存した画面から取り直しを頼む
+export function useRefreshMe(): () => Promise<void> {
+  return useMemberContext().refreshMe;
+}
+
+// API から 401 が返ってきたら、ログイン画面へ移す関数を取り出す（16-1-6：ログイン後の画面では、どの API の 401 でも移す）。
+// 別のタブでログアウトした場合などに起きる。移したら true を返すので、呼んだ側はそれ以上何もしない
+export function useRedirectIfUnauthorized(): (error: unknown) => boolean {
+  const router = useRouter();
+  const { me } = useMemberContext();
+
+  return useCallback(
+    (error: unknown) => {
+      if (error instanceof ApiError && error.status === 401) {
+        // 今のページ（? の後ろも含む）を return_to に付ける
+        router.replace(loginUrlWithReturnTo(me.role, window.location.pathname + window.location.search));
+        return true;
+      }
+      return false;
+    },
+    [router, me.role],
+  );
 }
 
 export function MemberOnly({ role, children }: { role: Role; children: ReactNode }) {
@@ -63,15 +100,23 @@ export function MemberOnly({ role, children }: { role: Role; children: ReactNode
     };
   }, [pathname, role, router]);
 
+  // ログイン中の人を取り直す。失敗したとき（401 など）の扱いは、呼んだ側に任せる
+  const refreshMe = useCallback(async () => {
+    setMe(await fetchMe());
+  }, []);
+
+  // 中身が変わったときだけ作り直す（毎回作り直すと、中の画面がすべて描き直されるため）
+  const contextValue = useMemo(() => (me ? { me, refreshMe } : null), [me, refreshMe]);
+
   if (failed) {
     // 16-1-10 の 500 の文言
     return <p className="p-8 text-sm text-destructive">エラーが起きました</p>;
   }
 
-  if (!me) {
+  if (!contextValue) {
     // 最初の確認が終わるまで（API設計.md の 16-1-1 の割り切り）
     return <p className="p-8 text-sm text-muted-foreground">読み込み中…</p>;
   }
 
-  return <MeContext value={me}>{children}</MeContext>;
+  return <MeContext value={contextValue}>{children}</MeContext>;
 }

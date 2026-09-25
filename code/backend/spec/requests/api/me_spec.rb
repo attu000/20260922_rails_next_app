@@ -26,6 +26,18 @@ RSpec.describe "ログイン中の人（GET /api/me）", type: :request do
     )
   end
 
+  it "企業にアイコンがあれば、icon_url にその URL が入る" do
+    user = create(:company_user)
+    user.company_profile.icon.attach(
+      io: StringIO.new(UploadHelper::PNG_BYTES), filename: "icon.png", content_type: "image/png"
+    )
+    log_in_as(user)
+
+    get "/api/me"
+
+    expect(response.parsed_body["icon_url"]).to start_with("/rails/active_storage/")
+  end
+
   it "学生なら形A を返す" do
     user = create(:student_user)
     log_in_as(user)

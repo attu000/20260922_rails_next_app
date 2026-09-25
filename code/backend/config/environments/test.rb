@@ -32,6 +32,11 @@ Rails.application.configure do
   # Store uploaded files on the local file system in a temporary directory.
   config.active_storage.service = :test
 
+  # テストでは、裏側のジョブを実行せず「頼まれた」ことだけを記録する（Rails の標準は async で、別のスレッドですぐ動く）。
+  # アイコンの保存で Active Storage が頼むジョブ（画像の解析、差し替え前の画像の削除）に、テストの結果が左右されないようにするため。
+  # 推薦のジョブが頼まれたかを確かめるときにも使う（design/designs/技術構成.md の 3-3 D-1、処理設計_類似度.md の 7-5）
+  config.active_job.queue_adapter = :test
+
   # Tell Action Mailer not to deliver emails to the real world.
   # The :test delivery method accumulates sent emails in the
   # ActionMailer::Base.deliveries array.

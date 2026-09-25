@@ -9,8 +9,10 @@ import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api";
 import { loginPathFor, type Role } from "@/lib/auth";
 import { useMe } from "@/components/member-only";
+import { ProfileIcon } from "@/components/profile-icon";
 
-// タブ。募集管理（企業）・募集検索（学生）以外の行き先は Phase 6 で作る。それまでは押すと「見つかりません」になる
+// タブ。会社情報・募集管理（企業）と募集検索（学生）以外の行き先は、その画面を作る順で作る（未決内容.md の 11-2）。
+// それまでは押すと「見つかりません」になる
 const TABS: Record<Role, { label: string; href: string }[]> = {
   company: [
     { label: "会社情報", href: "/company/profile" },
@@ -59,8 +61,11 @@ export function AppHeader() {
         </nav>
 
         <div className="ml-auto flex items-center gap-4">
-          {/* 企業なら会社名、学生なら氏名 */}
-          <span>{me.name}</span>
+          {/* 企業なら会社名、学生なら氏名。アイコンがなければ頭文字（学生のアイコンは順3 で作るので、それまでは頭文字） */}
+          <div className="flex items-center gap-2">
+            <ProfileIcon src={me.icon_url} name={me.name} size="sm" />
+            <span>{me.name}</span>
+          </div>
           <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>
             ログアウト
           </Button>
