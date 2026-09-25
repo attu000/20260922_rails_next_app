@@ -15,6 +15,19 @@ Rails.application.routes.draw do
     resource :session, only: %i[create destroy]
     # ③ GET /api/me（ログイン中の人）
     get "me", to: "me#show"
+    # ⑦ GET /api/options（選択肢とマスタ）
+    get "options", to: "options#show"
+
+    # /api/company/…：企業の窓口（16-1-3）。コントローラーは app/controllers/api/company/ に置き、
+    # すべて Api::Company::BaseController を親にする（学生なら 403）
+    namespace :company do
+      # ⑧ GET /api/company/profile（自社のプロフィール）、⑨ PATCH /api/company/profile（保存）。
+      # 自社に1つしかないので、番号を付けない単数形にする（16-1-4）
+      resource :profile, only: %i[show update] do
+        # ⑩ POST /api/company/profile/icon（企業のアイコン）
+        resource :icon, only: :create, controller: "profile_icons"
+      end
+    end
   end
 
   # /api/ の下の、ここより上のどれにも当てはまらない URL は、404 の形で返す（API設計.md の 16-1-10）。

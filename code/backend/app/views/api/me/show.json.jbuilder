@@ -6,8 +6,8 @@ json.id @user.id
 json.role @user.role
 # 企業なら会社名、学生なら氏名
 json.name @profile&.name
-# アイコンの URL。アイコンの機能を作る Phase 6 で埋める（未決内容.md の 11-2）
-json.icon_url nil
+# アイコンの URL。なければ null。学生は、学生のアイコンを作る順3 までは null（未決内容.md の 11-2）
+json.partial! "api/shared/icon_url", record: @profile
 # 企業なら未読の通知の件数、学生なら null。通知の機能を作る Phase 6 で埋める（未決内容.md の 11-2）。
 # まだ数えられないので、0（未読が0件）ではなく null にしている
 json.unread_notifications_count nil
