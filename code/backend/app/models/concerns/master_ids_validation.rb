@@ -16,4 +16,11 @@ module MasterIdsValidation
     errors.add(attribute, :duplicated) if ids.uniq.size != ids.size
     errors.add(attribute, :not_selectable) if master.where(id: ids.uniq).count != ids.uniq.size
   end
+
+  # 番号1つがマスタにあるか（募集の勤務地、学生の大学・学部・学科・在住の都道府県、プログラミング歴の技術）。
+  # 空欄なら何もしない。ないまま保存すると、データベースの外部キーで弾かれてエラーの画面（500）になるため、手前で止める。
+  # 文言は「勤務地は一覧にありません」の形（rails-i18n の inclusion）
+  def validate_master_id(attribute, id, master)
+    errors.add(attribute, :inclusion) if id.present? && !master.exists?(id)
+  end
 end

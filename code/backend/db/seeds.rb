@@ -129,6 +129,51 @@ end
   Prefecture.find_or_initialize_by(id: id).update!(name: name)
 end
 
+# 大学。デモ用に代表的な20校を仮置きする（データベース.md の 8-5）。
+# 学校コードは文部科学省の学校コード一覧（令和8年5月1日時点）の値。学校コードをキーにして、あれば名前を更新、なければ作る。
+# 表示は学校コードの順（University.ordered）なので、ここの並びは表示順に関係しない
+[
+  %w[F101110100010 北海道大学],
+  %w[F104110100856 東北大学],
+  %w[F108110101423 筑波大学],
+  %w[F113110102700 東京大学],
+  %w[F113110112030 東京科学大学],
+  %w[F113110102791 一橋大学],
+  %w[F123110106429 名古屋大学],
+  %w[F126110107407 京都大学],
+  %w[F127110107852 大阪大学],
+  %w[F128110108654 神戸大学],
+  %w[F140110110592 九州大学],
+  %w[F113210102824 東京都立大学],
+  %w[F127210111989 大阪公立大学],
+  %w[F113310103581 早稲田大学],
+  %w[F113310102984 慶應義塾大学],
+  %w[F113310103064 上智大学],
+  %w[F113310103340 東京理科大学],
+  %w[F113310103536 明治大学],
+  %w[F126310107617 立命館大学],
+  %w[F126310107564 同志社大学]
+].each do |school_code, name|
+  University.find_or_initialize_by(school_code: school_code).update!(name: name)
+end
+
+# 学部と、その中の学科（仮データ。データベース.md の 8-5）。並びがそのまま表示順になる。
+# どの学部にも「その他」の学科を入れる（ページ設計.md の 6-6 S1）
+{
+  "工学部" => %w[情報工学科 機械工学科 電気電子工学科 建築学科 その他],
+  "理学部" => %w[数学科 物理学科 化学科 生物学科 その他],
+  "情報学部" => %w[情報科学科 情報システム学科 情報メディア学科 その他],
+  "文学部" => %w[日本文学科 英米文学科 史学科 心理学科 その他],
+  "経済学部" => %w[経済学科 経営学科 その他],
+  "その他" => %w[その他]
+}.each.with_index(1) do |(faculty_name, department_names), faculty_position|
+  faculty = Faculty.find_or_initialize_by(name: faculty_name)
+  faculty.update!(position: faculty_position)
+  department_names.each.with_index(1) do |department_name, department_position|
+    Department.find_or_initialize_by(faculty: faculty, name: department_name).update!(position: department_position)
+  end
+end
+
 # ── 試しのアカウント ──
 
 # 企業のアカウント
@@ -143,4 +188,7 @@ student_user = User.find_or_create_by!(email: "student@example.com") do |user|
   user.password = "password"
   user.role = :student
 end
-student_user.student_profile || student_user.create_student_profile!(name: "山田 花子")
+student_profile = student_user.student_profile ||
+                  student_user.create_student_profile!(name: "山田 花子", activity_status: :skill_up)
+# 活動状況は必須（その他決め事.md の 5-9）。順3 より前に作った試しの学生は空なので、空なら入れる
+student_profile.update!(activity_status: :skill_up) if student_profile.activity_status.nil?

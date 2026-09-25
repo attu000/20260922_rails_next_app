@@ -3,10 +3,8 @@
 class CompanyProfile < ApplicationRecord
   # 番号の一覧の確認（validate_master_ids）。募集・学生プロフィールと共通（concerns/master_ids_validation.rb）
   include MasterIdsValidation
-
-  # アイコンで受け付ける形式と大きさ（技術構成.md の 9-3、権限_バリデーション.md の 17-3-4）
-  ICON_CONTENT_TYPES = %w[image/png image/jpeg image/webp].freeze
-  ICON_MAX_BYTES = 2.megabytes
+  # アイコンの添付と検証（形式・2MB）。学生プロフィールと共通（concerns/icon_attachment.rb）
+  include IconAttachment
 
   belongs_to :user
 
@@ -19,9 +17,6 @@ class CompanyProfile < ApplicationRecord
   has_many :industries, through: :company_industries
   has_many :company_business_types
   has_many :business_types, through: :company_business_types
-
-  # アイコン。列は足さず、Active Storage のテーブルで持つ（Django の ImageField にあたる）
-  has_one_attached :icon
 
   # 人数。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。範囲外の値は検証エラーにする。任意なので空欄は許す
   enum :employee_size, {
@@ -36,7 +31,6 @@ class CompanyProfile < ApplicationRecord
   # 形式と長さの決まり（権限_バリデーション.md の 17-3-4）
   validates :name, presence: true, length: { maximum: 100 }
   validates :business_description, :about, length: { maximum: 2000 }
-  validate :icon_must_be_acceptable
 
   # 企業プロフィールの保存（⑨ PATCH /api/company/profile）。窓口はこれを呼ぶだけにする（技術構成.md の 9-2）。
   # 保存できたら true、入力に誤りがあれば false を返す（誤りは errors に入る）。
@@ -69,16 +63,5 @@ class CompanyProfile < ApplicationRecord
     end
     # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
-  end
-
-  private
-
-  # アイコンの形式と大きさ。Rails には添付ファイルの検証が標準で入っていないので、自分で書く（技術構成.md の 9-3）。
-  # 形式は、ファイル名の拡張子ではなく、Active Storage がファイルの中身から判定したものを使う
-  def icon_must_be_acceptable
-    return unless icon.attached?
-
-    errors.add(:icon, :invalid_content_type) unless icon.blob.content_type.in?(ICON_CONTENT_TYPES)
-    errors.add(:icon, :file_too_large) if icon.blob.byte_size > ICON_MAX_BYTES
   end
 end

@@ -1,7 +1,180 @@
-# 学生プロフィール。Phase 5 では氏名だけを持つ（design/designs/未決内容.md の 11-2）
+# 学生プロフィール（design/designs/データベース.md の 8-5）。
+# 必須は氏名と活動状況だけで、マイページでも新規登録でも同じ（その他決め事.md の 5-9）。
+# 順3 で作る項目（【コア】）だけを持つ。性格の5つは順9（【強み】）、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
 class StudentProfile < ApplicationRecord
-  belongs_to :user
+  # 稼働条件の選択肢と検証。募集と共通（concerns/work_conditions.rb）
+  include WorkConditions
+  # 番号の確認（validate_master_ids・validate_master_id）。企業プロフィール・募集と共通（concerns/master_ids_validation.rb）
+  include MasterIdsValidation
+  # アイコンの添付と検証（形式・2MB）。企業プロフィールと共通（concerns/icon_attachment.rb）
+  include IconAttachment
 
-  # 氏名は必須、100文字まで（権限_バリデーション.md の 17-3-4）
+  # プログラミング歴の件数の上限（権限_バリデーション.md の 17-3-4）
+  SKILLS_MAX = 50
+
+  belongs_to :user
+  # 大学・学部・学科・在住の都道府県（どれも任意）
+  belongs_to :university, optional: true
+  belongs_to :faculty, optional: true
+  belongs_to :department, optional: true
+  belongs_to :prefecture, optional: true
+
+  # プログラミング歴。送られた順のまま返すため、作った順（id の順）に並べる
+  has_many :student_skills, -> { order(:id) }
+  # 興味のある職種・出社できる都道府県。Django の ManyToManyField(through=...) にあたる。
+  # through を書くと、interested_job_middle_category_ids・commutable_prefecture_ids が自動でできる
+  has_many :student_interested_job_categories
+  has_many :interested_job_middle_categories, through: :student_interested_job_categories, source: :job_middle_category
+  has_many :student_commutable_prefectures
+  has_many :commutable_prefectures, through: :student_commutable_prefectures, source: :prefecture
+
+  # 学年と活動状況。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。範囲外の値は検証エラーにする
+  enum :grade, {
+    undergrad_1: 0,
+    undergrad_2: 1,
+    undergrad_3: 2,
+    undergrad_4: 3,
+    undergrad_5_plus: 4,
+    master_1: 5,
+    master_2: 6,
+    doctoral: 7,
+    kosen: 8,
+    other: 9
+  }, validate: { allow_nil: true }
+  enum :activity_status, {
+    not_looking: 0,
+    skill_up: 1,
+    job_hunting: 2
+  }, validate: { allow_nil: true }
+
+  # 任意の文章が空白だけで送られてきたら、空欄（null）にそろえて保存する。
+  # 大学名（その他）は、空白だけで一覧の大学との CHECK をすり抜けないようにするためでもある
+  normalizes :university_other_name, :self_pr_strength, :self_pr_weakness, :self_pr_future, :work_note,
+             with: ->(value) { value.presence }
+
+  # 形式と長さの決まり（権限_バリデーション.md の 17-3-4）
   validates :name, presence: true, length: { maximum: 100 }
+  validates :activity_status, presence: true
+  validates :university_other_name, length: { maximum: 100 }
+  validates :self_pr_strength, :self_pr_weakness, :self_pr_future, :work_note, length: { maximum: 2000 }
+  # 卒業年度は整数。範囲の制限はない（画面の選択肢は今年〜10年後）
+  validates :graduation_year, numericality: { only_integer: true }, allow_nil: true
+  # 稼働条件の3つの数値（選択肢は concerns/work_conditions.rb）
+  validates_work_conditions days: :work_days_per_week,
+                            hours: :work_hours_per_day,
+                            months: :duration_months
+  # 勤務形態の可否は true か false（データベースで空欄不可）
+  validates :can_full_remote, :can_partial_remote, :can_onsite, inclusion: { in: [ true, false ] }
+  validate :available_from_must_be_first_day
+  validate :university_and_other_name_not_both
+  validate :department_must_belong_to_selected_faculty
+  # 番号1つがマスタにあるか（concerns/master_ids_validation.rb）
+  validate do
+    validate_master_id(:university_id, university_id, University)
+    validate_master_id(:faculty_id, faculty_id, Faculty)
+    validate_master_id(:department_id, department_id, Department)
+    validate_master_id(:prefecture_id, prefecture_id, Prefecture)
+  end
+
+  # エラーの項目名を引くとき、プログラミング歴の行のエラー（skills[0].years など）は、
+  # 1行分のモデル（StudentSkill）の項目名を使う。これで「年数は50以下の値にしてください」のような文になる（API設計.md の 16-3 ⑯）。
+  # 何もしないと、Rails は skills[0].years という項目名を見つけられず「Skills[0] years は…」になる
+  def self.human_attribute_name(attribute, options = {})
+    skill_attribute = attribute.to_s[/\Askills(?:\[\d+\])?\.(.+)\z/, 1]
+    skill_attribute ? StudentSkill.human_attribute_name(skill_attribute, options) : super
+  end
+
+  # 学生プロフィールの保存（⑯ PATCH /api/student/profile）。窓口はこれを呼ぶだけにする（技術構成.md の 9-2）。
+  # 保存できたら true、入力に誤りがあれば false を返す（誤りは errors に入る）。
+  # 企業プロフィール・募集と同じく、「先に全部確かめてから、トランザクションの中で書き込む」順番にしている
+  def save_profile(attributes)
+    attributes = attributes.to_h.symbolize_keys
+    job_middle_category_ids = attributes.delete(:interested_job_middle_category_ids)
+    commutable_prefecture_ids = attributes.delete(:commutable_prefecture_ids)
+    skill_rows = attributes.delete(:skills)
+
+    # ① 本体の値を、保存せずにモデルに入れるだけ
+    assign_attributes(attributes)
+
+    # ② 検証する。③ 番号の一覧と、プログラミング歴の各行を確かめる
+    valid?
+    validate_master_ids(:interested_job_middle_category_ids, job_middle_category_ids, JobMiddleCategory)
+    validate_master_ids(:commutable_prefecture_ids, commutable_prefecture_ids, Prefecture)
+    new_skills = build_skills(skill_rows)
+
+    # ④ 誤りが1つでもあれば、何も書き込まずに終わる
+    return false if errors.any?
+
+    # ⑤ まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
+    transaction do
+      save!
+      # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑯）。送られなかった項目は変えない
+      self.interested_job_middle_category_ids = job_middle_category_ids unless job_middle_category_ids.nil?
+      self.commutable_prefecture_ids = commutable_prefecture_ids unless commutable_prefecture_ids.nil?
+      replace_skills(new_skills) unless new_skills.nil?
+    end
+    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
+    true
+  end
+
+  private
+
+  # 開始時期は月の1日の日付。範囲の制限はない（募集と同じ。その他決め事.md の 5-6）
+  def available_from_must_be_first_day
+    errors.add(:available_from, :invalid) if available_from.present? && available_from.day != 1
+  end
+
+  # 一覧の大学と「その他」の名前は、両方同時には入らない（データベースの CHECK でも守る）
+  def university_and_other_name_not_both
+    errors.add(:university_other_name, :present) if university_id.present? && university_other_name.present?
+  end
+
+  # 学科は、選んだ学部のもの。学部を選ばずに学科だけ選んだ場合も、これで止める
+  def department_must_belong_to_selected_faculty
+    return if department_id.blank?
+
+    department = Department.find_by(id: department_id)
+    # 学科そのものがないときは、validate_master_id が「学科は一覧にありません」を出す
+    return if department.nil?
+
+    errors.add(:department_id, :not_in_selected_faculty) if department.faculty_id != faculty_id
+  end
+
+  # プログラミング歴を、送られた行から作って確かめる（まだ保存しない）。送られなかったら nil を返す。
+  # 行ごとの誤りは skills[0].years のように行の番号を付けた名前で、欄全体の誤りは skills の名前で入れる（API設計.md の 16-3 ⑯）
+  def build_skills(rows)
+    return nil if rows.nil?
+
+    rows = Array(rows)
+    errors.add(:skills, :too_many, count: SKILLS_MAX) if rows.size > SKILLS_MAX
+
+    skills = rows.each_with_index.map do |row, index|
+      skill = StudentSkill.new(
+        student_profile: self,
+        technology_id: row[:technology_id],
+        other_name: row[:other_name],
+        years: row[:years],
+        level: row[:level]
+      )
+      skill.valid?
+      # 1行分の誤りを、行の番号を付けた名前で写す。文（「は50以下の値にしてください」）は1行分のモデルが作ったものを使う
+      skill.errors.each { |error| errors.import(error, attribute: "skills[#{index}].#{error.attribute}") }
+      skill
+    end
+
+    # 同じ技術は1行だけ（データベースの UNIQUE と同じ決まり）。「その他」の行は技術が空なので対象外
+    technology_ids = skills.map(&:technology_id).compact
+    errors.add(:skills, :duplicated) if technology_ids.uniq.size != technology_ids.size
+
+    skills
+  end
+
+  # プログラミング歴を、送られた内容で消して作り直す（16-3 ⑯）。
+  # 募集の職種と同じく、1行ずつ見比べるより、まとめて消して作り直す方が単純で間違えにくい。
+  # トランザクションの中で呼ぶので、途中で失敗しても元に戻る
+  def replace_skills(new_skills)
+    StudentSkill.where(student_profile_id: id).delete_all
+    student_skills.reset
+    new_skills.each(&:save!)
+  end
 end

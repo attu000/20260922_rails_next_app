@@ -18,7 +18,8 @@ FactoryBot.define do
     role { :student }
 
     after(:create) do |user|
-      user.create_student_profile!(name: "テスト 太郎")
+      # 活動状況は必須（その他決め事.md の 5-9）
+      user.create_student_profile!(name: "テスト 太郎", activity_status: :skill_up)
     end
   end
 end

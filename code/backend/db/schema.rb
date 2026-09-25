@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_25_140007) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -79,6 +79,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["user_id"], name: "index_company_profiles_on_user_id", unique: true
+  end
+
+  create_table "departments", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "faculty_id", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["faculty_id", "name"], name: "index_departments_on_faculty_id_and_name", unique: true
+    t.index ["faculty_id"], name: "index_departments_on_faculty_id"
+  end
+
+  create_table "faculties", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_faculties_on_name", unique: true
   end
 
   create_table "industries", force: :cascade do |t|
@@ -179,12 +197,70 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
-  create_table "student_profiles", force: :cascade do |t|
+  create_table "student_commutable_prefectures", force: :cascade do |t|
     t.datetime "created_at", null: false
+    t.bigint "prefecture_id", null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["prefecture_id"], name: "index_student_commutable_prefectures_on_prefecture_id"
+    t.index ["student_profile_id", "prefecture_id"], name: "idx_on_student_profile_id_prefecture_id_da0300621b", unique: true
+    t.index ["student_profile_id"], name: "index_student_commutable_prefectures_on_student_profile_id"
+  end
+
+  create_table "student_interested_job_categories", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_middle_category_id", null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_middle_category_id"], name: "idx_on_job_middle_category_id_62e136b596"
+    t.index ["student_profile_id", "job_middle_category_id"], name: "idx_on_student_profile_id_job_middle_category_id_2286816a98", unique: true
+    t.index ["student_profile_id"], name: "index_student_interested_job_categories_on_student_profile_id"
+  end
+
+  create_table "student_profiles", force: :cascade do |t|
+    t.integer "activity_status"
+    t.date "available_from"
+    t.boolean "can_full_remote", default: true, null: false
+    t.boolean "can_onsite", default: true, null: false
+    t.boolean "can_partial_remote", default: true, null: false
+    t.datetime "created_at", null: false
+    t.bigint "department_id"
+    t.integer "duration_months", limit: 2
+    t.bigint "faculty_id"
+    t.integer "grade"
+    t.integer "graduation_year"
     t.string "name", null: false
+    t.bigint "prefecture_id"
+    t.text "self_pr_future"
+    t.text "self_pr_strength"
+    t.text "self_pr_weakness"
+    t.bigint "university_id"
+    t.string "university_other_name"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.integer "work_days_per_week", limit: 2
+    t.integer "work_hours_per_day", limit: 2
+    t.text "work_note"
+    t.index ["department_id"], name: "index_student_profiles_on_department_id"
+    t.index ["faculty_id"], name: "index_student_profiles_on_faculty_id"
+    t.index ["prefecture_id"], name: "index_student_profiles_on_prefecture_id"
+    t.index ["university_id"], name: "index_student_profiles_on_university_id"
     t.index ["user_id"], name: "index_student_profiles_on_user_id", unique: true
+    t.check_constraint "university_id IS NULL OR university_other_name IS NULL", name: "student_profiles_university_or_other_name"
+  end
+
+  create_table "student_skills", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "level", null: false
+    t.string "other_name"
+    t.bigint "student_profile_id", null: false
+    t.bigint "technology_id"
+    t.datetime "updated_at", null: false
+    t.decimal "years", precision: 3, scale: 1
+    t.index ["student_profile_id", "technology_id"], name: "index_student_skills_on_student_profile_id_and_technology_id", unique: true
+    t.index ["student_profile_id"], name: "index_student_skills_on_student_profile_id"
+    t.index ["technology_id"], name: "index_student_skills_on_technology_id"
+    t.check_constraint "(technology_id IS NULL) <> (other_name IS NULL)", name: "student_skills_technology_or_other_name"
   end
 
   create_table "technologies", force: :cascade do |t|
@@ -194,6 +270,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
     t.integer "position", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_technologies_on_name", unique: true
+  end
+
+  create_table "universities", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.string "school_code", null: false
+    t.datetime "updated_at", null: false
+    t.index ["school_code"], name: "index_universities_on_school_code", unique: true
   end
 
   create_table "users", force: :cascade do |t|
@@ -213,6 +297,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
   add_foreign_key "company_industries", "company_profiles"
   add_foreign_key "company_industries", "industries"
   add_foreign_key "company_profiles", "users"
+  add_foreign_key "departments", "faculties"
   add_foreign_key "job_middle_categories", "job_major_categories"
   add_foreign_key "job_posting_job_categories", "job_middle_categories"
   add_foreign_key "job_posting_job_categories", "job_postings"
@@ -221,5 +306,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
   add_foreign_key "job_postings", "company_profiles"
   add_foreign_key "job_postings", "prefectures"
   add_foreign_key "sessions", "users"
+  add_foreign_key "student_commutable_prefectures", "prefectures"
+  add_foreign_key "student_commutable_prefectures", "student_profiles"
+  add_foreign_key "student_interested_job_categories", "job_middle_categories"
+  add_foreign_key "student_interested_job_categories", "student_profiles"
+  add_foreign_key "student_profiles", "departments"
+  add_foreign_key "student_profiles", "faculties"
+  add_foreign_key "student_profiles", "prefectures"
+  add_foreign_key "student_profiles", "universities"
   add_foreign_key "student_profiles", "users"
+  add_foreign_key "student_skills", "student_profiles"
+  add_foreign_key "student_skills", "technologies"
 end

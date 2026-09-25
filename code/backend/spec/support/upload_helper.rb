@@ -21,9 +21,9 @@ module UploadHelper
     upload_file(GIF_BYTES, filename: "icon.png", content_type: "image/png")
   end
 
-  # PNG の中身の後ろを 0 で埋めて、2MB＋1バイトにしたもの（上限は CompanyProfile::ICON_MAX_BYTES）
+  # PNG の中身の後ろを 0 で埋めて、2MB＋1バイトにしたもの（上限は IconAttachment::ICON_MAX_BYTES。企業・学生で共通）
   def too_large_png_upload
-    padding = "\0".b * (CompanyProfile::ICON_MAX_BYTES + 1 - PNG_BYTES.bytesize)
+    padding = "\0".b * (IconAttachment::ICON_MAX_BYTES + 1 - PNG_BYTES.bytesize)
     upload_file(PNG_BYTES + padding, filename: "big.png", content_type: "image/png")
   end
 end

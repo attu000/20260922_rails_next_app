@@ -61,7 +61,8 @@ class JobPosting < ApplicationRecord
                             hours: :min_work_hours_per_day,
                             months: :min_duration_months
   validate :start_month_must_be_first_day
-  validate :prefecture_must_exist
+  # 勤務地の番号が都道府県にあるか（concerns/master_ids_validation.rb）
+  validate { validate_master_id(:prefecture_id, prefecture_id, Prefecture) }
   validate :cannot_create_as_closed, on: :create
 
   # 初めて掲載中にしたときだけ、最初に掲載した日時を記録する。再掲載しても変えない（権限_バリデーション.md の 17-2-2）。
@@ -131,11 +132,6 @@ class JobPosting < ApplicationRecord
   # 開始時期は月の1日の日付。範囲の制限はない（過去の月も選べる。その他決め事.md の 5-6）
   def start_month_must_be_first_day
     errors.add(:start_month, :invalid) if start_month.present? && start_month.day != 1
-  end
-
-  # 勤務地の番号が都道府県にあるか。ないまま保存すると、データベースの外部キーで弾かれてエラーの画面（500）になるため、手前で止める
-  def prefecture_must_exist
-    errors.add(:prefecture_id, :inclusion) if prefecture_id.present? && !Prefecture.exists?(prefecture_id)
   end
 
   # 新規作成のときは、非公開か掲載中だけを選べる（権限_バリデーション.md の 17-2-2）

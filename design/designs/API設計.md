@@ -261,7 +261,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 - アプリは日本時間（Asia/Tokyo）で動かす
   - データベースには、Rails の標準どおり世界標準時（UTC（ユーティーシー））で保存し、読み書きのときに Rails が日本時間に直す
-  - 最終活動日の「その日」、「30日以上」、開始時期の「今月から12ヶ月先まで」は、すべて日本時間で数える
+  - 最終活動日の「その日」、「30日以上」、募集の開始月が「今月より前」か（本書5-6）は、すべて日本時間で数える
   - Django の `TIME_ZONE = 'Asia/Tokyo'`、`USE_TZ = True` と同じ考え方
 - 「ログイン中の操作」（本書5-4 の最終活動日）は、ログインした状態での API の呼び出しすべてとする。画面を開いたときの /api/me も含む
   - 記録する場所が Rails の共通部分1か所で済み、画面を開いただけでも「使っている」と言えるため
@@ -716,7 +716,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | --- | --- | --- |
 | 1 | email、password、password_confirmation、terms_agreed（ここまで⑤と同じ）、name（氏名） | ○（すべて） |
 | 2 | **activity_status（活動状況）** | **○** |
-| 2 | university_id、faculty_id、department_id、grade、graduation_year、prefecture_id | |
+| 2 | university_id、university_other_name（一覧にない大学の名前）、faculty_id、department_id、grade、graduation_year、prefecture_id | |
 | 3 | interested_job_middle_category_ids（興味のある職種）、interested_industry_ids（興味のある業界）、job_hunting_prefecture_ids（就活希望エリア） | |
 | 4 | skills（プログラミング歴）、links（外部リンク）、certifications（資格） | |
 | 5 | work_days_per_week、work_hours_per_day、duration_months、available_from、can_full_remote、can_partial_remote、can_onsite、commutable_prefecture_ids（出社できる都道府県）、work_note | |
@@ -750,6 +750,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - **必須はステップ1のすべてと、ステップ2の activity_status（活動状況）だけ**（本書17-3-5）。これ以外は省いてよい
   - 省いた項目は空欄か既定値（勤務形態の3つは true、性格は 0）になる
   - skills の各要素は、technology_id か other_name のどちらか一方だけ（本書8-5 の CHECK と同じ）。level は必須
+  - university_id と university_other_name は、両方同時には送れない（どちらか一方か、どちらも空。本書8-5 の CHECK と同じ）
   - available_from は、月の1日の日付で送る
   - 数値や選択肢の範囲は、テーブル定義（本書8-5）と⑦に従う
 - 返すもの・主なエラー：⑤と同じ
@@ -984,7 +985,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 必須：name、activity_status（本書5-9）
 - 返すもの：200、⑮と同じ形
 - 主なエラー：422
-- 処理：student_profiles と付属テーブル7つを、1つのトランザクションで保存する
+  - skills の行ごとの誤りは、行の番号（0から数える）を付けた名前で返す。例：`"skills[0].years": ["年数は50以下の値にしてください"]`。画面はその行の下に出す
+  - 行の数の上限や、同じ技術が2行あるなど、欄全体の誤りは `skills` の名前で返す
+- 処理：student_profiles と付属テーブル7つを、1つのトランザクションで保存する（【コア】の順3 で作る付属テーブルは、プログラミング歴・興味のある職種・出社できる都道府県の3つ。残りは【仕上げ】で足す）
 - 裏側のジョブ：その学生の似た学生リストを作り直す（本書7-5）【強み】
 - 段階タグ：【コア】（性格5軸は【強み】、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】。本書6-6 S1）
 
