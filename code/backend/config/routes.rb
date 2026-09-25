@@ -33,6 +33,17 @@ Rails.application.routes.draw do
       # 募集は消さず、状態で管理するので、消す窓口（destroy）は作らない（16-3 ⑭）
       resources :job_postings, only: %i[index show create update]
     end
+
+    # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、
+    # すべて Api::Student::BaseController を親にする（企業なら 403）
+    namespace :student do
+      # ⑮ GET /api/student/profile（自分のプロフィール）、⑯ PATCH /api/student/profile（保存）。
+      # 自分に1つしかないので、番号を付けない単数形にする（16-1-4）
+      resource :profile, only: %i[show update] do
+        # ⑰ POST /api/student/profile/icon（学生のアイコン）
+        resource :icon, only: :create, controller: "profile_icons"
+      end
+    end
   end
 
   # /api/ の下の、ここより上のどれにも当てはまらない URL は、404 の形で返す（API設計.md の 16-1-10）。

@@ -1,5 +1,5 @@
 # ⑦ GET /api/options の形（design/designs/API設計.md の 16-3 ⑦）。
-# 順1・順2 で使う選択肢とマスタだけを返す。ほかの項目（大学、工程、性格・カルチャーの5軸など）は、使う順で足す（未決内容.md の 11-2）。
+# 順1〜順3 で使う選択肢とマスタだけを返す。ほかの項目（工程、性格・カルチャーの5軸など）は、使う順で足す（未決内容.md の 11-2）。
 # 選択肢の値はモデルの enum の名前、表示名は config/locales/ja.yml から取る
 
 json.enums do
@@ -23,6 +23,21 @@ json.enums do
     json.value value
     json.label t("enums.technology.category.#{value}")
   end
+  # 学年
+  json.grade StudentProfile.grades.keys do |value|
+    json.value value
+    json.label t("enums.student_profile.grade.#{value}")
+  end
+  # 活動状況
+  json.activity_status StudentProfile.activity_statuses.keys do |value|
+    json.value value
+    json.label t("enums.student_profile.activity_status.#{value}")
+  end
+  # プログラミング歴のレベル
+  json.skill_level StudentSkill.levels.keys do |value|
+    json.value value
+    json.label t("enums.student_skill.level.#{value}")
+  end
 end
 
 # 稼働条件の数値の選択肢。Rails の検証と同じ定数から作る（app/models/concerns/work_conditions.rb）
@@ -42,4 +57,11 @@ json.masters do
   json.industries @industries, :id, :name
   json.business_types @business_types, :id, :name
   json.prefectures @prefectures, :id, :name
+  # 大学（学校コードの順。app/models/university.rb）
+  json.universities @universities, :id, :name
+  # 学部。中に学科を入れる（学科は学部の中での表示順。app/models/faculty.rb）
+  json.faculties @faculties do |faculty|
+    json.extract! faculty, :id, :name
+    json.departments faculty.departments, :id, :name
+  end
 end
