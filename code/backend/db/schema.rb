@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_25_120006) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_25_130007) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -89,6 +89,87 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_120006) do
     t.index ["name"], name: "index_industries_on_name", unique: true
   end
 
+  create_table "job_major_categories", force: :cascade do |t|
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_job_major_categories_on_code", unique: true
+  end
+
+  create_table "job_middle_categories", force: :cascade do |t|
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.text "description", null: false
+    t.bigint "job_major_category_id", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_job_middle_categories_on_code", unique: true
+    t.index ["job_major_category_id"], name: "index_job_middle_categories_on_job_major_category_id"
+  end
+
+  create_table "job_posting_job_categories", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_middle_category_id", null: false
+    t.bigint "job_posting_id", null: false
+    t.integer "role", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_middle_category_id"], name: "index_job_posting_job_categories_on_job_middle_category_id"
+    t.index ["job_posting_id", "job_middle_category_id"], name: "idx_on_job_posting_id_job_middle_category_id_ff30f932c4", unique: true
+    t.index ["job_posting_id"], name: "index_job_posting_job_categories_on_job_posting_id"
+  end
+
+  create_table "job_posting_technologies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_posting_id", null: false
+    t.bigint "technology_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_posting_id", "technology_id"], name: "idx_on_job_posting_id_technology_id_5944876302", unique: true
+    t.index ["job_posting_id"], name: "index_job_posting_technologies_on_job_posting_id"
+    t.index ["technology_id"], name: "index_job_posting_technologies_on_technology_id"
+  end
+
+  create_table "job_postings", force: :cascade do |t|
+    t.text "about"
+    t.text "business_description"
+    t.bigint "company_profile_id", null: false
+    t.datetime "created_at", null: false
+    t.text "growth"
+    t.integer "hourly_wage"
+    t.text "internship_details"
+    t.integer "min_duration_months", limit: 2
+    t.integer "min_work_days_per_week", limit: 2
+    t.integer "min_work_hours_per_day", limit: 2
+    t.bigint "prefecture_id"
+    t.text "preferred_requirements"
+    t.datetime "published_at"
+    t.text "requirements"
+    t.date "start_month"
+    t.integer "status", default: 0, null: false
+    t.text "technology_note"
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.boolean "weekend_ok", default: false, null: false
+    t.string "work_location_note"
+    t.text "work_note"
+    t.integer "work_style"
+    t.string "work_style_note"
+    t.index ["company_profile_id"], name: "index_job_postings_on_company_profile_id"
+    t.index ["prefecture_id"], name: "index_job_postings_on_prefecture_id"
+    t.index ["status", "published_at"], name: "index_job_postings_on_status_and_published_at"
+    t.check_constraint "hourly_wage > 0", name: "job_postings_hourly_wage_positive"
+    t.check_constraint "status <> 1 OR internship_details IS NOT NULL AND hourly_wage IS NOT NULL", name: "job_postings_published_requires_details"
+  end
+
+  create_table "prefectures", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "sessions", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "ip_address"
@@ -104,6 +185,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_120006) do
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
     t.index ["user_id"], name: "index_student_profiles_on_user_id", unique: true
+  end
+
+  create_table "technologies", force: :cascade do |t|
+    t.integer "category", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_technologies_on_name", unique: true
   end
 
   create_table "users", force: :cascade do |t|
@@ -123,6 +213,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_120006) do
   add_foreign_key "company_industries", "company_profiles"
   add_foreign_key "company_industries", "industries"
   add_foreign_key "company_profiles", "users"
+  add_foreign_key "job_middle_categories", "job_major_categories"
+  add_foreign_key "job_posting_job_categories", "job_middle_categories"
+  add_foreign_key "job_posting_job_categories", "job_postings"
+  add_foreign_key "job_posting_technologies", "job_postings"
+  add_foreign_key "job_posting_technologies", "technologies"
+  add_foreign_key "job_postings", "company_profiles"
+  add_foreign_key "job_postings", "prefectures"
   add_foreign_key "sessions", "users"
   add_foreign_key "student_profiles", "users"
 end

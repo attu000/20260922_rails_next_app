@@ -32,6 +32,30 @@ ja:
         icon: アイコン
       student_profile:
         name: 氏名
+      job_posting:
+        status: 募集状態
+        title: 募集タイトル
+        about: どんな会社か
+        business_description: 事業内容
+        internship_details: インターンですること
+        growth: 成長イメージ
+        min_work_days_per_week: 週の稼働日数
+        min_work_hours_per_day: 1日の稼働時間
+        min_duration_months: 継続期間
+        start_month: 開始時期
+        work_style: 勤務形態
+        work_style_note: 勤務形態の補足
+        prefecture_id: 勤務地
+        work_location_note: 最寄り駅など
+        weekend_ok: 土日OK
+        work_note: 稼働条件の備考
+        hourly_wage: 時給
+        requirements: 必須要件
+        preferred_requirements: 歓迎要件
+        technology_note: 使用技術の補足
+        main_job_middle_category_ids: 主な職種
+        related_job_middle_category_ids: 関連する職種
+        technology_ids: 使用技術
 
   # 選択肢（enum）の日本語の表示名。⑦ GET /api/options がここを読んで返す（API設計.md の 16-1-9）。
   # 画面側には選択肢の表を書かない
@@ -45,6 +69,21 @@ ja:
         size_100_299: 100〜299人
         size_300_999: 300〜999人
         size_1000_plus: 1000人以上
+    job_posting:
+      status:
+        unpublished: 非公開
+        published: 掲載中
+        closed: 終了
+      work_style:
+        full_remote: フルリモート
+        partial_remote: 一部リモート
+        onsite: 出社
+    technology:
+      category:
+        language: 言語
+        framework: フレームワーク
+        cloud: クラウド
+        other: その他
 
   # rails-i18n の標準の文言を、設計書の文言に合わせる（17-3-6）
   errors:
@@ -55,6 +94,9 @@ ja:
       # 番号の一覧に、マスタにない番号がある／同じ番号が重複している（権限_バリデーション.md の 17-3-4）
       not_selectable: に選べない値が含まれています
       duplicated: に同じ値が重複しています
+      # 募集の関連する職種に、主な職種と同じ中分類がある（その他決め事.md の 5-7）。
+      # 「関連する職種に、主な職種と同じものが含まれています」になる
+      overlaps_main_job_categories: に、主な職種と同じものが含まれています
       # アイコンの形式と大きさ（技術構成.md の 9-3）
       invalid_content_type: はPNG・JPEG・WebPのいずれかにしてください
       file_too_large: は2MB以下にしてください

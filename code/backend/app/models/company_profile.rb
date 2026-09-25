@@ -1,11 +1,17 @@
 # 企業プロフィール（design/designs/データベース.md の 8-5）。
 # 必須は会社名だけで、新規登録でも企業プロフィール編集でも同じ（その他決め事.md の 5-9）
 class CompanyProfile < ApplicationRecord
+  # 番号の一覧の確認（validate_master_ids）。募集・学生プロフィールと共通（concerns/master_ids_validation.rb）
+  include MasterIdsValidation
+
   # アイコンで受け付ける形式と大きさ（技術構成.md の 9-3、権限_バリデーション.md の 17-3-4）
   ICON_CONTENT_TYPES = %w[image/png image/jpeg image/webp].freeze
   ICON_MAX_BYTES = 2.megabytes
 
   belongs_to :user
+
+  # 自社の募集。窓口では、自社の募集の中からだけ番号で探す（見てよい範囲の外は 404。API設計.md の 16-1-10）
+  has_many :job_postings
 
   # 業界・事業形態（どちらも任意、複数）。Django の ManyToManyField(through=...) にあたる。
   # 会社の紹介として表示するだけで、検索・おすすめには使わない（使うのは募集の値。その他決め事.md の 5-8）
@@ -66,15 +72,6 @@ class CompanyProfile < ApplicationRecord
   end
 
   private
-
-  # 番号の一覧が、重複なく、すべてマスタにあるかを確かめる（権限_バリデーション.md の 17-3-4）
-  def validate_master_ids(attribute, ids, master)
-    return if ids.nil?
-
-    ids = Array(ids).map(&:to_s)
-    errors.add(attribute, :duplicated) if ids.uniq.size != ids.size
-    errors.add(attribute, :not_selectable) if master.where(id: ids.uniq).count != ids.uniq.size
-  end
 
   # アイコンの形式と大きさ。Rails には添付ファイルの検証が標準で入っていないので、自分で書く（技術構成.md の 9-3）。
   # 形式は、ファイル名の拡張子ではなく、Active Storage がファイルの中身から判定したものを使う
