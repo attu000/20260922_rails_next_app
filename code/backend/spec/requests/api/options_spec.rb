@@ -95,4 +95,42 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
       ])
     end
   end
+
+  # 順3（学生プロフィール）で足した選択肢とマスタ
+  describe "学生プロフィールで使う選択肢とマスタ" do
+    before do
+      # 並び順どおりに並ぶかを見るため、後に並ぶほうを先に作る
+      create(:university, school_code: "F113310103581", name: "早稲田大学")
+      create(:university, school_code: "F101110100010", name: "北海道大学")
+      faculty_b = create(:faculty, name: "学部B", position: 2)
+      faculty_a = create(:faculty, name: "学部A", position: 1)
+      create(:department, faculty: faculty_a, name: "学科A2", position: 2)
+      create(:department, faculty: faculty_a, name: "学科A1", position: 1)
+      create(:department, faculty: faculty_b, name: "学科B1", position: 1)
+    end
+
+    it "学年・活動状況・プログラミング歴のレベルの選択肢を、名前と日本語の表示名で返す" do
+      get "/api/options"
+
+      enums = response.parsed_body["enums"]
+      expect(enums["grade"].size).to eq(10)
+      expect(enums["grade"].first).to eq("value" => "undergrad_1", "label" => "学部1年")
+      expect(enums["activity_status"].map { |option| option["label"] }).to eq(%w[今は探していない スキルアップ目的 就活目的])
+      expect(enums["skill_level"].first).to eq("value" => "v1", "label" => "v1 学習中")
+      expect(enums["skill_level"].size).to eq(4)
+    end
+
+    it "大学を学校コードの順で、学部を表示順で返す。学部の中の学科も表示順" do
+      get "/api/options"
+
+      masters = response.parsed_body["masters"]
+      expect(masters["universities"].map { |university| university["name"] }).to eq(%w[北海道大学 早稲田大学])
+      expect(masters["universities"].first.keys).to contain_exactly("id", "name")
+      faculties = masters["faculties"]
+      expect(faculties.map { |faculty| faculty["name"] }).to eq(%w[学部A 学部B])
+      expect(faculties.first.keys).to contain_exactly("id", "name", "departments")
+      expect(faculties.first["departments"].map { |department| department["name"] }).to eq(%w[学科A1 学科A2])
+      expect(faculties.second["departments"].map { |department| department["name"] }).to eq(%w[学科B1])
+    end
+  end
 end

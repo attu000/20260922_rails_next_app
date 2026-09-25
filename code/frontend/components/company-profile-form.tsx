@@ -4,11 +4,12 @@
 // 開いたら ⑦ 選択肢と ⑧ 自社のプロフィールを SWR で取り、保存で ⑨ を送る。アイコンを選んでいたら、⑨ の成功後に ⑩ を続けて送る。
 // 必須は会社名だけ（その他決め事.md の 5-9）。見た目は shadcn/ui の部品で、最低限だけそろえている
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { LONG_TEXT_MAX_LENGTH, toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
+import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
 import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { useRedirectIfUnauthorized, useRefreshMe } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
-import { ProfileIcon } from "@/components/profile-icon";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -38,14 +39,9 @@ type FormValues = {
   about: string;
 };
 
-// 項目ごとのエラー。Rails の 422 の errors と同じ形（例：{ name: ["会社名を入力してください"] }）
-type FieldErrors = Record<string, string[]>;
-
-// 形式と長さの決まり。Rails と同じ値を使う（権限_バリデーション.md の 17-3-4、技術構成.md の 9-3）
+// 会社名の長さの決まり。Rails と同じ値を使う（権限_バリデーション.md の 17-3-4）。
+// 文章の上限（2,000文字）は components/form-fields.tsx の LONG_TEXT_MAX_LENGTH
 const NAME_MAX_LENGTH = 100;
-const TEXT_MAX_LENGTH = 2000;
-const ICON_CONTENT_TYPES = ["image/png", "image/jpeg", "image/webp"];
-const ICON_MAX_BYTES = 2 * 1024 * 1024;
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
@@ -70,30 +66,17 @@ function validateOnScreen(values: FormValues, iconFile: File | null): FieldError
   } else if (values.name.length > NAME_MAX_LENGTH) {
     errors.name = [`会社名は${NAME_MAX_LENGTH}文字以内で入力してください`];
   }
-  if (values.business_description.length > TEXT_MAX_LENGTH) {
-    errors.business_description = [`事業内容は${TEXT_MAX_LENGTH}文字以内で入力してください`];
+  if (values.business_description.length > LONG_TEXT_MAX_LENGTH) {
+    errors.business_description = [`事業内容は${LONG_TEXT_MAX_LENGTH}文字以内で入力してください`];
   }
-  if (values.about.length > TEXT_MAX_LENGTH) {
-    errors.about = [`どんな会社かは${TEXT_MAX_LENGTH}文字以内で入力してください`];
+  if (values.about.length > LONG_TEXT_MAX_LENGTH) {
+    errors.about = [`どんな会社かは${LONG_TEXT_MAX_LENGTH}文字以内で入力してください`];
   }
-  if (iconFile) {
-    const iconErrors: string[] = [];
-    if (!ICON_CONTENT_TYPES.includes(iconFile.type)) {
-      iconErrors.push("アイコンはPNG・JPEG・WebPのいずれかにしてください");
-    }
-    if (iconFile.size > ICON_MAX_BYTES) {
-      iconErrors.push("アイコンは2MB以下にしてください");
-    }
-    if (iconErrors.length > 0) {
-      errors.icon = iconErrors;
-    }
+  const iconErrors = validateIconFile(iconFile);
+  if (iconErrors) {
+    errors.icon = iconErrors;
   }
   return errors;
-}
-
-// FieldError に渡す形に直す
-function toFieldErrorItems(messages: string[] | undefined) {
-  return messages?.map((message) => ({ message }));
 }
 
 export function CompanyProfileForm() {
@@ -102,10 +85,9 @@ export function CompanyProfileForm() {
   const redirectIfUnauthorized = useRedirectIfUnauthorized();
 
   const [values, setValues] = useState<FormValues | null>(null);
-  // 保存済みのアイコンの URL と、選んだ（まだ送っていない）ファイル、そのプレビュー
+  // 保存済みのアイコンの URL と、選んだ（まだ送っていない）ファイル・プレビュー（components/icon-field.tsx）
   const [currentIconUrl, setCurrentIconUrl] = useState<string | null>(null);
-  const [iconFile, setIconFile] = useState<File | null>(null);
-  const [iconPreviewUrl, setIconPreviewUrl] = useState<string | null>(null);
+  const iconPicker = useIconPicker();
 
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   // 画面の上に出す一言
@@ -116,7 +98,6 @@ export function CompanyProfileForm() {
   const [scrollToErrorRequest, setScrollToErrorRequest] = useState(0);
 
   const formRef = useRef<HTMLFormElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 開いたら ⑧ 自社のプロフィールを取る。401 は共通の枠がログイン画面へ移す
   const {
@@ -143,23 +124,8 @@ export function CompanyProfileForm() {
       ?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [scrollToErrorRequest]);
 
-  // プレビューの URL は、使い終わったら（別のファイルを選んだ、画面を離れた）ブラウザに返す
-  useEffect(() => {
-    return () => {
-      if (iconPreviewUrl) URL.revokeObjectURL(iconPreviewUrl);
-    };
-  }, [iconPreviewUrl]);
-
   function updateValue<K extends keyof FormValues>(key: K, value: FormValues[K]) {
     setValues((current) => (current ? { ...current, [key]: value } : current));
-    setSaved(false);
-  }
-
-  function handleIconChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0] ?? null;
-    setIconFile(file);
-    // 保存を押すまで Rails には送らない。ブラウザの中だけでプレビューを出す
-    setIconPreviewUrl(file ? URL.createObjectURL(file) : null);
     setSaved(false);
   }
 
@@ -176,7 +142,7 @@ export function CompanyProfileForm() {
 
     setMessage(null);
     setSaved(false);
-    const screenErrors = validateOnScreen(values, iconFile);
+    const screenErrors = validateOnScreen(values, iconPicker.file);
     if (Object.keys(screenErrors).length > 0) {
       setMessage("入力内容を確認してください");
       showErrors(screenErrors);
@@ -197,19 +163,12 @@ export function CompanyProfileForm() {
 
       // ② アイコンを選んでいたら、続けて送る（⑩。⑨ の成功後に送る決まり）
       let iconFailed = false;
-      if (iconFile) {
-        const formData = new FormData();
-        formData.append("icon", iconFile);
+      if (iconPicker.file) {
         try {
-          const result = await apiFetch<{ icon_url: string | null }>("/api/company/profile/icon", {
-            method: "POST",
-            body: formData,
-          });
-          setCurrentIconUrl(result.icon_url);
-          await mutateProfile({ ...savedProfile, icon_url: result.icon_url }, { revalidate: false });
-          setIconFile(null);
-          setIconPreviewUrl(null);
-          if (fileInputRef.current) fileInputRef.current.value = "";
+          const iconUrl = await uploadIcon("/api/company/profile/icon", iconPicker.file);
+          setCurrentIconUrl(iconUrl);
+          await mutateProfile({ ...savedProfile, icon_url: iconUrl }, { revalidate: false });
+          iconPicker.clear();
         } catch (error) {
           if (redirectIfUnauthorized(error)) return;
           // 本体の保存は取り消さない
@@ -294,7 +253,7 @@ export function CompanyProfileForm() {
               aria-invalid={fieldErrors.business_description ? true : undefined}
             />
             <FieldDescription>
-              {values.business_description.length}／{TEXT_MAX_LENGTH}文字
+              {values.business_description.length}／{LONG_TEXT_MAX_LENGTH}文字
             </FieldDescription>
             <FieldError errors={toFieldErrorItems(fieldErrors.business_description)} />
           </Field>
@@ -328,28 +287,18 @@ export function CompanyProfileForm() {
               aria-invalid={fieldErrors.about ? true : undefined}
             />
             <FieldDescription>
-              {values.about.length}／{TEXT_MAX_LENGTH}文字
+              {values.about.length}／{LONG_TEXT_MAX_LENGTH}文字
             </FieldDescription>
             <FieldError errors={toFieldErrorItems(fieldErrors.about)} />
           </Field>
 
-          <Field data-invalid={fieldErrors.icon ? true : undefined}>
-            <FieldLabel htmlFor="icon">アイコン</FieldLabel>
-            <div className="flex items-center gap-4">
-              <ProfileIcon src={iconPreviewUrl ?? currentIconUrl} name={values.name} size="lg" />
-              <input
-                ref={fileInputRef}
-                id="icon"
-                type="file"
-                accept={ICON_CONTENT_TYPES.join(",")}
-                onChange={handleIconChange}
-                aria-invalid={fieldErrors.icon ? true : undefined}
-                className="text-sm"
-              />
-            </div>
-            <FieldDescription>PNG・JPEG・WebP、2MBまで。保存を押すと登録されます</FieldDescription>
-            <FieldError errors={toFieldErrorItems(fieldErrors.icon)} />
-          </Field>
+          <IconField
+            picker={iconPicker}
+            currentUrl={currentIconUrl}
+            name={values.name}
+            errors={fieldErrors.icon}
+            onFileChange={() => setSaved(false)}
+          />
 
           <div className="flex items-center gap-4">
             <Button type="submit">{saving ? "保存中…" : "保存"}</Button>

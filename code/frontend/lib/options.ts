@@ -25,12 +25,19 @@ export type JobMajorCategory = {
 // 技術。category は区分の名前（"language" など。表示名は enums.technology_category）
 export type TechnologyRow = { id: number; name: string; category: string };
 
+// 学部。中に学科を持つ（学科は学部の中での表示順）
+export type Faculty = { id: number; name: string; departments: MasterRow[] };
+
 export type Options = {
   enums: {
     employee_size: EnumOption[];
     job_posting_status: EnumOption[];
     work_style: EnumOption[];
     technology_category: EnumOption[];
+    // 学年・活動状況・プログラミング歴のレベル（順3）
+    grade: EnumOption[];
+    activity_status: EnumOption[];
+    skill_level: EnumOption[];
   };
   // 稼働条件の数値の選択肢（その他決め事.md の 5-6）
   work_conditions: {
@@ -44,6 +51,9 @@ export type Options = {
     industries: MasterRow[];
     business_types: MasterRow[];
     prefectures: MasterRow[];
+    // 大学（学校コードの順）と学部（順3）
+    universities: MasterRow[];
+    faculties: Faculty[];
   };
 };
 

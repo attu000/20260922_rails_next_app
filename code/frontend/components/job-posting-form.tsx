@@ -10,7 +10,19 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import {
+  FormSection,
+  LONG_TEXT_MAX_LENGTH,
+  LongTextField,
+  MonthField,
+  SHORT_TEXT_MAX_LENGTH,
+  SelectField,
+  TextField,
+  toFieldErrorItems,
+  type FieldErrors,
+  type InputProps,
+} from "@/components/form-fields";
 import { JobCategoryPicker } from "@/components/job-category-picker";
 import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
@@ -18,11 +30,18 @@ import { PageTitle } from "@/components/page-title";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch, useApi } from "@/lib/api";
+import {
+  currentYearInTokyo,
+  isHalfSelectedMonth,
+  joinMonthDate,
+  splitMonthDate,
+  toNumberOrNull,
+  toText,
+  yearChoices,
+} from "@/lib/form-values";
 import type { JobPosting } from "@/lib/job-postings";
 import { useOptions } from "@/lib/options";
 
@@ -67,12 +86,8 @@ type TextKey = {
   [K in keyof FormValues]: FormValues[K] extends string ? K : never;
 }[keyof FormValues];
 
-// 項目ごとのエラー。Rails の 422 の errors と同じ形（例：{ title: ["募集タイトルを入力してください"] }）
-type FieldErrors = Record<string, string[]>;
-
-// 形式と長さの決まり。Rails と同じ値を使う（権限_バリデーション.md の 17-3-4）
-const SHORT_TEXT_MAX_LENGTH = 100;
-const LONG_TEXT_MAX_LENGTH = 2000;
+// 時給の上限。Rails と同じ値を使う（権限_バリデーション.md の 17-3-4）。
+// 文字数の上限は components/form-fields.tsx の SHORT_TEXT_MAX_LENGTH・LONG_TEXT_MAX_LENGTH
 const HOURLY_WAGE_MAX = 100000;
 
 // 項目名。その場での確認の文言を、Rails と同じ「項目名＋理由」の形にするために使う（config/locales/ja.yml と同じ）
@@ -120,9 +135,6 @@ const EMPTY_VALUES: FormValues = {
   related_job_middle_category_ids: [],
   technology_ids: [],
 };
-
-// 開始時期の月の選択肢（1〜12月）
-const MONTH_NUMBERS = Array.from({ length: 12 }, (_, index) => String(index + 1));
 
 // フォームのまとまり。見出しの行を押すと中身が開く（アコーディオン）。並びはこの順。
 // fields は、そのまとまりに入っている項目の名前（エラーのときに、どのまとまりを開くかを決めるのに使う。Rails の errors のキーと同じ）
@@ -174,18 +186,10 @@ const INITIAL_OPEN_SECTIONS: SectionValue[] = ["basic"];
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
 
-function toText(value: string | number | null): string {
-  return value === null ? "" : String(value);
-}
-
-function toNumberOrNull(value: string): number | null {
-  return value.trim() === "" ? null : Number(value);
-}
-
 // ⑫ の返事を、フォームの値に直す
 function toFormValues(posting: JobPosting): FormValues {
   // "2026-10-01" → 年 "2026"、月 "10"
-  const [year, month] = posting.start_month ? posting.start_month.split("-") : ["", ""];
+  const { year, month } = splitMonthDate(posting.start_month);
   return {
     status: posting.status,
     title: posting.title,
@@ -197,7 +201,7 @@ function toFormValues(posting: JobPosting): FormValues {
     min_work_hours_per_day: toText(posting.min_work_hours_per_day),
     min_duration_months: toText(posting.min_duration_months),
     start_year: year,
-    start_month_number: month ? String(Number(month)) : "",
+    start_month_number: month,
     work_style: toText(posting.work_style),
     work_style_note: toText(posting.work_style_note),
     prefecture_id: toText(posting.prefecture_id),
@@ -223,26 +227,11 @@ function toRequestBody(values: FormValues) {
     min_work_days_per_week: toNumberOrNull(values.min_work_days_per_week),
     min_work_hours_per_day: toNumberOrNull(values.min_work_hours_per_day),
     min_duration_months: toNumberOrNull(values.min_duration_months),
-    start_month: startYear && startMonthNumber ? `${startYear}-${startMonthNumber.padStart(2, "0")}-01` : null,
+    start_month: joinMonthDate(startYear, startMonthNumber),
     work_style: values.work_style === "" ? null : values.work_style,
     prefecture_id: toNumberOrNull(values.prefecture_id),
     hourly_wage: toNumberOrNull(values.hourly_wage),
   };
-}
-
-// 今年（日本時間で数える。API設計.md の 16-1-12）
-function currentYearInTokyo(): number {
-  return Number(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Tokyo", year: "numeric" }).format(new Date()));
-}
-
-// 開始時期の年の選択肢：1年前〜2年後。保存済みの年がその範囲の外なら、その年も足す（ページ設計.md の 6-5 C3）
-function startYearOptions(currentYear: number, savedYear: string): string[] {
-  const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2].map(String);
-  if (savedYear !== "" && !years.includes(savedYear)) {
-    years.push(savedYear);
-    years.sort();
-  }
-  return years;
 }
 
 // その場で分かる確認だけを行う（17-3-2）。Rails も同じ確認をするので、ここをすり抜けても守られる。
@@ -288,144 +277,11 @@ function validateOnScreen(values: FormValues): FieldErrors {
   }
 
   // 開始時期は、年と月の両方を選ぶか、両方空欄（随時）にする
-  if ((values.start_year === "") !== (values.start_month_number === "")) {
+  if (isHalfSelectedMonth(values.start_year, values.start_month_number)) {
     errors.start_month = ["開始時期は年と月の両方を選んでください"];
   }
 
   return errors;
-}
-
-// FieldError に渡す形に直す
-function toFieldErrorItems(messages: string[] | undefined) {
-  return messages?.map((message) => ({ message }));
-}
-
-// 入力欄の部品が共通で受け取るもの。フォームの中の textProps() で作って渡す
-type InputProps = {
-  id: string;
-  value: string;
-  onChange: (value: string) => void;
-  errors: string[] | undefined;
-};
-
-// 文字の入力欄（1行）。見出し・入力欄・文字数・エラーの組み立てを使い回す。
-// 部品はフォームの外に置く（フォームの中で定義すると、描き直すたびに入力欄が作り直され、打っている途中でカーソルが外れるため）
-function TextField({ id, value, onChange, errors, label }: InputProps & { label: string }) {
-  return (
-    <Field data-invalid={errors ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={errors ? true : undefined}
-      />
-      <FieldDescription>
-        {value.length}／{SHORT_TEXT_MAX_LENGTH}文字
-      </FieldDescription>
-      <FieldError errors={toFieldErrorItems(errors)} />
-    </Field>
-  );
-}
-
-// 文章の入力欄（複数行）。placeholder は、空欄のときに薄く出す文（どんな会社か・事業内容で、会社情報の内容を出す）
-function LongTextField({
-  id,
-  value,
-  onChange,
-  errors,
-  label,
-  placeholder,
-  description,
-}: InputProps & { label: string; placeholder?: string; description?: string }) {
-  return (
-    <Field data-invalid={errors ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      {description && <FieldDescription>{description}</FieldDescription>}
-      <Textarea
-        id={id}
-        rows={4}
-        value={value}
-        placeholder={placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={errors ? true : undefined}
-      />
-      <FieldDescription>
-        {value.length}／{LONG_TEXT_MAX_LENGTH}文字
-      </FieldDescription>
-      <FieldError errors={toFieldErrorItems(errors)} />
-    </Field>
-  );
-}
-
-// 選択欄。選択肢と表示名は Rails が返したものだけを使う（16-1-9）
-function SelectField({
-  id,
-  value,
-  onChange,
-  errors,
-  label,
-  choices,
-  emptyLabel,
-  description,
-}: InputProps & {
-  label: string;
-  choices: { value: string; label: string }[];
-  // 空欄の選択肢の表示。なければ空欄を選べない
-  emptyLabel?: string;
-  description?: string;
-}) {
-  return (
-    <Field data-invalid={errors ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <NativeSelect
-        id={id}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        aria-invalid={errors ? true : undefined}
-      >
-        {emptyLabel !== undefined && <NativeSelectOption value="">{emptyLabel}</NativeSelectOption>}
-        {choices.map((choice) => (
-          <NativeSelectOption key={choice.value} value={choice.value}>
-            {choice.label}
-          </NativeSelectOption>
-        ))}
-      </NativeSelect>
-      {description && <FieldDescription>{description}</FieldDescription>}
-      <FieldError errors={toFieldErrorItems(errors)} />
-    </Field>
-  );
-}
-
-// まとまり1つ分。四角い見出しの行（題名と一言、エラーがあれば「要確認」）と、押すと下に開く中身。
-// 閉じている間も中身は消さずに隠すだけにする（keepMounted）。職種の開閉などの状態を、閉じても覚えておくため
-function FormSection({
-  value,
-  title,
-  hint,
-  hasError,
-  children,
-}: {
-  value: SectionValue;
-  title: string;
-  hint: string;
-  hasError: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <AccordionItem value={value} className="rounded-lg border">
-      <AccordionTrigger className="items-center px-4 py-3 hover:no-underline">
-        <span className="flex flex-col gap-0.5">
-          <span className="text-base font-bold">{title}</span>
-          <span className="text-xs font-normal text-muted-foreground">{hint}</span>
-        </span>
-        {hasError && <span className="mr-2 ml-auto text-xs text-destructive">要確認</span>}
-      </AccordionTrigger>
-      <AccordionContent keepMounted className="px-4 pt-2 pb-4">
-        <FieldGroup>{children}</FieldGroup>
-      </AccordionContent>
-    </AccordionItem>
-  );
 }
 
 type JobPostingFormProps = {
@@ -742,41 +598,18 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
               }))}
             />
 
-            {/* 開始時期：年と月の2つの選択欄。両方空欄なら随時（ページ設計.md の 6-5 C3） */}
-            <Field data-invalid={fieldErrors.start_month ? true : undefined}>
-              <FieldLabel htmlFor="start_year">開始時期</FieldLabel>
-              <div className="flex items-center gap-2">
-                <NativeSelect
-                  id="start_year"
-                  value={values.start_year}
-                  onChange={(event) => updateValue("start_year", event.target.value)}
-                  aria-invalid={fieldErrors.start_month ? true : undefined}
-                >
-                  <NativeSelectOption value="">―</NativeSelectOption>
-                  {startYearOptions(currentYear, values.start_year).map((year) => (
-                    <NativeSelectOption key={year} value={year}>
-                      {year}年
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-                <NativeSelect
-                  aria-label="開始時期の月"
-                  value={values.start_month_number}
-                  onChange={(event) => updateValue("start_month_number", event.target.value)}
-                  aria-invalid={fieldErrors.start_month ? true : undefined}
-                >
-                  <NativeSelectOption value="">―</NativeSelectOption>
-                  {MONTH_NUMBERS.map((month) => (
-                    <NativeSelectOption key={month} value={month}>
-                      {month}月
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-                <span className="text-sm">から</span>
-              </div>
-              <FieldDescription>両方空欄なら「随時」になります</FieldDescription>
-              <FieldError errors={toFieldErrorItems(fieldErrors.start_month)} />
-            </Field>
+            {/* 開始時期：年と月の2つの選択欄。両方空欄なら随時。年の選択肢は1年前〜2年後（ページ設計.md の 6-5 C3） */}
+            <MonthField
+              id="start_year"
+              label="開始時期"
+              year={values.start_year}
+              month={values.start_month_number}
+              onYearChange={(value) => updateValue("start_year", value)}
+              onMonthChange={(value) => updateValue("start_month_number", value)}
+              years={yearChoices(currentYear - 1, currentYear + 2, values.start_year)}
+              errors={fieldErrors.start_month}
+              description="両方空欄なら「随時」になります"
+            />
 
             <SelectField
               {...textProps("work_style")}

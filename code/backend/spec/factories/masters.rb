@@ -36,4 +36,21 @@ FactoryBot.define do
   factory :prefecture do
     sequence(:name) { |n| "県#{n}" }
   end
+
+  factory :university do
+    sequence(:school_code) { |n| format("F1%011d", n) }
+    sequence(:name) { |n| "大学#{n}" }
+  end
+
+  factory :faculty do
+    sequence(:name) { |n| "学部#{n}" }
+    sequence(:position) { |n| n }
+  end
+
+  # 学科。学部も一緒に作る
+  factory :department do
+    faculty
+    sequence(:name) { |n| "学科#{n}" }
+    sequence(:position) { |n| n }
+  end
 end

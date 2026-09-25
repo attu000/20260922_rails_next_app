@@ -117,6 +117,12 @@ class StudentProfile < ApplicationRecord
     true
   end
 
+  # エラーの文を作るとき、Rails は項目の今の値を読みに行く（文の中に %{value} で差し込めるようにするため）。
+  # プログラミング歴の欄全体のエラーは skills の名前で入れるので、その名前でプログラミング歴を読めるようにする。
+  # alias_method で作ったメソッドは private の指定が効かないので、下の行で外から呼べないようにする
+  alias_method :skills, :student_skills
+  private :skills
+
   private
 
   # 開始時期は月の1日の日付。範囲の制限はない（募集と同じ。その他決め事.md の 5-6）
@@ -149,6 +155,9 @@ class StudentProfile < ApplicationRecord
     errors.add(:skills, :too_many, count: SKILLS_MAX) if rows.size > SKILLS_MAX
 
     skills = rows.each_with_index.map do |row, index|
+      # save_profile の symbolize_keys は外側の名前だけをシンボルにし、中の各行は「名前が文字列の普通の辞書」にしてしまう。
+      # row[:technology_id] で取り出せるよう、文字列でもシンボルでも取り出せる形に直す
+      row = row.to_h.with_indifferent_access
       skill = StudentSkill.new(
         student_profile: self,
         technology_id: row[:technology_id],
