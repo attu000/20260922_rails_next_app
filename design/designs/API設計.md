@@ -155,7 +155,7 @@
 #### 16-1-9. 選択肢・表示名と、判定の置き場所
 
 - 選択肢（enum の値、稼働条件の選択肢）と日本語の表示名、性格・カルチャーの5軸の名前と両端の説明は、Rails の1か所で持つ（本書9-1）
-- これらは、選択肢の窓口（16-3 ⑦ GET /api/options）で、マスタ（職種・工程・技術・業界・都道府県・大学・学部・学科）と一緒に1回で返す
+- これらは、選択肢の窓口（16-3 ⑦ GET /api/options）で、マスタ（職種・工程・技術・業界・事業形態・都道府県・大学・学部・学科）と一緒に1回で返す
 - 画面側は、これを使ってフォームの選択肢を作り、データの中の名前（`"published"`）を日本語（「掲載中」）に直して表示する。画面側に選択肢の表を手で書かない
 - 判定も Rails で行い、結果を返す。画面側に同じ判定を書かない
   - 稼働条件の一致、カルチャーの一致・ずれ・近さ（16-3 ⑲・㉓）
@@ -350,7 +350,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | 画面 | タイミング | URL | 概要 |
 | --- | --- | --- | --- |
 | C1 企業プロフィール編集 | 画面の URL | `/company/profile` | |
-| | 開いたとき | ⑦ GET /api/options | 業種・人数の選択肢 |
+| | 開いたとき | ⑦ GET /api/options | 業界・事業形態・人数の選択肢 |
 | | 開いたとき | ⑧ GET /api/company/profile | 自社のプロフィール |
 | | 保存 | ⑨ PATCH /api/company/profile | 本体を保存 |
 | | 保存（アイコンを変えたとき） | ⑩ POST /api/company/profile/icon | ⑨の成功後に続けて送る |
@@ -403,7 +403,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 新規登録はこちら | `/company/signup` | 画面の移動だけ |
 | | 学生の方はこちら | `/student/login` | 画面の移動だけ |
 | C9 新規登録 | 画面の URL | `/company/signup` | |
-| | 開いたとき | ⑦ GET /api/options | 業種・人数の選択肢 |
+| | 開いたとき | ⑦ GET /api/options | 業界・事業形態・人数の選択肢 |
 | | ステップ1から進むとき | ④ POST /api/email_checks | メールアドレスの重複を確認 |
 | | 登録する | ⑤ POST /api/company_registrations | アカウントとプロフィールを作り、自動でログイン |
 | | 登録の直後（アイコンを選んでいたとき） | ⑩ POST /api/company/profile/icon | → `/company/job_postings` |
@@ -448,7 +448,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | この企業とのメッセージ（⑲ の has_message_thread が true のとき） | `/student/messages?company_id=[id]` | 画面の移動だけ |
 | | 会社名 | `/student/companies/[id]` | 画面の移動だけ |
 | S7 企業詳細 | 画面の URL | `/student/companies/[id]` | |
-| | 開いたとき | ⑦ GET /api/options | 業種・人数の表示名 |
+| | 開いたとき | ⑦ GET /api/options | 業界・事業形態・人数の表示名 |
 | | 開いたとき | ⑳ GET /api/student/companies/:id | 企業のプロフィールと掲載中の募集 |
 | | 募集を押す | `/student/job_postings/[id]` | 画面の移動だけ |
 | | この企業とのメッセージ（⑳ の has_message_thread が true のとき） | `/student/messages?company_id=[id]` | 画面の移動だけ |
@@ -550,7 +550,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "id": 12,
   "title": "自社サービスのバックエンド開発インターン",
   "is_open": true,
-  "company": { "id": 3, "name": "株式会社サンプル", "icon_url": null, "industry_ids": [1] },
+  "company": { "id": 3, "name": "株式会社サンプル", "icon_url": null },
+  "industry_ids": [1],
+  "business_type_ids": [2],
   "main_job_middle_category_ids": [2],
   "related_job_middle_category_ids": [3],
   "main_work_process_ids": [5],
@@ -566,6 +568,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 ```
 
 - is_open：掲載中なら true。false なら、画面は「募集終了」と表示する（非公開か終了かの区別は、学生に見せない）
+- industry_ids・business_type_ids：**その募集の**業界・事業形態。企業プロフィールの値は返さず、募集が空欄なら空の配列（本書5-8）
 - company.icon_url も返す。どの画面でアイコンを出すかは Phase 6 で決める（本書10-2）
 
 **形C：企業向けの学生の行**（㉒・㉕）
@@ -688,7 +691,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | 1 | password_confirmation | 文字列 | ○（password と一致すること） |
 | 1 | name（会社名） | 文字列 | ○ |
 | 1 | terms_agreed（利用規約・プライバシーポリシーへの同意） | 真偽値 | ○（true であること。保存はしない） |
-| 2 | industry_ids（業種） | 数値の配列 | |
+| 2 | industry_ids（業界） | 数値の配列 | |
+| 2 | business_type_ids（事業形態） | 数値の配列 | |
 | 2 | employee_size（人数） | 選択肢の名前 | |
 | 2 | business_description（事業内容） | 文字列 | |
 | 2 | about（どんな会社か） | 文字列 | |
@@ -696,7 +700,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 必須の○は、データベースで空欄を許さない項目と、登録に欠かせない項目だけ。ステップ2は「あとで入力する」で飛ばせる（本書17-3-5）
 - 返すもの：201、形A。自動でログインした状態になる
 - 主なエラー：422（項目ごと。登録済みのメールアドレスを含む）。画面側は、エラーのある項目を含む最初のステップに戻して表示する
-- 処理：users、sessions（自動でログインした状態にする）、company_profiles、company_industries を1つのトランザクションで作る
+- 処理：users、sessions（自動でログインした状態にする）、company_profiles、company_industries、company_business_types を1つのトランザクションで作る
   - アイコンは含めない。登録が成功した直後に、画面が⑩へ送る
   - アイコンの保存に失敗しても、登録は取り消さない。「アイコンを保存できませんでした。あとで会社情報から登録してください」と出して、ホームへ進む
 - 裏側のジョブ：なし
@@ -764,7 +768,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | enums | 画面に出す選択肢すべて：grade、activity_status、employee_size、skill_level、job_posting_status、work_style、purpose、hiring_possibility、candidacy_reason、candidacy_status、**candidacy_tag**、**my_status**、technology_category、work_process_stage、last_active_range |
 | work_conditions | 稼働条件の数値の選択肢（週の日数、1日の時間、継続期間。本書5-6） |
 | culture_axes | 性格・カルチャーの5軸の名前と、両端の説明（本書5-5） |
-| masters | 職種（大分類の中に中分類）、工程（主に使う大分類つき）、技術、業界、都道府県、大学、学部（中に学科） |
+| masters | 職種（大分類の中に中分類）、工程（主に使う大分類つき）、技術、業界、事業形態、都道府県、大学、学部（中に学科） |
 
 ```json
 {
@@ -799,7 +803,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
       { "id": 1, "name": "企画・要件定義", "stage": "upstream", "planning": true, "job_major_category_ids": [1, 4] }
     ],
     "technologies": [{ "id": 1, "name": "Ruby", "category": "language" }],
-    "industries": [{ "id": 1, "name": "Webサービス" }],
+    "industries": [{ "id": 1, "name": "EC・小売" }],
+    "business_types": [{ "id": 1, "name": "自社サービス（個人向け）" }],
     "prefectures": [{ "id": 13, "name": "東京都" }],
     "universities": [{ "id": 1, "name": "〇〇大学" }],
     "faculties": [
@@ -824,6 +829,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 {
   "name": "株式会社サンプル",
   "industry_ids": [1, 3],
+  "business_type_ids": [2, 3],
   "employee_size": "size_10_49",
   "business_description": "受託開発と自社サービスの運営",
   "about": "エンジニアが半数を占める、30人ほどの会社です",
@@ -836,8 +842,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 **⑨ PATCH /api/company/profile（自社のプロフィールの保存）**
 
 - 画面・操作：C1 の保存
-- 送るもの：⑧と同じ項目（icon_url は除く）。フォームの全項目を送る。industry_ids は、送った内容でまるごと置き換える
-- 必須：name、employee_size、business_description、about（本書5-9。industry_ids は任意）
+- 送るもの：⑧と同じ項目（icon_url は除く）。フォームの全項目を送る。industry_ids・business_type_ids は、送った内容でまるごと置き換える
+- 必須：name だけ（本書5-9。ほかはすべて任意）
+- 処理：company_profiles、company_industries、company_business_types を1つのトランザクションで保存する（本書9-2）
 - 返すもの：200、⑧と同じ形
 - 主なエラー：422
 - 裏側のジョブ：自社の、一度でも掲載した募集それぞれについて、似た募集リストを作り直す（本書7-5）【強み】
@@ -918,12 +925,15 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "main_work_process_ids": [5],
   "involved_work_process_ids": [1, 2],
   "technology_ids": [1, 7],
+  "industry_ids": [1],
+  "business_type_ids": [2],
   "updated_at": "2026-09-21T18:00:00.000+09:00"
 }
 ```
 
 - 職種と工程は、「主な／関連する」「メインで担当する／関われる」で配列を分けて返す（フォームの入力欄とそのまま対応させるため）
 - about・business_description が空欄なら、null のまま返す。画面側は、⑧の企業プロフィールの値を薄く表示する
+- industry_ids・business_type_ids：この募集の業界・事業形態（任意）。企業プロフィールの値とは別に持つ（本書5-8）
 - 求める人材（学生には見せない）
   - target_grades：求める学年。grade の選択肢の名前の配列（複数選択、任意）
   - target_graduation_year_from／target_graduation_year_to：求める卒業年度の範囲。片方だけの指定もできる（本書17-3-4）
@@ -936,7 +946,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 送るもの：⑫と同じ項目（id、published_at、updated_at は除く）
 - 新規作成のときは、非公開か掲載中を選ぶ（本書17-2-2）
 - 返すもの：201、⑫と同じ形
-- 処理：job_postings と中間テーブル3つ（職種・工程・使用技術）を、1つのトランザクションで作る。状態が掲載中なら published_at を記録する
+- 処理：job_postings と中間テーブル5つ（職種・工程・使用技術・業界・事業形態）を、1つのトランザクションで作る。状態が掲載中なら published_at を記録する
 - 主なエラー：422（必須の項目（本書5-9）、選択肢の範囲、主と関連に同じ中分類がある、状態の誤り、など）
 - 裏側のジョブ：一度でも掲載した募集を保存したら（初めて掲載したときを含む）、その募集の似た募集リストを作る（本書7-5）【強み】
 - 段階タグ：【コア】
@@ -951,7 +961,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 主なエラー：422（⑬と同じもの、状態の移り変わりの誤り）
 - 裏側のジョブ：⑬と同じ
 - 募集を消す窓口は作らない（募集は消さず、状態で管理する。本書8-6）
-- 段階タグ：【コア】（工程・カルチャーは【強み】、目的・求める人材は【仕上げ】。本書6-5 C3）
+- 段階タグ：【コア】（工程・業界・事業形態・カルチャーは【強み】、目的・求める人材は【仕上げ】。本書6-5 C3）
 
 #### 16-3-5. まとまり3：学生のプロフィールと募集検索
 
@@ -997,7 +1007,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | available_from | 日付 | ③ 開始時期 | 募集が随時（空欄）か、**募集の開始月が今月より前**か、募集の開始月がこの日以降（本書5-6） |
 | work_styles[] | 選択肢の名前の配列 | ③ 勤務形態 | 募集の勤務形態が、この中に含まれる |
 | weekend_ok | 真偽値 | ③ 土日OK | true なら、土日OK の募集だけ |
-| industry_ids[] | 数値の配列 | ④ 業界 | 企業の業種のどれか1つが一致 |
+| industry_ids[] | 数値の配列 | ④ 業界 | 募集の業界のどれか1つが一致（企業プロフィールの値は使わない。本書5-8） |
+| business_type_ids[] | 数値の配列 | ④ 事業形態 | 募集の事業形態のどれか1つが一致（同上） |
 | job_major_category_ids[] | 数値の配列 | ④ 職種（大分類だけ選んだとき） | その大分類に属する中分類を、主・関連のどちらかに持つ募集 |
 | job_middle_category_ids[] | 数値の配列 | ④ 職種（中分類） | 主・関連のどれか1つが一致。フロントエンド・バックエンドを選んだときは、フルスタックの募集も含める |
 | planning | 真偽値 | ④ 企画・設計から関われる | true なら、工程（メイン・関われる）に「企画・設計から関われる」の対象の工程を持つ募集だけ |
@@ -1019,7 +1030,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 新着順に切り替えたとき：稼働条件のボタンをすべてオフにする。おすすめ順に戻したら、もう一度自動で選ぶ
   - ボタンの選択肢は、稼働条件の共通形式（本書5-6）と同じ
 - 返すもの：200。items は形B に `matched`（真偽値）を加えたもの、pagination に matched_count あり（16-1-11）
-- 段階タグ：【コア】（おすすめ順とボタンの自動選択、「企画・設計から関われる」は【強み】。稼働条件の手動の選択、土日OK、業界、フルスタックのルールは【仕上げ】）
+- 段階タグ：【コア】（おすすめ順とボタンの自動選択、「企画・設計から関われる」は【強み】。稼働条件の手動の選択、土日OK、業界・事業形態、フルスタックのルールは【仕上げ】）
 
 **⑲ GET /api/student/job_postings/:id（募集詳細）**
 
@@ -1031,7 +1042,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "id": 12,
   "title": "自社サービスのバックエンド開発インターン",
   "is_open": true,
-  "company": { "id": 3, "name": "株式会社サンプル", "icon_url": null, "industry_ids": [1] },
+  "company": { "id": 3, "name": "株式会社サンプル", "icon_url": null },
+  "industry_ids": [1],
+  "business_type_ids": [2],
   "about": "エンジニアが半数を占める、30人ほどの会社です",
   "business_description": "受託開発と自社サービスの運営",
   "internship_details": "…",
@@ -1049,6 +1062,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 上の例のほかに、⑫と同じ名前で次の項目も返す：稼働条件（min_work_days_per_week、min_work_hours_per_day、min_duration_months、start_month、work_style、work_style_note、prefecture_id、work_location_note、weekend_ok、work_note）、hourly_wage、culture_ の5つ、requirements、preferred_requirements、technology_note、職種・工程・使用技術の配列、published_at
 - 返さない項目：status（代わりに is_open）、purpose、hiring_possibility、target_grades、target_graduation_year_from、target_graduation_year_to、target_other（学生に見せない項目）
 - about・business_description：募集側が空欄なら、企業プロフィールの値を入れて返す（学生の画面では区別が要らないため）
+- industry_ids・business_type_ids：その募集の値だけを返す。about などと違い、空欄でも企業プロフィールの値で補わない（本書5-8）
 - culture_comparison：result は Rails が本書5-5 のルールで判定する。`match`（一致）、`mismatch`（ずれ）、`not_judged`（どちらかが中央なので判定しない）のどれか。㉓の比較と同じ部品を使う
 - my_status・my_candidacy_id：形E
 - has_message_thread：**その企業とのスレッドがあるか**。true なら画面に「この企業とのメッセージ」のボタンを出す（本書17-2-3）
@@ -1066,6 +1080,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "id": 3,
   "name": "株式会社サンプル",
   "industry_ids": [1],
+  "business_type_ids": [2, 3],
   "employee_size": "size_10_49",
   "business_description": "受託開発と自社サービスの運営",
   "about": "エンジニアが半数を占める、30人ほどの会社です",
@@ -1075,6 +1090,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 }
 ```
 
+- industry_ids・business_type_ids：企業プロフィールの業界・事業形態（会社の紹介として表示する）
 - job_postings：その企業の掲載中の募集。形B で、ページ分けしない
 - has_message_thread：その企業とのスレッドがあるか。true なら「この企業とのメッセージ」のボタンを出す（⑲と同じ判定。本書17-2-3）
 - 段階タグ：【コア】
@@ -1201,7 +1217,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - job_postings：自社の全募集（掲載中以外も含む）。各要素は形D に comparison を加えたもの。並び順は⑪と同じ。最初に選ぶタブは画面側が決める（遷移元の job_posting_id、なければ先頭）
 - comparison（Rails が計算する。⑲と同じ部品）
   - work_conditions：稼働条件の項目ごとに `match`（一致）、`mismatch`（不一致）、`not_judged`（どちらかが未入力）。照合のルールは本書5-6
-  - job_middle_category_ids・technology_ids・industry_ids：一致した id の一覧。どちらかが未入力なら null（画面は「未入力」と出す）
+  - job_middle_category_ids・technology_ids・industry_ids：一致した id の一覧。どちらかが未入力なら null（画面は「未入力」と出す）。industry_ids は、募集の業界と学生の興味のある業界を比べる（企業プロフィールの値は使わない。本書5-8）
   - culture：軸ごとの値と距離。close は、距離が1以下で、どちらも中央でないときに true（画面は背景を薄いオレンジにする）
 - 段階タグ：【コア】（comparison と reasons は【強み】、last_active_range は【仕上げ】）
 
@@ -1225,7 +1241,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | ㉛ POST /api/student/candidacies（応募） | job_posting_id、reasons（配列、最低1つ） | 募集が掲載中で、その募集とのやりとりがまだない | やりとり（応募・未マッチ）、応募理由、reason_mask を作る | 推薦の更新（本書7-5 の応募・マッチ時の手順） |
 | ㉜ POST /api/student/candidacies/:id/match（マッチ） | reasons（配列、最低1つ） | 発生元がスカウトで、状態が未マッチか見送り。募集が掲載中 | 状態をマッチにし、matched_at、応募理由、reason_mask を保存 | 推薦の更新（同上） |
 
-- reasons の値：business、industry、job_category、work_process、internship_details、culture、hourly_wage、work_conditions、technologies（本書8-5 candidacy_reasons）
+- reasons の値：business、industry、job_major_category、job_middle_category、business_type、work_process、internship_details、growth、culture、hourly_wage、work_conditions、technologies の12個（本書8-5 candidacy_reasons）
 - 主なエラー：404（他社・他人のやりとり、見てよい範囲の外の募集）、409（上の「できる状態」でない）、422（スカウト文が空、応募理由が0個、など。長さの上限は本書17-3-4）
 - ㉔ の student_profile_id は、すべての学生を指定できる
 - 段階タグ：㉔・㉖・㉛・㉜は【コア】、㉗〜㉚は【強み】

@@ -24,11 +24,37 @@ ja:
         role: 種別
       company_profile:
         name: 会社名
+        business_description: 事業内容
+        about: どんな会社か
+        employee_size: 人数
+        industry_ids: 業界
+        business_type_ids: 事業形態
+        icon: アイコン
       student_profile:
         name: 氏名
+
+  # 選択肢（enum）の日本語の表示名。⑦ GET /api/options がここを読んで返す（API設計.md の 16-1-9）。
+  # 画面側には選択肢の表を書かない
+  enums:
+    company_profile:
+      # 人数の範囲は仮置き（未決内容.md の 10-1）
+      employee_size:
+        size_1_9: 1〜9人
+        size_10_49: 10〜49人
+        size_50_99: 50〜99人
+        size_100_299: 100〜299人
+        size_300_999: 300〜999人
+        size_1000_plus: 1000人以上
 
   # rails-i18n の標準の文言を、設計書の文言に合わせる（17-3-6）
   errors:
     messages:
       # 標準は「はすでに存在します」
       taken: はすでに登録されています
+      # この API 独自の文言。項目名と組み合わさって「業界に選べない値が含まれています」のような文になる
+      # 番号の一覧に、マスタにない番号がある／同じ番号が重複している（権限_バリデーション.md の 17-3-4）
+      not_selectable: に選べない値が含まれています
+      duplicated: に同じ値が重複しています
+      # アイコンの形式と大きさ（技術構成.md の 9-3）
+      invalid_content_type: はPNG・JPEG・WebPのいずれかにしてください
+      file_too_large: は2MB以下にしてください

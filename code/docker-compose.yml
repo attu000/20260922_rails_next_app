@@ -1,5 +1,5 @@
 # 開発用のコンテナの設計図。code/ フォルダで `docker compose up -d` を実行して起動する。
-# 詳しくは design/designs/技術構成.md の 3-1 A-4
+# 詳しくは design/designs/開発環境.md の 18-1
 
 # まとまりの名前。コンテナやボリュームの名前の頭に付く
 name: rails_next_test
@@ -39,6 +39,9 @@ services:
       - ./backend:/app
       # 入れた部品（gem）の置き場所
       - bundle_data:/usr/local/bundle
+      # アップロードされたファイル（アイコン）の置き場所。Active Storage が storage/ に保存する。
+      # Windows 側ではなくボリュームに置き、データベースと一緒に消えるようにする（技術構成.md の 9-3、開発環境.md の 18-1）
+      - storage_data:/app/storage
     environment:
       # Docker の中では、コンテナ名（db）がそのまま住所になる
       DB_HOST: db
@@ -55,7 +58,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile.dev
     # 開発のときだけ、標準の Turbopack ではなく webpack を使う。
-    # Turbopack はポーリングを設定しても、Windows 側のファイルの変更に気づけなかったため（技術構成.md の 3-1 A-7）
+    # Turbopack はポーリングを設定しても、Windows 側のファイルの変更に気づけなかったため（開発環境.md の 18-5）
     command: npm run dev -- --webpack
     ports:
       # 127.0.0.1 を付けて、このパソコンからだけつながるようにする
@@ -63,7 +66,7 @@ services:
     volumes:
       # 手元のコードをそのまま見せる。書き換えるとすぐ反映される
       - ./frontend:/app
-      # 大きなフォルダは、Windows 側ではなくボリュームに置く（技術構成.md の 3-1 A-4）
+      # 大きなフォルダは、Windows 側ではなくボリュームに置く（開発環境.md の 18-2）
       - node_modules:/app/node_modules
       - next_build:/app/.next
     environment:
@@ -71,7 +74,7 @@ services:
       RAILS_API_URL: http://backend:3001
       # 1000ミリ秒（1秒）ごとにファイルの変更を確かめる（ポーリング）。Windows 側のファイルの変更は、知らせが届かないため。
       # webpack と、Next.js 自身のファイルの見張り役の両方がこの値を読む。
-      # リポジトリを WSL2 側に移したら、この行と上の --webpack は消してよい（技術構成.md の 3-1 A-7）
+      # リポジトリを WSL2 側に移したら、この行と上の --webpack は消してよい（開発環境.md の 18-5）
       WATCHPACK_POLLING: 1000
     depends_on:
       - backend
@@ -80,5 +83,6 @@ volumes:
   # コンテナを消しても残るデータの保存場所
   postgres_data:
   bundle_data:
+  storage_data:
   node_modules:
   next_build:
