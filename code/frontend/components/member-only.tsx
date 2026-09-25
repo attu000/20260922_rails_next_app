@@ -4,10 +4,12 @@
 // 開いたら /api/me を呼び、未ログインならログイン画面へ（開こうとしていたページを return_to に付ける）、
 // 種別が違えば相手の種別のホームへ移す。中の画面からは、次の3つを使える。
 // - useMe()：ログイン中の人  - useRefreshMe()：それを取り直す  - useRedirectIfUnauthorized()：API の 401 でログイン画面へ移す
+// 中の画面が SWR（useApi）でデータを取って 401 になったときも、ここでまとめてログイン画面へ移す。
 // これは見た目のための振り分けで、守りは Rails が行う（design/designs/API設計.md の 16-1-6）
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { SWRConfig, type SWRConfiguration } from "swr";
 import { ApiError } from "@/lib/api";
 import { fetchMe, homePathFor, loginUrlWithReturnTo, type Me, type Role } from "@/lib/auth";
 
@@ -108,6 +110,19 @@ export function MemberOnly({ role, children }: { role: Role; children: ReactNode
   // 中身が変わったときだけ作り直す（毎回作り直すと、中の画面がすべて描き直されるため）
   const contextValue = useMemo(() => (me ? { me, refreshMe } : null), [me, refreshMe]);
 
+  // 中の画面の SWR の共通設定。データを取って 401 になったら（別のタブでログアウトした、など）、ログイン画面へ移す。
+  // ログイン前の画面はこの外側なので、移さない（16-1-6）
+  const swrConfig = useMemo<SWRConfiguration>(
+    () => ({
+      onError: (error: unknown) => {
+        if (error instanceof ApiError && error.status === 401) {
+          router.replace(loginUrlWithReturnTo(role, window.location.pathname + window.location.search));
+        }
+      },
+    }),
+    [router, role],
+  );
+
   if (failed) {
     // 16-1-10 の 500 の文言
     return <p className="p-8 text-sm text-destructive">エラーが起きました</p>;
@@ -118,5 +133,9 @@ export function MemberOnly({ role, children }: { role: Role; children: ReactNode
     return <p className="p-8 text-sm text-muted-foreground">読み込み中…</p>;
   }
 
-  return <MeContext value={contextValue}>{children}</MeContext>;
+  return (
+    <MeContext value={contextValue}>
+      <SWRConfig value={swrConfig}>{children}</SWRConfig>
+    </MeContext>
+  );
 }

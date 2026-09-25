@@ -9,6 +9,9 @@ type MasterCheckboxGroupProps = {
   // 入力欄の名前。チェックボックスの id を作るのに使う（例："industry"）
   name: string;
   legend: string;
+  // true なら、見出しを画面には出さず、読み上げ（スクリーンリーダー）にだけ残す。
+  // 開閉の見出しの行に、同じ名前がすでに出ているときに使う（募集詳細編集の使用技術など）
+  hideLegend?: boolean;
   rows: MasterRow[];
   selectedIds: number[];
   onChange: (selectedIds: number[]) => void;
@@ -16,14 +19,24 @@ type MasterCheckboxGroupProps = {
   errors?: string[];
 };
 
-export function MasterCheckboxGroup({ name, legend, rows, selectedIds, onChange, errors }: MasterCheckboxGroupProps) {
+export function MasterCheckboxGroup({
+  name,
+  legend,
+  hideLegend,
+  rows,
+  selectedIds,
+  onChange,
+  errors,
+}: MasterCheckboxGroupProps) {
   function toggle(id: number, checked: boolean) {
     onChange(checked ? [...selectedIds, id] : selectedIds.filter((selectedId) => selectedId !== id));
   }
 
   return (
     <FieldSet>
-      <FieldLegend variant="label">{legend}</FieldLegend>
+      <FieldLegend variant="label" className={hideLegend ? "sr-only" : undefined}>
+        {legend}
+      </FieldLegend>
       <div className="grid gap-2 sm:grid-cols-2">
         {rows.map((row) => {
           const id = `${name}-${row.id}`;

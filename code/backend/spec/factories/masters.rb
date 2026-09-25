@@ -10,4 +10,30 @@ FactoryBot.define do
     sequence(:name) { |n| "事業形態#{n}" }
     sequence(:position) { |n| n }
   end
+
+  factory :job_major_category do
+    sequence(:code) { |n| "M#{n}" }
+    sequence(:name) { |n| "大分類#{n}" }
+    description { "大分類の説明" }
+    sequence(:position) { |n| n }
+  end
+
+  # 中分類。大分類も一緒に作る
+  factory :job_middle_category do
+    job_major_category
+    sequence(:code) { |n| "M-#{n}" }
+    sequence(:name) { |n| "中分類#{n}" }
+    description { "中分類の説明" }
+    sequence(:position) { |n| n }
+  end
+
+  factory :technology do
+    sequence(:name) { |n| "技術#{n}" }
+    category { :language }
+    sequence(:position) { |n| n }
+  end
+
+  factory :prefecture do
+    sequence(:name) { |n| "県#{n}" }
+  end
 end

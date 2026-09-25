@@ -1,6 +1,9 @@
 // Rails の API を呼ぶ共通の関数と、エラーの形。
 // すべての画面は、Rails を呼ぶときに必ず apiFetch を使う（合言葉やエラーの扱いを1か所にまとめるため）。
+// 画面のデータを取る（GET）ときは、apiFetch を SWR で包んだ useApi を使う（API設計.md の 16-1-14）。
 // 詳しくは design/designs/API設計.md の 16-1-7（CSRF 対策）、16-1-10（エラーの形）
+
+import useSWR, { type SWRConfiguration } from "swr";
 
 // エラーの形。Rails の {"message": "…", "errors": {…}} をそのまま持つ
 export class ApiError extends Error {
@@ -92,4 +95,17 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   }
 
   return data as T;
+}
+
+// 画面のデータを SWR で取る。data（取れた中身。まだなら undefined）、error、isValidating（取り直し中か）などを返す。
+// SWR は、取った結果を覚えておき、同じ URL なら別の画面でもすぐ出して、裏で取り直す。
+// 同じ URL を同時に何か所から頼まれても、1回だけ取りに行く。
+// path に null を渡すと取りに行かない（番号がまだ決まっていないときなどに使う）。
+// ログイン後の画面での 401 は、共通の枠（components/member-only.tsx）がまとめてログイン画面へ移す
+export function useApi<T>(path: string | null, config?: SWRConfiguration<T, ApiError>) {
+  return useSWR<T, ApiError>(path, (key: string) => apiFetch<T>(key), {
+    // 失敗しても自動でやり直さない（401・403・404 は、やり直しても同じ結果のため）
+    shouldRetryOnError: false,
+    ...config,
+  });
 }

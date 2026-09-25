@@ -31,4 +31,68 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
     expect(masters["industries"].map { |industry| industry["name"] }).to eq(%w[業界A 業界B])
     expect(masters["business_types"].map { |business_type| business_type["name"] }).to eq(%w[自社サービス])
   end
+
+  # 順2（募集の作成・編集）で足した選択肢とマスタ
+  describe "募集で使う選択肢とマスタ" do
+    before do
+      # 表示順どおりに並ぶかを見るため、表示順の大きいほうを先に作る
+      major_b = create(:job_major_category, name: "大分類B", position: 2)
+      major_a = create(:job_major_category, name: "大分類A", position: 1)
+      create(:job_middle_category, job_major_category: major_a, name: "中分類A2", position: 2)
+      create(:job_middle_category, job_major_category: major_a, name: "中分類A1", position: 1)
+      create(:job_middle_category, job_major_category: major_b, name: "中分類B1", position: 1)
+      create(:technology, name: "技術B", category: :language, position: 2)
+      create(:technology, name: "技術A", category: :framework, position: 1)
+      # 都道府県は表示順の列を持たず、番号の順に並ぶ
+      create(:prefecture, id: 13, name: "東京都")
+      create(:prefecture, id: 1, name: "北海道")
+    end
+
+    it "募集状態・勤務形態・技術の区分の選択肢を、名前と日本語の表示名で返す" do
+      get "/api/options"
+
+      enums = response.parsed_body["enums"]
+      expect(enums["job_posting_status"]).to eq([
+        { "value" => "unpublished", "label" => "非公開" },
+        { "value" => "published", "label" => "掲載中" },
+        { "value" => "closed", "label" => "終了" }
+      ])
+      expect(enums["work_style"].map { |option| option["label"] }).to eq(%w[フルリモート 一部リモート 出社])
+      expect(enums["technology_category"].map { |option| option["label"] }).to eq(%w[言語 フレームワーク クラウド その他])
+    end
+
+    it "稼働条件の数値の選択肢を返す" do
+      get "/api/options"
+
+      expect(response.parsed_body["work_conditions"]).to eq(
+        "work_days_per_week" => [ 1, 2, 3, 4, 5 ],
+        "work_hours_per_day" => [ 2, 3, 4, 5, 6, 8 ],
+        "duration_months" => [ 1, 3, 6, 9, 12 ]
+      )
+    end
+
+    it "職種を、大分類の中に中分類を入れた形で、どちらも表示順で返す" do
+      get "/api/options"
+
+      majors = response.parsed_body["masters"]["job_major_categories"]
+      expect(majors.map { |major| major["name"] }).to eq(%w[大分類A 大分類B])
+      expect(majors.first.keys).to contain_exactly("id", "code", "name", "description", "job_middle_categories")
+      expect(majors.first["job_middle_categories"].map { |middle| middle["name"] }).to eq(%w[中分類A1 中分類A2])
+      expect(majors.second["job_middle_categories"].map { |middle| middle["name"] }).to eq(%w[中分類B1])
+    end
+
+    it "技術を表示順で、都道府県を番号の順で返す" do
+      get "/api/options"
+
+      masters = response.parsed_body["masters"]
+      expect(masters["technologies"]).to eq([
+        { "id" => Technology.find_by!(name: "技術A").id, "name" => "技術A", "category" => "framework" },
+        { "id" => Technology.find_by!(name: "技術B").id, "name" => "技術B", "category" => "language" }
+      ])
+      expect(masters["prefectures"]).to eq([
+        { "id" => 1, "name" => "北海道" },
+        { "id" => 13, "name" => "東京都" }
+      ])
+    end
+  end
 end

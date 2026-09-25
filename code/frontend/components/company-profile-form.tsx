@@ -1,7 +1,7 @@
 "use client";
 
 // 企業プロフィール編集（C1）の入力フォーム。詳しくは design/designs/ページ設計.md の 6-5 C1、API設計.md の 16-3 ⑦⑧⑨⑩。
-// 開いたら ⑦ 選択肢と ⑧ 自社のプロフィールを取り、保存で ⑨ を送る。アイコンを選んでいたら、⑨ の成功後に ⑩ を続けて送る。
+// 開いたら ⑦ 選択肢と ⑧ 自社のプロフィールを SWR で取り、保存で ⑨ を送る。アイコンを選んでいたら、⑨ の成功後に ⑩ を続けて送る。
 // 必須は会社名だけ（その他決め事.md の 5-9）。見た目は shadcn/ui の部品で、最低限だけそろえている
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
@@ -14,7 +14,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { ApiError, apiFetch } from "@/lib/api";
+import { ApiError, apiFetch, useApi } from "@/lib/api";
 import { useOptions } from "@/lib/options";
 
 // ⑧⑨ の返事の形。Rails の app/views/api/company/profiles/show.json.jbuilder と同じ
@@ -118,26 +118,22 @@ export function CompanyProfileForm() {
   const formRef = useRef<HTMLFormElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 開いたら ⑧ 自社のプロフィールを取る
-  useEffect(() => {
-    // 画面を離れた後に返事が来たときは、何もしない
-    let active = true;
+  // 開いたら ⑧ 自社のプロフィールを取る。401 は共通の枠がログイン画面へ移す
+  const {
+    data: profile,
+    error: profileError,
+    isValidating: profileValidating,
+    mutate: mutateProfile,
+  } = useApi<CompanyProfile>("/api/company/profile");
 
-    apiFetch<CompanyProfile>("/api/company/profile")
-      .then((profile) => {
-        if (!active) return;
-        setValues(toFormValues(profile));
-        setCurrentIconUrl(profile.icon_url);
-      })
-      .catch((error: unknown) => {
-        if (!active || redirectIfUnauthorized(error)) return;
-        setMessage(error instanceof ApiError ? error.message : FALLBACK_ERROR_MESSAGE);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [redirectIfUnauthorized]);
+  // 入力欄の最初の値は、最新を取り終えてから1回だけ入れる。
+  // SWR は前に開いたときの内容を覚えていて、まずそれを出してから裏で取り直すので、
+  // 取り直しが終わる前に入れると、古い内容が入力欄に残ってしまうため。
+  // 描いている途中で値を入れるのは、React の「前の描画から情報を引き継ぐ」書き方（values が null の間だけ動く）
+  if (values === null && profile && !profileValidating) {
+    setValues(toFormValues(profile));
+    setCurrentIconUrl(profile.icon_url);
+  }
 
   // 最初のエラーの項目まで画面を動かす
   useEffect(() => {
@@ -191,11 +187,13 @@ export function CompanyProfileForm() {
 
     try {
       // ① 本体を保存する（⑨）。フォームの全項目を送る。人数が空欄なら null
-      const profile = await apiFetch<CompanyProfile>("/api/company/profile", {
+      const savedProfile = await apiFetch<CompanyProfile>("/api/company/profile", {
         method: "PATCH",
         body: { ...values, employee_size: values.employee_size === "" ? null : values.employee_size },
       });
-      setValues(toFormValues(profile));
+      setValues(toFormValues(savedProfile));
+      // SWR が覚えている中身も、保存後の内容に差し替える（取り直しはしない）
+      await mutateProfile(savedProfile, { revalidate: false });
 
       // ② アイコンを選んでいたら、続けて送る（⑩。⑨ の成功後に送る決まり）
       let iconFailed = false;
@@ -208,6 +206,7 @@ export function CompanyProfileForm() {
             body: formData,
           });
           setCurrentIconUrl(result.icon_url);
+          await mutateProfile({ ...savedProfile, icon_url: result.icon_url }, { revalidate: false });
           setIconFile(null);
           setIconPreviewUrl(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
@@ -238,9 +237,13 @@ export function CompanyProfileForm() {
     return <p className="text-sm text-destructive">{FALLBACK_ERROR_MESSAGE}</p>;
   }
 
+  // ⑧ が取れなかった。401 のときは共通の枠がログイン画面へ移すので、読み込み中のままにする
+  if (!values && profileError && profileError.status !== 401) {
+    return <p className="text-sm text-destructive">{profileError.message}</p>;
+  }
+
   if (!options || !values) {
-    // 読み込みに失敗したときは、上に出す一言を出す
-    return <p className="text-sm text-muted-foreground">{message ?? "読み込み中…"}</p>;
+    return <p className="text-sm text-muted-foreground">読み込み中…</p>;
   }
 
   return (
