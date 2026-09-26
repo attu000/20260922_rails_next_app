@@ -1,5 +1,5 @@
 # 学生向けの募集の行（形B。design/designs/API設計.md の 16-3-2）。
-# ⑱ 募集検索と ⑳ 企業詳細で使い回す。順5 以降の募集管理・スカウト管理でも使う。
+# ⑱ 募集検索、⑳ 企業詳細、㉞ 募集管理で使い回す。順6 のスカウト管理でも使う。
 # 使い方：json.partial! "api/student/job_postings/job_posting", job_posting: 募集
 #
 # 業界・事業形態・工程（industry_ids、business_type_ids、main_work_process_ids、involved_work_process_ids）は、

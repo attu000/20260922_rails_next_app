@@ -25,6 +25,12 @@ class Candidacy < ApplicationRecord
     failed: 4
   }, validate: true
 
+  # 学生の募集管理（S3。API設計.md の 16-3 ㉞）に出すやりとり（データベース.md の 8-7）。
+  # 発生元が応募のもの（状態は問わない）と、発生元がスカウトで状態がマッチ・合格・不合格のもの。
+  # スカウトの未マッチ・見送りは、スカウト管理（S4。順6）に出す。
+  # Django でいうと、Manager に filter(...) を返すメソッドを足すのにあたる
+  scope :listed_in_student_candidacies, -> { application.or(where(status: %i[matched passed failed])) }
+
   # ㉛ 応募（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
   # まだないやりとりを作るので、クラスのメソッドにしている（PR204）。
   # - 今の状態ではできない（募集が掲載中でない、この募集とのやりとりがもうある）なら、ConflictError を投げる（窓口では 409）
