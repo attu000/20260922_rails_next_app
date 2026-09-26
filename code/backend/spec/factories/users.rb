@@ -16,6 +16,8 @@ FactoryBot.define do
     sequence(:email) { |n| "student#{n}@example.com" }
     password { "password" }
     role { :student }
+    # 今日活動したことにする。学生検索は30日以内に活動した学生だけを出すため（StudentProfile.recently_active）
+    last_active_on { Time.zone.today }
 
     after(:create) do |user|
       # 活動状況は必須（その他決め事.md の 5-9）

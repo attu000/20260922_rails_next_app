@@ -11,6 +11,9 @@ class StudentProfile < ApplicationRecord
 
   # プログラミング歴の件数の上限（権限_バリデーション.md の 17-3-4）
   SKILLS_MAX = 50
+  # 最終活動日からこの日数以内なら「最近活動した学生」とする（その他決め事.md の 5-4）。
+  # ちょうど30日前も含める。企業に見せる最終活動の目安の「30日以内」とそろえるため（PR216）
+  ACTIVE_WITHIN_DAYS = 30
 
   belongs_to :user
   # 大学・学部・学科・在住の都道府県（どれも任意）
@@ -49,6 +52,14 @@ class StudentProfile < ApplicationRecord
     skill_up: 1,
     job_hunting: 2
   }, validate: { allow_nil: true }
+
+  # 最近（30日以内に）活動した学生。学生検索（C5）の対象で、後で「似た学生」と通知でも使う（その他決め事.md の 5-4）。
+  # 最終活動日が空欄の学生（一度もログインしていない）は、活動の記録がないので入らない（PR216）。
+  # ログイン情報（users）の表を結合せず「番号がこの一覧に入っているか」（サブクエリ）で絞る。
+  # 結合すると、検索で条件を and でつなぐときに「形の違う絞り込み」として Rails に拒まれるため
+  scope :recently_active, lambda {
+    where(user_id: User.where(last_active_on: (Time.zone.today - ACTIVE_WITHIN_DAYS)..).select(:id))
+  }
 
   # 任意の文章が空白だけで送られてきたら、空欄（null）にそろえて保存する。
   # 大学名（その他）は、空白だけで一覧の大学との CHECK をすり抜けないようにするためでもある

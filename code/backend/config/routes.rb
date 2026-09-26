@@ -37,8 +37,8 @@ Rails.application.routes.draw do
       resources :candidacies, only: :index do
         post :match, on: :member
       end
-      # ㉓ GET /api/company/students/:id（学生詳細）。㉒ 学生検索（index）は順6 で足す
-      resources :students, only: :show
+      # ㉒ GET /api/company/students（学生検索）、㉓ GET /api/company/students/:id（学生詳細）
+      resources :students, only: %i[index show]
       # ㉔ POST /api/company/scouts（スカウト）
       resources :scouts, only: :create
     end
