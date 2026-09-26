@@ -3,6 +3,20 @@
 module Api
   module Student
     class ProfilesController < BaseController
+      # 受け取ってよい項目の一覧（strong parameters に渡すもの）。
+      # ⑥ 学生の新規登録（student_registrations_controller.rb）も、アカウントの3つに加えて、この一覧を使う。
+      # 1か所に書くことで、項目を足したときに登録の側だけ足し忘れることを防ぐ。
+      # 性格の5つは順9、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+      PERMITTED_PARAMS = [
+        :name, :university_id, :university_other_name, :faculty_id, :department_id,
+        :grade, :prefecture_id, :self_pr_strength, :self_pr_weakness, :self_pr_future,
+        :graduation_year, :activity_status,
+        :work_days_per_week, :work_hours_per_day, :duration_months, :available_from,
+        :can_full_remote, :can_partial_remote, :can_onsite, :work_note,
+        { interested_job_middle_category_ids: [], commutable_prefecture_ids: [],
+          skills: %i[technology_id other_name years level] }
+      ].freeze
+
       # ⑮ 表示。返事は app/views/api/student/profiles/show.json.jbuilder
       def show
         @student = current_student
@@ -23,16 +37,9 @@ module Api
       private
 
       # 受け取ってよい値だけを通す（strong parameters。Django の Serializer の fields にあたる）。
-      # icon_url や user_id などを送られても、ここで捨てる。
-      # 性格の5つは順9、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+      # icon_url や user_id などを送られても、ここで捨てる
       def profile_params
-        params.permit(:name, :university_id, :university_other_name, :faculty_id, :department_id,
-                      :grade, :prefecture_id, :self_pr_strength, :self_pr_weakness, :self_pr_future,
-                      :graduation_year, :activity_status,
-                      :work_days_per_week, :work_hours_per_day, :duration_months, :available_from,
-                      :can_full_remote, :can_partial_remote, :can_onsite, :work_note,
-                      interested_job_middle_category_ids: [], commutable_prefecture_ids: [],
-                      skills: %i[technology_id other_name years level])
+        params.permit(*PERMITTED_PARAMS)
       end
     end
   end

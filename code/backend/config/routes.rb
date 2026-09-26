@@ -17,6 +17,13 @@ Rails.application.routes.draw do
     get "me", to: "me#show"
     # ⑦ GET /api/options（選択肢とマスタ）
     get "options", to: "options#show"
+    # ログイン前に使う新規登録の窓口（16-3 ④⑤⑥）。企業・学生の外に置く
+    # ④ POST /api/email_checks（メールアドレスの確認）
+    resources :email_checks, only: :create
+    # ⑤ POST /api/company_registrations（企業の新規登録）
+    resources :company_registrations, only: :create
+    # ⑥ POST /api/student_registrations（学生の新規登録）
+    resources :student_registrations, only: :create
 
     # /api/company/…：企業の窓口（16-1-3）。コントローラーは app/controllers/api/company/ に置き、
     # すべて Api::Company::BaseController を親にする（学生なら 403）
