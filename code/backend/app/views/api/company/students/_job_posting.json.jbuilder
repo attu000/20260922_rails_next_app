@@ -1,5 +1,5 @@
 # 企業から見た、募集ごとのやりとりの状態（形D。design/designs/API設計.md の 16-3-2）。
-# ㉓ 学生詳細の job_postings の要素と、㉖ マッチ（順6 で ㉔ スカウト、順11 で ㉗〜㉚）の返事で使い回す。
+# ㉓ 学生詳細の job_postings の要素と、㉔ スカウト・㉖ マッチ（順11 で ㉗〜㉚）の返事で使い回す。
 # 使い方：json.partial! "api/company/students/job_posting", job_posting: 募集, candidacy: その学生とのやりとり（なければ nil）
 #
 # candidacy.reasons（応募理由。♥印に使う）は順10 で足す（API設計.md の 16-3 ㉓ の作る順）

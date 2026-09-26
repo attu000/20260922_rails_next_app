@@ -63,15 +63,23 @@ RSpec.describe "企業の学生詳細（/api/company/students/:id）", type: :re
       expect(job_postings.map { |job_posting| job_posting["status"] }).to eq(%w[published unpublished closed])
     end
 
-    it "やりとりのない募集は、candidacy が null で、押せるボタンなし" do
+    it "やりとりのない掲載中の募集は、candidacy が null で、「スカウトをする」のボタンを返す" do
       posting = create(:job_posting, :published, company_profile: company)
 
       get "/api/company/students/#{student.id}"
 
       expect(response.parsed_body["job_postings"].sole).to eq(
         "id" => posting.id, "title" => posting.title, "status" => "published",
-        "candidacy" => nil, "available_actions" => []
+        "candidacy" => nil, "available_actions" => [ "scout" ]
       )
+    end
+
+    it "やりとりのない募集でも、掲載中でなければ押せるボタンなし" do
+      create(:job_posting, :closed, company_profile: company)
+
+      get "/api/company/students/#{student.id}"
+
+      expect(response.parsed_body["job_postings"].sole["available_actions"]).to eq([])
     end
 
     it "応募のある掲載中の募集は、やりとりの状態・タグと、「マッチする」のボタンを返す" do

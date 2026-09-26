@@ -1,4 +1,5 @@
-# ㉞ 募集管理（GET /api/student/candidacies）と ㉛ 応募（POST /api/student/candidacies）。
+# ㉞ 募集管理（GET /api/student/candidacies）、㉛ 応募（POST /api/student/candidacies）、
+# ㉜ スカウトにマッチ（POST /api/student/candidacies/:id/match）。
 # 詳しくは design/designs/API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1。企業なら 403 は親（BaseController）が返す
 module Api
   module Student
@@ -27,6 +28,21 @@ module Api
 
         if @candidacy.persisted?
           render :create, status: :created
+        else
+          render_unprocessable(@candidacy.errors)
+        end
+      end
+
+      # ㉜ 学生がスカウトにマッチする。処理はモデルの Candidacy#match_by_student に1つにまとめてある（技術構成.md の 9-2）。
+      # できない状態（応募由来、マッチ済み、募集が掲載中でない）の 409 は、match_by_student が投げる ConflictError を
+      # error_responses.rb が返すので、ここには書かない（PR205）。
+      # 返事は、マッチしたあとの自分の状態（形E）。app/views/api/student/candidacies/match.json.jbuilder
+      def match
+        # 自分のやりとりの中からだけ探す。他人のやりとりの番号なら 404（16-1-10）
+        @candidacy = current_student.candidacies.find(params[:id])
+
+        if @candidacy.match_by_student(candidacy_params[:reasons])
+          render :match
         else
           render_unprocessable(@candidacy.errors)
         end

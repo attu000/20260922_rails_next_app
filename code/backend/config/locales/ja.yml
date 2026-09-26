@@ -87,9 +87,11 @@ ja:
         main_job_middle_category_ids: 主な職種
         related_job_middle_category_ids: 関連する職種
         technology_ids: 使用技術
-      # やりとり。reasons は列ではなく、応募のときに送られる理由の一覧（「応募理由を入力してください」などになる）
+      # やりとり。reasons は列ではなく、応募のときに送られる理由の一覧（「応募理由を入力してください」などになる）。
+      # body も列ではなく、スカウトのときに送られるスカウト文（「スカウト文を入力してください」などになる）
       candidacy:
         reasons: 応募理由
+        body: スカウト文
       message:
         body: 本文
 

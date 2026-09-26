@@ -1,6 +1,7 @@
 require "rails_helper"
 
-# ㉛ POST /api/student/candidacies（応募）と ㉞ GET /api/student/candidacies（募集管理）のテスト。
+# ㉛ POST /api/student/candidacies（応募）、㉞ GET /api/student/candidacies（募集管理）、
+# ㉜ POST /api/student/candidacies/:id/match（スカウトにマッチ）のテスト。
 # 必須テスト「企業が学生の窓口を呼ぶと 403」「見てよい範囲の外の番号は 404」（技術構成.md の 3-3 D-1、API設計.md の 16-1-10）を含む。
 # 詳しくは design/designs/API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1・17-3-4・17-3-6、データベース.md の 8-7
 RSpec.describe "学生のやりとり（応募・募集管理。/api/student/candidacies）", type: :request do
@@ -245,6 +246,137 @@ RSpec.describe "学生のやりとり（応募・募集管理。/api/student/can
         expect(response.parsed_body["pagination"]).to eq(
           "page" => 2, "per_page" => 20, "total_count" => 21, "total_pages" => 2
         )
+      end
+    end
+  end
+
+  describe "㉜ スカウトにマッチ" do
+    # マッチを送る。テストでも CSRF 対策は有効なので、合言葉を付ける
+    def post_match(candidacy_id, reasons: %w[business culture])
+      post "/api/student/candidacies/#{candidacy_id}/match",
+           params: { reasons: reasons },
+           headers: { "X-CSRF-Token" => csrf_token },
+           as: :json
+    end
+
+    it "企業なら 403" do
+      candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student)
+      log_in_as(create(:company_user))
+
+      post_match(candidacy.id)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(candidacy.reload).to be_unmatched
+    end
+
+    context "ログインしている学生" do
+      before { log_in_as(student_user) }
+
+      it "200 と「マッチ済み」を返し、マッチした日時・マッチ理由・理由の組の写しを保存する" do
+        candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student)
+
+        post_match(candidacy.id, reasons: %w[business culture])
+
+        expect(response).to have_http_status(:ok)
+        expect(response.parsed_body).to eq("my_status" => "matched", "my_candidacy_id" => candidacy.id)
+        candidacy.reload
+        expect(candidacy).to be_matched
+        expect(candidacy.matched_at).to be_present
+        # 事業内容（0）とカルチャー（5）：1 + 32
+        expect(candidacy.reason_mask).to eq(33)
+        expect(candidacy.reasons).to contain_exactly("business", "culture")
+      end
+
+      it "企業に見送られたスカウトにもマッチできる（見送りは学生に見せないため）" do
+        candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student, status: :declined)
+
+        post_match(candidacy.id)
+
+        expect(response).to have_http_status(:ok)
+        expect(candidacy.reload).to be_matched
+      end
+
+      it "マッチしたあとは、スカウト管理から消え、募集管理に出る" do
+        candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student)
+
+        post_match(candidacy.id)
+        get "/api/student/scouts"
+        scouts = response.parsed_body["items"]
+        get "/api/student/candidacies"
+
+        expect(scouts).to eq([])
+        expect(response.parsed_body["items"].sole).to include("candidacy_id" => candidacy.id, "my_status" => "matched")
+      end
+
+      # 今の状態ではできない（権限_バリデーション.md の 17-2-1）
+      {
+        "応募から始まったやりとり（企業が応じたときにマッチする）" => { origin: :application },
+        "もうマッチ済みのやりとり" => { origin: :scout, status: :matched }
+      }.each do |label, attributes|
+        it "#{label}なら 409。状態は変わらず、理由も保存されない" do
+          candidacy = create(:candidacy, job_posting: posting, student_profile: student, **attributes)
+
+          post_match(candidacy.id)
+
+          expect(response).to have_http_status(:conflict)
+          expect(response.parsed_body["message"]).to eq("この操作は今はできません。画面を読み込み直してください")
+          expect(candidacy.reload.status).to eq((attributes[:status] || :unmatched).to_s)
+          expect(CandidacyReason.count).to eq(0)
+        end
+      end
+
+      it "募集が掲載中でなければ 409" do
+        candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student)
+        posting.update!(status: :closed)
+
+        post_match(candidacy.id)
+
+        expect(response).to have_http_status(:conflict)
+        expect(candidacy.reload).to be_unmatched
+      end
+
+      # 確かめる順番は「番号（404）→ 状態（409）→ 入力（422）」（16-3-6）
+      it "掲載中でない募集で、理由も0個なら、状態の確かめが先で 409" do
+        candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student)
+        posting.update!(status: :closed)
+
+        post_match(candidacy.id, reasons: [])
+
+        expect(response).to have_http_status(:conflict)
+      end
+
+      # 必須テスト：他人のやりとりの番号は 404（16-1-10）
+      it "ほかの学生のやりとりの番号なら 404。状態は変わらない" do
+        other_candidacy = create(:candidacy, :scout, job_posting: posting)
+
+        post_match(other_candidacy.id)
+
+        expect(response).to have_http_status(:not_found)
+        expect(other_candidacy.reload).to be_unmatched
+      end
+
+      it "存在しない番号なら 404" do
+        post_match(0)
+
+        expect(response).to have_http_status(:not_found)
+      end
+
+      # マッチ理由は、応募理由と同じ項目・同じ確かめ（技術構成.md の 9-2）
+      {
+        "理由が0個" => [ [], "応募理由を入力してください" ],
+        "12個にない値がある" => [ %w[business unknown], "応募理由に選べない値が含まれています" ]
+      }.each do |label, (reasons, message)|
+        it "#{label}なら 422。状態は変わらず、理由も保存されない" do
+          candidacy = create(:candidacy, :scout, job_posting: posting, student_profile: student)
+
+          post_match(candidacy.id, reasons: reasons)
+
+          expect(response).to have_http_status(:unprocessable_content)
+          expect(response.parsed_body["errors"]).to eq("reasons" => [ message ])
+          expect(candidacy.reload).to be_unmatched
+          expect(candidacy.matched_at).to be_nil
+          expect(CandidacyReason.count).to eq(0)
+        end
       end
     end
   end

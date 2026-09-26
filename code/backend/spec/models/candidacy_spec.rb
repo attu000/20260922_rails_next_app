@@ -36,13 +36,13 @@ RSpec.describe Candidacy, type: :model do
   end
 
   # 押せるボタンの判定（形D の available_actions。権限_バリデーション.md の 17-2-1）。
-  # 窓口ができている操作だけを返す（PR202）。順5 では「マッチする」だけ
+  # 窓口ができている操作だけを返す（PR202）。順6 までは「スカウトをする」と「マッチする」
   describe ".available_actions_for（企業が今押せるボタン）" do
     let(:published) { create(:job_posting, :published) }
     let(:closed) { create(:job_posting, :closed) }
 
-    it "やりとりがなければ、空の一覧（スカウトは順6 で足す）" do
-      expect(described_class.available_actions_for(published, nil)).to eq([])
+    it "やりとりがなく、募集が掲載中なら scout" do
+      expect(described_class.available_actions_for(published, nil)).to eq([ "scout" ])
     end
 
     it "応募の未マッチ・見送りで、募集が掲載中なら match" do

@@ -39,6 +39,8 @@ Rails.application.routes.draw do
       end
       # ㉓ GET /api/company/students/:id（学生詳細）。㉒ 学生検索（index）は順6 で足す
       resources :students, only: :show
+      # ㉔ POST /api/company/scouts（スカウト）
+      resources :scouts, only: :create
     end
 
     # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、
@@ -55,8 +57,13 @@ Rails.application.routes.draw do
       resources :job_postings, only: %i[index show]
       # ⑳ GET /api/student/companies/:id（企業詳細）
       resources :companies, only: :show
-      # ㉞ GET /api/student/candidacies（募集管理）、㉛ POST /api/student/candidacies（応募）
-      resources :candidacies, only: %i[index create]
+      # ㉞ GET /api/student/candidacies（募集管理）、㉛ POST /api/student/candidacies（応募）、
+      # ㉜ POST /api/student/candidacies/:id/match（スカウトにマッチ）
+      resources :candidacies, only: %i[index create] do
+        post :match, on: :member
+      end
+      # ㉟ GET /api/student/scouts（スカウト管理）
+      resources :scouts, only: :index
     end
   end
 
