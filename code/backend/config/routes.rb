@@ -65,7 +65,14 @@ Rails.application.routes.draw do
       # ⑱ GET /api/student/job_postings（募集検索）、⑲ GET /api/student/job_postings/:id（募集詳細）
       resources :job_postings, only: %i[index show]
       # ⑳ GET /api/student/companies/:id（企業詳細）
-      resources :companies, only: :show
+      resources :companies, only: :show do
+        # ㊵ GET /api/student/companies/:company_id/message_thread（その企業とのチャット）、
+        # ㊶ POST /api/student/companies/:company_id/message_thread/messages（送信）。
+        # スレッドは企業×学生で1本なので、企業の下に番号を付けない単数形で置く（16-3-7）
+        resource :message_thread, only: :show do
+          resources :messages, only: :create
+        end
+      end
       # ㉞ GET /api/student/candidacies（募集管理）、㉛ POST /api/student/candidacies（応募）、
       # ㉜ POST /api/student/candidacies/:id/match（スカウトにマッチ）
       resources :candidacies, only: %i[index create] do
@@ -73,6 +80,8 @@ Rails.application.routes.draw do
       end
       # ㉟ GET /api/student/scouts（スカウト管理）
       resources :scouts, only: :index
+      # ㊴ GET /api/student/message_threads（スレッド一覧）
+      resources :message_threads, only: :index
     end
   end
 
