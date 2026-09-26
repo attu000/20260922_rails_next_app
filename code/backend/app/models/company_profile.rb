@@ -10,6 +10,8 @@ class CompanyProfile < ApplicationRecord
 
   # 自社の募集。窓口では、自社の募集の中からだけ番号で探す（見てよい範囲の外は 404。API設計.md の 16-1-10）
   has_many :job_postings
+  # 学生とのスレッド
+  has_many :message_threads
 
   # 業界・事業形態（どちらも任意、複数）。Django の ManyToManyField(through=...) にあたる。
   # 会社の紹介として表示するだけで、検索・おすすめには使わない（使うのは募集の値。その他決め事.md の 5-8）

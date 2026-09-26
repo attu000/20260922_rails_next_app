@@ -27,6 +27,9 @@ class StudentProfile < ApplicationRecord
   has_many :interested_job_middle_categories, through: :student_interested_job_categories, source: :job_middle_category
   has_many :student_commutable_prefectures
   has_many :commutable_prefectures, through: :student_commutable_prefectures, source: :prefecture
+  # 自分のやりとり（応募・スカウト）と、企業とのスレッド。窓口では、自分の分の中からだけ番号で探す（API設計.md の 16-1-10）
+  has_many :candidacies
+  has_many :message_threads
 
   # 学年と活動状況。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。範囲外の値は検証エラーにする
   enum :grade, {

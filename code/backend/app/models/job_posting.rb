@@ -19,6 +19,8 @@ class JobPosting < ApplicationRecord
   # 使用技術。Django の ManyToManyField(through=...) にあたる
   has_many :job_posting_technologies
   has_many :technologies, through: :job_posting_technologies
+  # この募集とのやりとり（応募・スカウト）
+  has_many :candidacies
 
   # 状態と勤務形態。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。範囲外の値は検証エラーにする
   enum :status, {

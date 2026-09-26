@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_25_140007) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_26_120003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -48,6 +48,33 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_140007) do
     t.integer "position", null: false
     t.datetime "updated_at", null: false
     t.index ["name"], name: "index_business_types_on_name", unique: true
+  end
+
+  create_table "candidacies", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_posting_id", null: false
+    t.datetime "matched_at"
+    t.integer "origin", null: false
+    t.integer "reason_mask", limit: 2
+    t.integer "status", default: 0, null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_posting_id", "status"], name: "index_candidacies_on_job_posting_id_and_status"
+    t.index ["job_posting_id", "student_profile_id"], name: "index_candidacies_on_job_posting_id_and_student_profile_id", unique: true
+    t.index ["job_posting_id"], name: "index_candidacies_on_job_posting_id"
+    t.index ["job_posting_id"], name: "index_candidacies_on_job_posting_id_with_reasons", where: "(reason_mask IS NOT NULL)"
+    t.index ["student_profile_id"], name: "index_candidacies_on_student_profile_id"
+    t.index ["student_profile_id"], name: "index_candidacies_on_student_profile_id_with_reasons", where: "(reason_mask IS NOT NULL)"
+    t.check_constraint "reason_mask >= 1 AND reason_mask <= 4095", name: "candidacies_reason_mask_range"
+  end
+
+  create_table "candidacy_reasons", force: :cascade do |t|
+    t.bigint "candidacy_id", null: false
+    t.datetime "created_at", null: false
+    t.integer "reason", null: false
+    t.datetime "updated_at", null: false
+    t.index ["candidacy_id", "reason"], name: "index_candidacy_reasons_on_candidacy_id_and_reason", unique: true
+    t.index ["candidacy_id"], name: "index_candidacy_reasons_on_candidacy_id"
   end
 
   create_table "company_business_types", force: :cascade do |t|
@@ -182,6 +209,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_140007) do
     t.check_constraint "status <> 1 OR internship_details IS NOT NULL AND hourly_wage IS NOT NULL", name: "job_postings_published_requires_details"
   end
 
+  create_table "message_threads", force: :cascade do |t|
+    t.bigint "company_profile_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "last_message_at"
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["company_profile_id", "student_profile_id"], name: "idx_on_company_profile_id_student_profile_id_acbd6009bb", unique: true
+    t.index ["company_profile_id"], name: "index_message_threads_on_company_profile_id"
+    t.index ["student_profile_id"], name: "index_message_threads_on_student_profile_id"
+  end
+
   create_table "prefectures", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -292,6 +330,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_140007) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "candidacies", "job_postings"
+  add_foreign_key "candidacies", "student_profiles"
+  add_foreign_key "candidacy_reasons", "candidacies"
   add_foreign_key "company_business_types", "business_types"
   add_foreign_key "company_business_types", "company_profiles"
   add_foreign_key "company_industries", "company_profiles"
@@ -305,6 +346,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_25_140007) do
   add_foreign_key "job_posting_technologies", "technologies"
   add_foreign_key "job_postings", "company_profiles"
   add_foreign_key "job_postings", "prefectures"
+  add_foreign_key "message_threads", "company_profiles"
+  add_foreign_key "message_threads", "student_profiles"
   add_foreign_key "sessions", "users"
   add_foreign_key "student_commutable_prefectures", "prefectures"
   add_foreign_key "student_commutable_prefectures", "student_profiles"
