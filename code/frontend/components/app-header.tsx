@@ -11,9 +11,8 @@ import { loginPathFor, type Role } from "@/lib/auth";
 import { useMe } from "@/components/member-only";
 import { ProfileIcon } from "@/components/profile-icon";
 
-// タブ。会社情報・募集管理・候補者管理・学生検索（企業）と、マイページ・募集検索・募集管理・スカウト管理（学生）以外の行き先は、
-// その画面を作る順で作る（未決内容.md の 11-2）。
-// それまでは押すと「見つかりません」になる
+// タブ。行き先の画面はすべてある（メッセージは順7 で作った。未決内容.md の 11-2）。
+// 通知（企業だけ）の行き先は、それを作る順15 で作る。それまでは押すと「見つかりません」になる
 const TABS: Record<Role, { label: string; href: string }[]> = {
   company: [
     { label: "会社情報", href: "/company/profile" },

@@ -39,6 +39,13 @@ export type Message = {
   scout: { job_posting: { id: number; title: string } } | null;
 };
 
+// 学生が今マッチできるスカウト（㊵ の matchable_scouts の要素。PR222・PR223）。
+// 押したら ㉜ POST /api/student/candidacies/:candidacy_id/match に送る
+export type MatchableScout = {
+  candidacy_id: number;
+  job_posting: { id: number; title: string };
+};
+
 // ㊲㊵ チャット。
 // マッチしている募集（matched_job_postings）は【仕上げ】で足す
 export type MessageThreadDetail = {
@@ -47,4 +54,6 @@ export type MessageThreadDetail = {
   can_send: boolean;
   // 古い順に全件
   messages: Message[];
+  // 学生のチャット（㊵）だけが返す。今マッチできるスカウト（Rails が判定する）。企業のチャット（㊲）にはない
+  matchable_scouts?: MatchableScout[];
 };

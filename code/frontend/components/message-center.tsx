@@ -8,6 +8,7 @@
 // 選んだ相手とページは、URL の ?student_id=（学生なら ?company_id=）と ?page= に持つ（URL が正。16-1-13）。
 // 候補者一覧・学生詳細・募集詳細・企業詳細のメッセージのボタンから来たときは、その相手のスレッドが開いた状態になる。
 // リアルタイム更新はしない。送ったメッセージは返事をそのまま末尾に足し、相手からの新しいメッセージは開き直したときに取る（16-3-7）。
+// 学生の画面では、まだマッチしていないスカウトがあれば、チャットの下の方に「マッチする」を出す（PR222・PR223）。
 // 次のものは【仕上げ】で足す
 //   - チャットの上部の「マッチしている募集」
 //   - 相手の名前から学生詳細・企業詳細へのリンク
@@ -22,12 +23,21 @@ import { PageNav } from "@/components/page-nav";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
 import { StatusBadge } from "@/components/status-badge";
+import { ReasonsDialog } from "@/components/student-candidacy-actions";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch, useApi } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import type { Message, MessageThreadDetail, MessageThreadListResult, MessageThreadRow } from "@/lib/messages";
+import type {
+  MatchableScout,
+  Message,
+  MessageThreadDetail,
+  MessageThreadListResult,
+  MessageThreadRow,
+} from "@/lib/messages";
+import { useOptions } from "@/lib/options";
+import type { MyCandidacyStatus } from "@/lib/student-job-postings";
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
@@ -35,7 +45,7 @@ const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
 // 本文が空のまま送ろうとしたときの文言。Rails の 422 と同じ（権限_バリデーション.md の 17-3-3）
 const BODY_REQUIRED_MESSAGE = "本文を入力してください";
 
-// 相手の種類ごとの違い。学生のメッセージ管理（S5）は、順7 の次の段階で足す
+// 相手の種類ごとの違い
 const SETTINGS = {
   company: {
     // 画面の住所
@@ -48,6 +58,15 @@ const SETTINGS = {
     threadApiPath: (partnerId: string) => `/api/company/students/${encodeURIComponent(partnerId)}/message_thread`,
     // まだ送れないとき（スカウトの返事待ち）に、送信欄の下に出す一言
     cannotSendMessage: "この学生とマッチすると、メッセージを送れるようになります",
+  },
+  student: {
+    pagePath: "/student/messages",
+    partnerParam: "company_id",
+    // ㊴ スレッド一覧
+    threadsApiPath: "/api/student/message_threads",
+    // ㊵ チャット（この後ろに /messages を付けると ㊶ 送信）
+    threadApiPath: (partnerId: string) => `/api/student/companies/${encodeURIComponent(partnerId)}/message_thread`,
+    cannotSendMessage: "この企業とマッチすると、メッセージを送れるようになります",
   },
 } as const;
 
@@ -67,7 +86,7 @@ function pageUrl(settings: MessageCenterSettings, query: string): string {
 }
 
 type MessageCenterProps = {
-  // "company"（企業のメッセージ管理）
+  // "company"（企業のメッセージ管理）か "student"（学生のメッセージ管理）
   kind: keyof typeof SETTINGS;
 };
 
@@ -217,6 +236,13 @@ function ChatPanel({ settings, partnerId, onSent }: ChatPanelProps) {
     onSent();
   }
 
+  // スカウトにマッチできたとき：送れるか・マッチできるスカウトが変わるので、チャットを取り直す。
+  // スレッド一覧も、送ったときと同じく取り直す
+  function handleMatched() {
+    void mutate();
+    onSent();
+  }
+
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div className="flex items-center gap-2">
@@ -232,6 +258,16 @@ function ChatPanel({ settings, partnerId, onSent }: ChatPanelProps) {
             <MessageItem key={message.id} message={message} />
           ))}
         </ul>
+      )}
+
+      {/* 学生のチャットだけが返す。まだマッチしていないスカウトがあれば、送信欄のすぐ上に出す（PR222） */}
+      {data.matchable_scouts && data.matchable_scouts.length > 0 && (
+        <MatchableScouts
+          scouts={data.matchable_scouts}
+          onMatched={handleMatched}
+          // できなかったとき（409 など）は、最新の状態に取り直す
+          onFailed={() => void mutate()}
+        />
       )}
 
       <MessageForm
@@ -262,6 +298,66 @@ function MessageItem({ message }: { message: Message }) {
       </p>
       <span className="text-xs text-muted-foreground">{formatDateTime(message.created_at)}</span>
     </li>
+  );
+}
+
+type MatchableScoutsProps = {
+  scouts: MatchableScout[];
+  onMatched: () => void;
+  onFailed: () => void;
+};
+
+// 学生のチャットの「届いているスカウト」の枠（PR222）。募集ごとに1行ずつ「マッチする」を出す（PR223）。
+// どのスカウトを出すかは Rails が判定する（募集詳細の「マッチする」と同じ判定。16-1-9）。
+// 押すと、募集詳細と同じ「理由を選ぶポップアップ」を出す（項目と文言は応募と同じ。PR218）
+function MatchableScouts({ scouts, onMatched, onFailed }: MatchableScoutsProps) {
+  // 理由の選択肢（⑦ の enums.candidacy_reason）。この枠を出すときだけ取る
+  const { options, failed } = useOptions();
+  // マッチできなかったときの一言（「この操作は今はできません…」など）。取り直して行が消えても出したままにする
+  const [message, setMessage] = useState<string | null>(null);
+
+  let rows: ReactNode;
+  if (failed) {
+    rows = <p className="text-sm text-destructive">{FALLBACK_ERROR_MESSAGE}</p>;
+  } else if (!options) {
+    rows = <p className="text-sm text-muted-foreground">読み込み中…</p>;
+  } else {
+    rows = (
+      <ul className="space-y-2">
+        {scouts.map((scout) => (
+          <li key={scout.candidacy_id} className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm">募集「{scout.job_posting.title}」のスカウト</span>
+            <ReasonsDialog
+              triggerLabel="マッチする"
+              reasonOptions={options.enums.candidacy_reason}
+              // ㉜ スカウトにマッチする。返事は自分の状態（形E）だが、ここではチャットを取り直すので使わない
+              submit={(reasons) =>
+                apiFetch<MyCandidacyStatus>(`/api/student/candidacies/${scout.candidacy_id}/match`, {
+                  method: "POST",
+                  body: { reasons },
+                })
+              }
+              onDone={() => {
+                setMessage(null);
+                onMatched();
+              }}
+              onFailed={(failedMessage) => {
+                setMessage(failedMessage);
+                onFailed();
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <section aria-label="届いているスカウト" className="space-y-2 rounded-lg bg-muted p-3">
+      <h3 className="text-sm font-bold">届いているスカウト</h3>
+      {rows}
+      {message && <p className="text-sm text-destructive">{message}</p>}
+    </section>
   );
 }
 

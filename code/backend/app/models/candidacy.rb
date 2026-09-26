@@ -6,6 +6,8 @@ class Candidacy < ApplicationRecord
   MY_STATUSES = %w[none applied scouted matched].freeze
   # 企業から見たタグの6つ（API設計.md の 16-3 ㉑・形D）。計算は tag。⑦ の選択肢（candidacy_tag）に使う
   TAGS = %w[pending_application scouted matched declined passed failed].freeze
+  # マッチ以降の状態（マッチ・合格・不合格）。絞り込みの after_match と、1件ずつ確かめる after_match? で使う
+  AFTER_MATCH_STATUSES = %i[matched passed failed].freeze
 
   belongs_to :job_posting
   belongs_to :student_profile
@@ -42,7 +44,7 @@ class Candidacy < ApplicationRecord
   # 検索はスカウトする相手を探すためのものなので、もうスカウトした・見送った・マッチした学生は出さない
   scope :excluded_from_student_search, -> { scout.or(where.not(status: :unmatched)) }
   # マッチ以降（マッチ・合格・不合格）のやりとり。メッセージを送れるかの判定に使う（権限_バリデーション.md の 17-2-3）
-  scope :after_match, -> { where(status: %i[matched passed failed]) }
+  scope :after_match, -> { where(status: AFTER_MATCH_STATUSES) }
 
   # ㉛ 応募（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
   # まだないやりとりを作るので、クラスのメソッドにしている（PR204）。
@@ -204,6 +206,13 @@ class Candidacy < ApplicationRecord
     end
     # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
+  end
+
+  # このやりとりがマッチ以降（マッチ・合格・不合格）か。
+  # 候補者一覧（API設計.md の 16-3 ㉑）の行に「メッセージ」のボタンを出すかに使う（PR224）。
+  # 判定を画面側に書かず、ここで計算して返す（16-1-9）。Django のモデルの @property で status in (...) を返すのにあたる
+  def after_match?
+    AFTER_MATCH_STATUSES.include?(status.to_sym)
   end
 
   # 企業から見た、やりとりの状態のタグ（API設計.md の 16-3 ㉑・形D）。

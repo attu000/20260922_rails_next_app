@@ -45,7 +45,7 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
 
         item = response.parsed_body["items"].sole
         expect(item.keys).to contain_exactly(
-          "id", "job_posting", "student", "origin", "status", "tag", "created_at", "matched_at"
+          "id", "job_posting", "student", "origin", "status", "tag", "after_match", "created_at", "matched_at"
         )
         expect(item).to include(
           "id" => candidacy.id,
@@ -57,8 +57,24 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
           "origin" => "application",
           "status" => "unmatched",
           "tag" => "pending_application",
+          "after_match" => false,
           "matched_at" => nil
         )
+      end
+
+      # 「メッセージ」のボタンを出すか（PR224）
+      it "after_match は、未マッチ・見送りの行は false、マッチ・合格の行は true" do
+        expected = {
+          create(:candidacy, job_posting: posting) => false,
+          create(:candidacy, job_posting: posting, status: :declined) => false,
+          create(:candidacy, :scout, job_posting: posting, status: :matched) => true,
+          create(:candidacy, job_posting: posting, status: :passed) => true
+        }
+
+        get "/api/company/candidacies"
+
+        expect(response.parsed_body["items"].to_h { |item| [ item["id"], item["after_match"] ] })
+          .to eq(expected.transform_keys(&:id))
       end
 
       it "タグは、応募の未マッチが未対応応募、スカウトの未マッチがスカウト済み、マッチはマッチ" do

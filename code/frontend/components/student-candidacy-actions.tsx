@@ -143,8 +143,9 @@ type ReasonsDialogProps = {
 };
 
 // 「応募する」「マッチする」のボタンと、応募理由を選ぶポップアップ（12項目から複数、最低1つ。その他決め事.md の 5-1）。
-// マッチ理由は応募理由と同じ項目なので、説明・欄の見出し・エラーの文言も応募と同じにする（PR218）
-function ReasonsDialog({ triggerLabel, reasonOptions, submit, onDone, onFailed }: ReasonsDialogProps) {
+// マッチ理由は応募理由と同じ項目なので、説明・欄の見出し・エラーの文言も応募と同じにする（PR218）。
+// 学生のメッセージ管理の「マッチする」（components/message-center.tsx。PR222）でも使う
+export function ReasonsDialog({ triggerLabel, reasonOptions, submit, onDone, onFailed }: ReasonsDialogProps) {
   const redirectIfUnauthorized = useRedirectIfUnauthorized();
   const [open, setOpen] = useState(false);
   // 選んだ応募理由の名前（"business" など）

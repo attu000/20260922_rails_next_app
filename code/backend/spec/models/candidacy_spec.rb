@@ -35,6 +35,15 @@ RSpec.describe Candidacy, type: :model do
     end
   end
 
+  # 候補者一覧の「メッセージ」のボタンを出すか（PR224）
+  describe "#after_match?（マッチ以降か）" do
+    { unmatched: false, declined: false, matched: true, passed: true, failed: true }.each do |status, expected|
+      it "状態が #{status} なら #{expected}" do
+        expect(described_class.new(origin: :application, status:).after_match?).to be(expected)
+      end
+    end
+  end
+
   # 押せるボタンの判定（形D の available_actions。権限_バリデーション.md の 17-2-1）。
   # 窓口ができている操作だけを返す（PR202）。順6 までは「スカウトをする」と「マッチする」
   describe ".available_actions_for（企業が今押せるボタン）" do
