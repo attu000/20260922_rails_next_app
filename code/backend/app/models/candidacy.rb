@@ -37,6 +37,10 @@ class Candidacy < ApplicationRecord
   # 学生のスカウト管理（S4。API設計.md の 16-3 ㉟）に出すやりとり。
   # 発生元がスカウトで、状態が未マッチか見送りのもの（見送りは学生に見せないので、「スカウトあり」のまま出す）
   scope :listed_in_student_scouts, -> { scout.where(status: %i[unmatched declined]) }
+  # 企業の学生検索（C5）から外すやりとり（PR220）。「未対応応募（応募の未マッチ）」以外のすべて。
+  # スカウトから始まったもの（未マッチ・見送り・マッチ以降）と、応募から始まって見送り・マッチ以降になったもの。
+  # 検索はスカウトする相手を探すためのものなので、もうスカウトした・見送った・マッチした学生は出さない
+  scope :excluded_from_student_search, -> { scout.or(where.not(status: :unmatched)) }
 
   # ㉛ 応募（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
   # まだないやりとりを作るので、クラスのメソッドにしている（PR204）。

@@ -175,7 +175,8 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         expect(first.keys).to contain_exactly(
           "id", "name", "icon_url", "grade", "graduation_year", "activity_status",
           "interested_job_middle_category_ids", "skills",
-          "work_days_per_week", "work_hours_per_day", "duration_months", "matched"
+          "work_days_per_week", "work_hours_per_day", "duration_months", "matched",
+          "candidacy", "candidacy_count"
         )
         expect(first).to include(
           "id" => student.id, "name" => student.name, "icon_url" => nil,
@@ -224,6 +225,42 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
 
         expect(response).to have_http_status(:ok)
         expect(response.parsed_body["items"].map { |item| item["id"] }).to eq([ newer.id, older.id ])
+      end
+
+      # 行のタグ（PR219）。スカウト済み・見送り・マッチ以降の学生は検索の本体が除く（PR220）ので、残るのは未対応応募だけ
+      describe "行のタグ用の candidacy と candidacy_count" do
+        let(:posting) { create(:job_posting, :published, company_profile: company) }
+
+        it "募集を選ぶと、その募集の未対応応募の学生に candidacy（tag は pending_application）を返す。やりとりのない学生は null" do
+          candidacy = create(:candidacy, job_posting: posting, student_profile: student)
+          no_candidacy = create(:student_user).student_profile
+
+          get "/api/company/students", params: { job_posting_id: posting.id }
+
+          items = response.parsed_body["items"].index_by { |item| item["id"] }
+          expect(items[student.id]["candidacy"]).to eq(
+            "id" => candidacy.id, "origin" => "application", "status" => "unmatched", "tag" => "pending_application"
+          )
+          expect(items[no_candidacy.id]["candidacy"]).to be_nil
+        end
+
+        it "募集を選ばないと、candidacy は常に null。candidacy_count は自社の募集とのやりとりの件数（他社の分は数えない）" do
+          create(:candidacy, job_posting: posting, student_profile: student)
+          create(:candidacy, :scout, job_posting: create(:job_posting, :published), student_profile: student)
+
+          get "/api/company/students"
+
+          item = response.parsed_body["items"].sole
+          expect(item).to include("candidacy" => nil, "candidacy_count" => 1)
+        end
+
+        it "スカウト済みの学生は、その募集を選ぶと出てこない（PR220）" do
+          create(:candidacy, :scout, job_posting: posting, student_profile: student)
+
+          get "/api/company/students", params: { job_posting_id: posting.id }
+
+          expect(response.parsed_body["items"]).to eq([])
+        end
       end
 
       it "20件ずつのページに分ける" do

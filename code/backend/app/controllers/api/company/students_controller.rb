@@ -15,11 +15,19 @@ module Api
         # 募集は、自社の募集の中から探す。他社の募集の番号なら 404（16-1-10）
         job_posting = current_company.job_postings.find(params[:job_posting_id]) if params[:job_posting_id].present?
 
-        search = StudentSearch.new(job_posting: job_posting, params: search_params)
+        search = StudentSearch.new(company: current_company, job_posting: job_posting, params: search_params)
         @pagy, records = paginate(search.ordered)
         @students = preload_records(records, ROW_ASSOCIATIONS)
-        @matched_ids = search.matched_ids_in(@students.map(&:id))
+        student_ids = @students.map(&:id)
+        @matched_ids = search.matched_ids_in(student_ids)
         @matched_count = search.matched_count
+
+        # 行のタグ用（PR219）。1ページ分の学生について、まとめて1回ずつ取り出す（1行ごとに問い合わせない。N+1問題を避ける）
+        # 募集を選んだときの、その募集とのやりとり（学生の番号で引ける）。除外のあとなので、残っているのは未対応応募だけ（PR220）
+        @candidacies_by_student_id =
+          job_posting ? job_posting.candidacies.where(student_profile_id: student_ids).index_by(&:student_profile_id) : {}
+        # 自社の募集とのやりとりの件数（学生の番号 => 件数）。募集を選ばないときの「やりとりあり」に使う。他社の分は数えない
+        @candidacy_counts = current_company.candidacies.where(student_profile_id: student_ids).group(:student_profile_id).count
       end
 
       # ㉓ 学生のプロフィールと、自社の全募集ぶんの状態・押せるボタン。

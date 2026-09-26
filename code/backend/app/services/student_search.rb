@@ -2,8 +2,8 @@
 # 詳しくは design/designs/API設計.md の 16-3 ㉒・16-1-11、処理設計_類似度.md の 7-3。
 # 募集検索の本体（job_posting_search.rb）と同じ組み立てにしている。
 #
-# 条件で結果を減らさない。30日以内に活動した学生をすべて返し、指定した条件を「全部」満たす学生を合致の群として先に、
-# 1つでも外れる学生を合致外の群としてあとに並べる（技術構成.md の 9-1-1 の1）。
+# 条件で結果を減らさない。対象の学生（30日以内に活動し、もうスカウトした・見送った・マッチした学生を除く）をすべて返し、
+# 指定した条件を「全部」満たす学生を合致の群として先に、1つでも外れる学生を合致外の群としてあとに並べる（技術構成.md の 9-1-1 の1）。
 # どちらの群の中も、選んだ並び順（おすすめ順・最終活動が新しい順）で並べる。
 # 性格は合致の判定に使わない（サービス概要_コンセプト.md の 2-4）。
 # ページ分けはコントローラー（concerns/pagination.rb）が行う。ここでは「並べた一覧」までを作る
@@ -26,11 +26,13 @@ class StudentSearch
     "onsite" => :can_onsite
   }.freeze
 
-  # job_posting：選んだ自社の募集（おすすめの点数に使う）。選んでいなければ nil。
+  # company：検索している会社（募集を選んでいないときの除外に使う）。
+  # job_posting：選んだ自社の募集（除外とおすすめの点数に使う）。選んでいなければ nil。
   # params：画面から送られた条件（q、work_days_per_week、work_hours_per_day、duration_months、start_month、work_style、
   #   prefecture_id、technology_ids、min_level、job_major_category_ids、job_middle_category_ids、grades、graduation_years、
   #   activity_statuses、sort）。形のおかしい値や知らない名前は、その条件を「指定なし」として扱う（募集検索と同じゆるさ。PR200）
-  def initialize(job_posting:, params:)
+  def initialize(company:, job_posting:, params:)
+    @company = company
     @job_posting = job_posting
     @params = params.to_h.with_indifferent_access
     @sort = decide_sort(@params[:sort])
@@ -63,9 +65,36 @@ class StudentSearch
     SORTS.include?(sort) ? sort : "recommended"
   end
 
-  # 対象は30日以内に活動した学生すべて。システムが決めた除外はこれだけ（利用者が指定した条件ではないため。7-3）
+  # 対象の学生。システムが決めた除外は、次の2つ（利用者が指定した条件ではなく、全員に同じ基準で当たるため。7-3）
+  #   - 30日より前に活動した学生（最終活動日が空の学生も。PR216）
+  #   - もうスカウトした・見送った・マッチした学生（excluded_student_ids。PR220）
+  # ここで除くので、人数・合致の群と合致外の群・ページ分け・おすすめ順のすべてが、除いた後の学生で計算される
   def base
-    StudentProfile.recently_active
+    @base ||= begin
+      scope = StudentProfile.recently_active
+      excluded_ids = excluded_student_ids
+      excluded_ids ? scope.where.not(id: excluded_ids) : scope
+    end
+  end
+
+  # 除く学生の番号の一覧（データベースの問い合わせの形。サブクエリとして使う）。除かないなら nil（PR220）
+  #   - 募集を選んでいるとき：その募集と「学生検索から外すやりとり」がある学生
+  #   - 募集を選んでいないとき：自社の掲載中の募集すべてと、そのやりとりがある学生（どの募集でも、もうスカウトできない学生）。
+  #     掲載中の募集が1件もなければ、誰も除かない
+  def excluded_student_ids
+    return @job_posting.candidacies.excluded_from_student_search.select(:student_profile_id) if @job_posting
+
+    published_postings = @company.job_postings.published
+    published_count = published_postings.count
+    return nil if published_count.zero?
+
+    # 1つの募集×学生のやりとりは1件だけなので、学生ごとの件数が掲載中の募集の数と同じなら、すべての募集で当てはまる。
+    # Django の .values("student_profile").annotate(n=Count("id")).filter(n__gte=掲載中の数) にあたる
+    Candidacy.excluded_from_student_search
+             .where(job_posting_id: published_postings.select(:id))
+             .group(:student_profile_id)
+             .having("COUNT(*) >= ?", published_count)
+             .select(:student_profile_id)
   end
 
   # 指定した条件を全部満たす学生。条件が1つもなければ base と同じ（全員が合致）。

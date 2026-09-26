@@ -7,7 +7,12 @@ RSpec.describe StudentSearch do
   let(:company) { create(:company_user).company_profile }
 
   def search(params = {}, job_posting: nil)
-    StudentSearch.new(job_posting: job_posting, params: params)
+    StudentSearch.new(company: company, job_posting: job_posting, params: params)
+  end
+
+  # 検索に出る学生の番号（ページ分けの前の、並べた一覧）
+  def listed_ids(job_posting: nil)
+    search({}, job_posting: job_posting).ordered.map(&:id)
   end
 
   # 条件に合う学生の番号（すべての学生の中から）
@@ -37,6 +42,96 @@ RSpec.describe StudentSearch do
 
       expect(result.ordered.map(&:id)).to contain_exactly(today.id, thirty_days_ago.id)
       expect(result.matched_count).to eq(2)
+    end
+  end
+
+  # もうスカウトした・見送った・マッチした学生は出さない（PR220）。未対応応募（応募の未マッチ）だけは残す
+  describe "やりとりによる除外" do
+    let(:posting) { create(:job_posting, :published, company_profile: company) }
+
+    def create_candidacy(student, job_posting, origin, status)
+      create(:candidacy, student_profile: student, job_posting: job_posting, origin: origin, status: status)
+    end
+
+    context "募集を選んだとき" do
+      it "その募集とスカウト済み・見送り・マッチ以降のやりとりがある学生は出さない。未対応応募と、やりとりのない学生は出す" do
+        # 出さない7人（スカウト済み、スカウトの見送り・マッチ、応募の見送り・マッチ・合格・不合格）
+        [
+          %i[scout unmatched], %i[scout declined], %i[scout matched],
+          %i[application declined], %i[application matched], %i[application passed], %i[application failed]
+        ].each { |origin, status| create_candidacy(create_student, posting, origin, status) }
+        pending_application = create_student.tap { |student| create_candidacy(student, posting, :application, :unmatched) }
+        no_candidacy = create_student
+
+        expect(listed_ids(job_posting: posting)).to contain_exactly(pending_application.id, no_candidacy.id)
+      end
+
+      it "ほかの募集とだけやりとりがある学生は出す" do
+        other_posting = create(:job_posting, :published, company_profile: company)
+        student = create_student.tap { |s| create_candidacy(s, other_posting, :scout, :matched) }
+
+        expect(listed_ids(job_posting: posting)).to eq([ student.id ])
+      end
+
+      it "除いた学生は、人数（全◯人・条件に合う◯人）にも入らない" do
+        create_student.tap { |student| create_candidacy(student, posting, :scout, :unmatched) }
+        create_student
+
+        result = search({}, job_posting: posting)
+
+        expect(result.ordered.size).to eq(1)
+        expect(result.matched_count).to eq(1)
+      end
+    end
+
+    context "募集を選ばないとき" do
+      let!(:other_posting) { create(:job_posting, :published, company_profile: company) }
+
+      it "自社の掲載中の募集すべてで、もうすることがない学生は出さない。1つでも残っていれば出す" do
+        done_with_all = create_student.tap do |student|
+          create_candidacy(student, posting, :scout, :unmatched)
+          create_candidacy(student, other_posting, :application, :declined)
+        end
+        one_left = create_student.tap { |student| create_candidacy(student, posting, :scout, :matched) }
+        pending_application = create_student.tap do |student|
+          create_candidacy(student, posting, :scout, :unmatched)
+          create_candidacy(student, other_posting, :application, :unmatched)
+        end
+
+        expect(listed_ids).not_to include(done_with_all.id)
+        expect(listed_ids).to contain_exactly(one_left.id, pending_application.id)
+      end
+
+      it "非公開・終了の募集は数えない。掲載中の募集すべてで済んでいれば出さず、終了の募集のやりとりで数を補っても出す" do
+        closed = create(:job_posting, :closed, company_profile: company)
+        # 掲載中の2件とも済んでいる（終了の募集とはやりとりがないが、数えないので関係ない）
+        done_with_published = create_student.tap do |s|
+          create_candidacy(s, posting, :scout, :unmatched)
+          create_candidacy(s, other_posting, :scout, :unmatched)
+        end
+        # 掲載中の1件と終了の1件で済んでいる。掲載中のもう1件が残っているので出す
+        one_published_left = create_student.tap do |s|
+          create_candidacy(s, posting, :scout, :unmatched)
+          create_candidacy(s, closed, :scout, :matched)
+        end
+
+        expect(listed_ids).not_to include(done_with_published.id)
+        expect(listed_ids).to include(one_published_left.id)
+      end
+
+      it "他社の募集とのやりとりは関係しない" do
+        others = create(:job_posting, :published)
+        student = create_student.tap { |s| create_candidacy(s, others, :scout, :matched) }
+
+        expect(listed_ids).to eq([ student.id ])
+      end
+    end
+
+    it "掲載中の募集が1件もない会社では、誰も除かない" do
+      closed = create(:job_posting, :closed, company_profile: company)
+      student = create_student.tap { |s| create_candidacy(s, closed, :scout, :matched) }
+
+      expect(listed_ids).to eq([ student.id ])
     end
   end
 
