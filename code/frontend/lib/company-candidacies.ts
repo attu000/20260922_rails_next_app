@@ -26,6 +26,8 @@ export type CompanyCandidacyRow = {
   status: string;
   // 企業から見たタグ（"pending_application" など）。Rails が計算する。表示名は ⑦ の enums.candidacy_tag
   tag: string;
+  // マッチ以降（マッチ・合格・不合格）か。Rails が判定する。true の行に「メッセージ」のボタンを出す（PR224）
+  after_match: boolean;
   // やりとりが始まった日時（応募日・スカウト日）
   created_at: string;
   matched_at: string | null;

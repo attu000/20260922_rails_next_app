@@ -4,8 +4,8 @@
 // 開いたら ㉓ 学生詳細と ⑦ 選択肢を取り、学生の名前、募集タブ、選んだ募集での状態とボタン、学生のプロフィールを並べる。
 // 最初に選ぶタブは URL の ?job_posting_id=（候補者一覧から来たときはその募集）。なければ先頭の募集。
 // ボタンは Rails が返す available_actions だけに従う。画面側では状態から組み立てない（16-1-9）。
+// 「この学生とのメッセージ」は、募集タブの外（名前の横）に、Rails の has_message_thread が true のときだけ出す（PR213）。
 // 次のものは、それを作る順で足す
-//   - 「この学生とのメッセージ」（has_message_thread を使う）：行き先のメッセージ管理を作る順7（PR213）
 //   - 送信後の「この学生に似た学生」のポップアップ：順14
 //   - 比較の表示と応募理由の♥印：順10、見送る・見送りを取り消す・合格・不合格：順11
 //   - 最終活動の目安：【仕上げ】
@@ -88,9 +88,19 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <ProfileIcon src={data.student.icon_url} name={data.student.name} size="lg" />
         <PageTitle>{data.student.name}</PageTitle>
+        {/* メッセージは募集ごとではなく相手ごとなので、募集タブの外に置く。
+            スレッドがあれば出す（送れるかどうかは、行き先のメッセージ管理が決める。権限_バリデーション.md の 17-2-3） */}
+        {data.has_message_thread && (
+          <Link
+            href={`/company/messages?student_id=${encodeURIComponent(studentId)}`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "ml-auto")}
+          >
+            この学生とのメッセージ
+          </Link>
+        )}
       </div>
 
       {/* 募集タブと、その中身。タブは枠の外に並べ、選んだタブだけを下の大きな枠とつなげて見せる（PR217）。

@@ -5,15 +5,15 @@
 // 見られない募集（関係のない非公開・終了の募集、存在しない番号）は Rails が 404 を返し、「見つかりません」と出る（守りは Rails。16-1-10）。
 // 自分とやりとりがある募集は、非公開・終了でも開ける（「募集終了」と出す）。
 // 自分の状態の表示と「応募する」「マッチする」は components/student-candidacy-actions.tsx。
-// 次のものは、それを作る順で足す（PR189）
-//   - 「この企業とのメッセージ」（has_message_thread を使う）：行き先のメッセージ管理を作る順7（PR213）
-//   - 業界・事業形態・工程、カルチャーグラフと自分の性格との一致・ずれ：順9・順10
+// 「この企業とのメッセージ」は、Rails の has_message_thread が true のときだけ出す（PR213）。
+// 業界・事業形態・工程、カルチャーグラフと自分の性格との一致・ずれは、順9・順10 で足す（PR189）
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
 import { StudentCandidacyActions } from "@/components/student-candidacy-actions";
+import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
 import { formatHourlyWage, formatStartMonth } from "@/lib/format";
 import { jobMiddleCategoryNames, labelOf, nameOf, useOptions } from "@/lib/options";
@@ -85,11 +85,23 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
           {/* やりとりがある非公開・終了の募集を開いたとき */}
           {!data.is_open && <span className="ml-2 text-base font-normal text-muted-foreground">募集終了</span>}
         </PageTitle>
-        {/* 会社名から企業詳細へ */}
-        <Link href={`/student/companies/${data.company.id}`} className="inline-flex items-center gap-2 hover:underline">
-          <ProfileIcon src={data.company.icon_url} name={data.company.name} size="sm" />
-          <span className="text-sm">{data.company.name}</span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* 会社名から企業詳細へ */}
+          <Link href={`/student/companies/${data.company.id}`} className="inline-flex items-center gap-2 hover:underline">
+            <ProfileIcon src={data.company.icon_url} name={data.company.name} size="sm" />
+            <span className="text-sm">{data.company.name}</span>
+          </Link>
+          {/* 状態に関係なく、その企業とのスレッドがあれば出す。スカウトが届いただけでも、スカウト文を読みに行ける。
+              送れるかどうかは、行き先のメッセージ管理が決める（権限_バリデーション.md の 17-2-3） */}
+          {data.has_message_thread && (
+            <Link
+              href={`/student/messages?company_id=${data.company.id}`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              この企業とのメッセージ
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* 自分の状態と「応募する」「マッチする」。まず目に入るよう、タイトルと会社名のすぐ下に置く */}

@@ -31,7 +31,7 @@ export type CompanyStudentDetail = {
   // マイページ（⑮）と同じ項目
   student: StudentProfile;
   // この学生とのスレッドがあるか（スカウトを送ったか、応募がマッチしたらできる）。
-  // 「この学生とのメッセージ」のボタンに、行き先のメッセージ管理を作る順7 で使う（PR213）
+  // true なら「この学生とのメッセージ」のボタンを出す（PR213）
   has_message_thread: boolean;
   // 自社の全募集（非公開・終了も含む。最終更新の新しい順）
   job_postings: CompanyJobPostingState[];

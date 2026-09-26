@@ -3,12 +3,15 @@
 // 企業詳細（S7）の表示。詳しくは design/designs/ページ設計.md の 6-6 S7、API設計.md の 16-3 ⑳。
 // 開いたら ⑳ 企業詳細と ⑦ 選択肢（業界・事業形態の名前、人数の表示名）を取り、企業のプロフィールと掲載中の募集を並べる。
 // 業界・事業形態は企業プロフィールの値（募集の値ではない）。
-// 「この企業とのメッセージ」は、順6 で足す（PR189）
+// 「この企業とのメッセージ」は、Rails の has_message_thread が true のときだけ出す（募集詳細と同じ判定。PR213）
 
+import { cn } from "cn";
+import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
 import { DetailItem, DetailSection } from "@/components/student-job-posting-detail";
 import { StudentJobPostingRow } from "@/components/student-job-posting-row";
+import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
 import { labelOf, nameOf, useOptions } from "@/lib/options";
 import type { StudentCompany } from "@/lib/student-job-postings";
@@ -39,9 +42,18 @@ export function StudentCompanyDetail({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <ProfileIcon src={data.icon_url} name={data.name} size="lg" />
         <PageTitle>{data.name}</PageTitle>
+        {/* その企業とのスレッドがあれば出す（送れるかどうかは、行き先のメッセージ管理が決める） */}
+        {data.has_message_thread && (
+          <Link
+            href={`/student/messages?company_id=${data.id}`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "ml-auto")}
+          >
+            この企業とのメッセージ
+          </Link>
+        )}
       </div>
 
       {/* 並びは、ページ設計.md の 6-6 S7 の「表示」の順 */}

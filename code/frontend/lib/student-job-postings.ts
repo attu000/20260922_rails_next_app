@@ -1,7 +1,7 @@
 // 学生から見た募集・企業の型。Rails の app/views/api/student/ の JSON と同じ形
 // （design/designs/API設計.md の 16-3 ⑱⑲⑳、形B）。空欄は null。
 // 企業から見た募集（lib/job-postings.ts）とは返す項目が違うので、別のファイルにしている。
-// 業界・事業形態・工程・カルチャーは順9、その企業とのスレッドがあるか（has_message_thread）は、使う順7 で足す
+// 業界・事業形態・工程・カルチャーは順9 で足す
 
 import { idsFromQuery, monthDateFromQuery, numberFromQuery, type QueryReader } from "@/lib/search-query";
 
@@ -158,6 +158,9 @@ export type StudentJobPostingDetail = MyCandidacyStatus & {
   related_job_middle_category_ids: number[];
   technology_ids: number[];
   published_at: string;
+  // その企業とのスレッドがあるか（スカウトが届いたか、マッチしたらできる）。
+  // true なら「この企業とのメッセージ」のボタンを出す（権限_バリデーション.md の 17-2-3。PR213）
+  has_message_thread: boolean;
 };
 
 // ㉞ 募集管理と ㉟ スカウト管理の返事（同じ形）。行は形B に、やりとりの番号と自分の状態を足したもの。
@@ -184,6 +187,8 @@ export type StudentCompany = {
   business_description: string | null;
   about: string | null;
   icon_url: string | null;
+  // その企業とのスレッドがあるか。true なら「この企業とのメッセージ」のボタンを出す（募集詳細と同じ判定。PR213）
+  has_message_thread: boolean;
   // その企業の掲載中の募集（最初に掲載した日時の新しい順。ページ分けしない）
   job_postings: StudentJobPostingRow[];
 };

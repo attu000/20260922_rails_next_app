@@ -4,9 +4,9 @@
 // 自社の募集への応募・スカウトを、1件1行で、やりとりが始まった日の新しい順に並べる（Rails が選んで並べる）。
 // タブ（「すべて」と募集別）とページは、URL の ?job_posting_id= と ?page= に持つ（URL が正。16-1-13）。
 // 企業の募集一覧の「この募集の候補者を見る」から来たときは、その募集のタブが選ばれた状態で開く。
+// マッチ以降の行には「メッセージ」のボタンを出す。出すかは Rails の after_match に従う（PR209・PR224）。
 // 次のものは、それを作る順で足す
 //   - 見送り・合格・不合格を既定で隠す切り替え（?show_all=true）：順11
-//   - 「メッセージ」のボタン（マッチ以降の行）：順7（PR209）
 //   - 未返信のタグ：【仕上げ】
 
 import type { ReactNode } from "react";
@@ -166,9 +166,20 @@ function CandidacyRow({ candidacy, options }: CandidacyRowProps) {
         </p>
       </div>
 
-      <Link href={detailHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
-        詳細を見る
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link href={detailHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+          詳細を見る
+        </Link>
+        {/* マッチ以降の行だけ。判定は Rails（after_match）で、状態から組み立てない（16-1-9。PR224） */}
+        {candidacy.after_match && (
+          <Link
+            href={`/company/messages?student_id=${student.id}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            メッセージ
+          </Link>
+        )}
+      </div>
     </li>
   );
 }
