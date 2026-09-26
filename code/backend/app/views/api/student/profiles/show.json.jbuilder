@@ -1,22 +1,4 @@
 # ⑮ GET /api/student/profile の形。⑯ 保存の返事も同じ（design/designs/API設計.md の 16-3 ⑮）。
-# 項目の名前と形は、⑥ 学生の新規登録で送るものと同じ（アカウントの項目は除く）。icon_url を加える。
-# 空欄は null のまま返す。性格の5つは順9、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+# 項目は、㉓ 学生詳細と共通の部品（app/views/api/shared/_student_profile.json.jbuilder）にまとめてある
 
-json.extract! @student,
-              :name, :university_id, :university_other_name, :faculty_id, :department_id, :grade,
-              :graduation_year, :prefecture_id, :activity_status,
-              :self_pr_strength, :self_pr_weakness, :self_pr_future,
-              :work_days_per_week, :work_hours_per_day, :duration_months, :available_from,
-              :can_full_remote, :can_partial_remote, :can_onsite, :work_note,
-              :interested_job_middle_category_ids, :commutable_prefecture_ids
-
-# プログラミング歴。保存のたびに消して作り直すので、各行の番号（id）は返さない
-json.skills @student.student_skills do |skill|
-  json.technology_id skill.technology_id
-  json.other_name skill.other_name
-  # 小数の列は、そのままだと "1.5" と文字列になるので、数値に直して返す（16-1-8）
-  json.years skill.years&.to_f
-  json.level skill.level
-end
-
-json.partial! "api/shared/icon_url", record: @student
+json.partial! "api/shared/student_profile", student: @student

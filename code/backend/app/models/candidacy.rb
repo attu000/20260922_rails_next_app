@@ -85,6 +85,41 @@ class Candidacy < ApplicationRecord
     update!(reason_mask: CandidacyReason.mask_for(reasons))
   end
 
+  # 企業がその募集で今押せるボタンの名前の一覧（形D の available_actions。API設計.md の 16-3-2）。
+  # 状態遷移表（権限_バリデーション.md の 17-2-1）にしたがって、判定をここ1か所で行う。画面はここに入っているボタンだけを出す。
+  # 窓口ができている操作だけを返す（PR202）。順6 で、やりとりがなく掲載中なら "scout" を、
+  # 順11 で "decline"・"undo_decline"・"pass"・"fail" を足す
+  def self.available_actions_for(job_posting, candidacy)
+    return [] if candidacy.nil?
+
+    actions = []
+    actions << "match" if candidacy.can_match_by_company?
+    actions
+  end
+
+  # 企業がこのやりとりにマッチできるか（㉖。権限_バリデーション.md の 17-2-1）。
+  # 応募から始まり、状態が未マッチか見送りで、募集が掲載中なら true。
+  # スカウトから始まったやりとりは、学生が応じたときにマッチするので、企業はマッチできない（その他決め事.md の 5-1）
+  def can_match_by_company?
+    application? && (unmatched? || declined?) && job_posting.published?
+  end
+
+  # ㉖ 企業が応募にマッチする（API設計.md の 16-3-6）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
+  # 今あるやりとりを変えるので、インスタンスのメソッドにしている（PR204）。
+  # できない状態なら ConflictError を投げる（窓口では 409）。押せるボタンの判定と同じ can_match_by_company? で確かめるので、
+  # 「ボタンは出ているのに押すと 409」という食い違いは起きない
+  def match
+    raise ConflictError unless can_match_by_company?
+
+    # やりとりの更新と、スレッドの作成（まだなければ）を1つのトランザクションで行う（技術構成.md の 9-2）
+    transaction do
+      update!(status: :matched, matched_at: Time.current)
+      # スレッドは企業×学生で1本。同じ企業の別の募集で先にマッチしていれば、もうある。
+      # create_or_find_by! は「作ってみて、1本だけの決まりに弾かれたら、今あるものを使う」。同時に2つマッチされても重複しない
+      MessageThread.create_or_find_by!(company_profile_id: job_posting.company_profile_id, student_profile_id: student_profile_id)
+    end
+  end
+
   # 企業から見た、やりとりの状態のタグ（API設計.md の 16-3 ㉑・形D）。
   # 「未対応応募」は発生元と状態の組み合わせに付けた名前なので、画面側では組み立てず、ここで計算して返す（16-1-9）
   def tag

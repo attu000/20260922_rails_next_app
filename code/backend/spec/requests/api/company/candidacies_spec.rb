@@ -1,6 +1,6 @@
 require "rails_helper"
 
-# ㉑ GET /api/company/candidacies（候補者一覧）のテスト。
+# ㉑ GET /api/company/candidacies（候補者一覧）と ㉖ POST /api/company/candidacies/:id/match（マッチ）のテスト。
 # 必須テスト「学生が企業の窓口を呼ぶと 403」「見てよい範囲の外の番号は 404」（技術構成.md の 3-3 D-1、API設計.md の 16-1-10）を含む。
 # 詳しくは design/designs/API設計.md の 16-3-6、データベース.md の 8-7
 RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :request do
@@ -118,6 +118,109 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
         expect(response.parsed_body["pagination"]).to eq(
           "page" => 2, "per_page" => 20, "total_count" => 21, "total_pages" => 2
         )
+      end
+    end
+  end
+
+  describe "㉖ マッチ" do
+    let(:student) { create(:student_user).student_profile }
+
+    # マッチを送る。テストでも CSRF 対策は有効なので、合言葉を付ける
+    def post_match(candidacy_id)
+      post "/api/company/candidacies/#{candidacy_id}/match", headers: { "X-CSRF-Token" => csrf_token }, as: :json
+    end
+
+    it "学生なら 403" do
+      candidacy = create(:candidacy, job_posting: posting)
+      log_in_as(create(:student_user))
+
+      post_match(candidacy.id)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(candidacy.reload).to be_unmatched
+    end
+
+    context "ログインしている企業" do
+      before { log_in_as(company_user) }
+
+      it "200 と、マッチしたあとの募集の状態（形D）を返す。マッチした日時が入り、スレッドができる" do
+        candidacy = create(:candidacy, job_posting: posting, student_profile: student)
+
+        post_match(candidacy.id)
+
+        expect(response).to have_http_status(:ok)
+        candidacy.reload
+        expect(candidacy).to be_matched
+        expect(candidacy.matched_at).to be_present
+        expect(response.parsed_body).to include(
+          "id" => posting.id, "status" => "published",
+          "candidacy" => include("id" => candidacy.id, "status" => "matched", "tag" => "matched"),
+          # マッチしたあとは、押せるボタンがなくなる
+          "available_actions" => []
+        )
+        expect(MessageThread.where(company_profile: company, student_profile: student).count).to eq(1)
+      end
+
+      it "見送りの応募にもマッチできる" do
+        candidacy = create(:candidacy, job_posting: posting, student_profile: student, status: :declined)
+
+        post_match(candidacy.id)
+
+        expect(response).to have_http_status(:ok)
+        expect(candidacy.reload).to be_matched
+      end
+
+      it "同じ企業の別の募集で、先にスレッドができていれば、増やさずにそのまま使う" do
+        MessageThread.create!(company_profile: company, student_profile: student)
+        candidacy = create(:candidacy, job_posting: posting, student_profile: student)
+
+        post_match(candidacy.id)
+
+        expect(response).to have_http_status(:ok)
+        expect(MessageThread.where(company_profile: company, student_profile: student).count).to eq(1)
+      end
+
+      # 今の状態ではできない（権限_バリデーション.md の 17-2-1）
+      {
+        "スカウトから始まったやりとり（学生が応じたときにマッチする）" => { origin: :scout },
+        "もうマッチ済みのやりとり" => { status: :matched }
+      }.each do |label, attributes|
+        it "#{label}なら 409。状態は変わらず、スレッドもできない" do
+          candidacy = create(:candidacy, job_posting: posting, student_profile: student, **attributes)
+
+          post_match(candidacy.id)
+
+          expect(response).to have_http_status(:conflict)
+          expect(response.parsed_body["message"]).to eq("この操作は今はできません。画面を読み込み直してください")
+          expect(candidacy.reload.status).to eq((attributes[:status] || :unmatched).to_s)
+          expect(MessageThread.count).to eq(0)
+        end
+      end
+
+      it "募集が掲載中でなければ 409" do
+        candidacy = create(:candidacy, job_posting: posting, student_profile: student)
+        posting.update!(status: :closed)
+
+        post_match(candidacy.id)
+
+        expect(response).to have_http_status(:conflict)
+        expect(candidacy.reload).to be_unmatched
+      end
+
+      # 必須テスト：他社のやりとりの番号は 404（16-1-10）
+      it "他社の募集へのやりとりの番号なら 404。状態は変わらない" do
+        other_candidacy = create(:candidacy)
+
+        post_match(other_candidacy.id)
+
+        expect(response).to have_http_status(:not_found)
+        expect(other_candidacy.reload).to be_unmatched
+      end
+
+      it "存在しない番号なら 404" do
+        post_match(0)
+
+        expect(response).to have_http_status(:not_found)
       end
     end
   end

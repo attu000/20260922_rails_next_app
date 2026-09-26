@@ -35,6 +35,50 @@ RSpec.describe Candidacy, type: :model do
     end
   end
 
+  # 押せるボタンの判定（形D の available_actions。権限_バリデーション.md の 17-2-1）。
+  # 窓口ができている操作だけを返す（PR202）。順5 では「マッチする」だけ
+  describe ".available_actions_for（企業が今押せるボタン）" do
+    let(:published) { create(:job_posting, :published) }
+    let(:closed) { create(:job_posting, :closed) }
+
+    it "やりとりがなければ、空の一覧（スカウトは順6 で足す）" do
+      expect(described_class.available_actions_for(published, nil)).to eq([])
+    end
+
+    it "応募の未マッチ・見送りで、募集が掲載中なら match" do
+      %i[unmatched declined].each do |status|
+        candidacy = create(:candidacy, job_posting: published, status: status)
+
+        expect(described_class.available_actions_for(published, candidacy)).to eq([ "match" ])
+      end
+    end
+
+    it "応募の未マッチでも、募集が掲載中でなければ押せない" do
+      candidacy = create(:candidacy, job_posting: published)
+      published.update!(status: :closed)
+
+      expect(described_class.available_actions_for(published, candidacy.reload)).to eq([])
+    end
+
+    it "スカウトから始まったやりとりには、企業はマッチできない" do
+      candidacy = create(:candidacy, :scout, job_posting: published)
+
+      expect(described_class.available_actions_for(published, candidacy)).to eq([])
+    end
+
+    it "マッチ以降（マッチ・合格・不合格）には、もうマッチできない" do
+      %i[matched passed failed].each do |status|
+        candidacy = create(:candidacy, job_posting: published, status: status)
+
+        expect(described_class.available_actions_for(published, candidacy)).to eq([])
+      end
+    end
+
+    it "終了した募集は、やりとりがなくてもボタンなし" do
+      expect(described_class.available_actions_for(closed, nil)).to eq([])
+    end
+  end
+
   # 番号は保存されている値そのものなので、並べ替えなどでずれると、既存のデータの意味が変わってしまう（技術構成.md の 9-1）
   describe "enum の番号" do
     it "発生元と状態の番号が、設計書の表と一致する" do

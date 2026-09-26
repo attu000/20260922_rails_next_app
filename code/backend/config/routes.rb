@@ -32,8 +32,13 @@ Rails.application.routes.draw do
       # ⑬ POST /api/company/job_postings（新規作成）、⑭ PATCH /api/company/job_postings/:id（保存・状態の変更）。
       # 募集は消さず、状態で管理するので、消す窓口（destroy）は作らない（16-3 ⑭）
       resources :job_postings, only: %i[index show create update]
-      # ㉑ GET /api/company/candidacies（候補者一覧）
-      resources :candidacies, only: :index
+      # ㉑ GET /api/company/candidacies（候補者一覧）、㉖ POST /api/company/candidacies/:id/match（マッチ）。
+      # 状態を変える操作は、1件ごとの操作（member）として、やりとりの番号の後ろに操作の名前を付ける（16-1-4）
+      resources :candidacies, only: :index do
+        post :match, on: :member
+      end
+      # ㉓ GET /api/company/students/:id（学生詳細）。㉒ 学生検索（index）は順6 で足す
+      resources :students, only: :show
     end
 
     # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、

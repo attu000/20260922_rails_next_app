@@ -1241,6 +1241,10 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - job_middle_category_ids・technology_ids・industry_ids：一致した id の一覧。どちらかが未入力なら null（画面は「未入力」と出す）。industry_ids は、募集の業界と学生の興味のある業界を比べる（企業プロフィールの値は使わない。本書5-8）
   - culture：軸ごとの値と距離。close は、距離が1以下で、どちらも中央でないときに true（画面は背景を薄いオレンジにする）
 - 段階タグ：【コア】（comparison と reasons は【強み】、last_active_range は【仕上げ】）
+- 作る順：⑲と同じく、項目は元になるものができる順で足していく
+  - 順5（応募 → 企業がマッチ）：student、job_postings（形D の candidacy のうち reasons 以外と、available_actions）。available_actions は、窓口ができている操作だけを返す（順5 は match だけ。scout は順6、decline・undo_decline・pass・fail は順11 で足す）
+  - 順6（スカウト → 学生がマッチ）：has_message_thread。スレッドは順5 のマッチでもできるが、⑲⑳の has_message_thread と同じ順でそろえる（押した先の C7 は順7）
+  - 順10（比較の表示）：comparison、candidacy.reasons。【仕上げ】：last_active_range
 
 **状態を変える操作（㉔・㉖〜㉜）の共通の決まり**
 
