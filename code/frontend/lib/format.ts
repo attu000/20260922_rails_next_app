@@ -11,9 +11,24 @@ const DATE_FORMAT = new Intl.DateTimeFormat("ja-JP", {
   day: "2-digit",
 });
 
+// 日時の書式（時刻まで）。日本時間で数える
+const DATE_TIME_FORMAT = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 // 日時（"2026-09-25T10:00:00.000+09:00"）を「2026/09/25」にする
 export function formatDate(isoString: string): string {
   return DATE_FORMAT.format(new Date(isoString));
+}
+
+// 日時（"2026-09-25T10:00:00.000+09:00"）を「2026/09/25 10:00」にする。メッセージの日時に使う
+export function formatDateTime(isoString: string): string {
+  return DATE_TIME_FORMAT.format(new Date(isoString));
 }
 
 // 稼働条件の1行表示に使う、募集の項目
