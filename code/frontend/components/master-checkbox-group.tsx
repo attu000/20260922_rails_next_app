@@ -17,6 +17,9 @@ type MasterCheckboxGroupProps = {
   onChange: (selectedIds: number[]) => void;
   // Rails や画面側の確認で見つかったエラー（例：「業界に選べない値が含まれています」）
   errors?: string[];
+  // 並べる列の数（Tailwind の grid-cols-…）。省略時は、広い画面で2列。
+  // 募集一覧の勤務地のポップアップで、47都道府県を多くの列で並べるときに使う
+  columnsClassName?: string;
 };
 
 export function MasterCheckboxGroup({
@@ -27,6 +30,7 @@ export function MasterCheckboxGroup({
   selectedIds,
   onChange,
   errors,
+  columnsClassName = "sm:grid-cols-2",
 }: MasterCheckboxGroupProps) {
   function toggle(id: number, checked: boolean) {
     onChange(checked ? [...selectedIds, id] : selectedIds.filter((selectedId) => selectedId !== id));
@@ -37,7 +41,7 @@ export function MasterCheckboxGroup({
       <FieldLegend variant="label" className={hideLegend ? "sr-only" : undefined}>
         {legend}
       </FieldLegend>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className={`grid gap-2 ${columnsClassName}`}>
         {rows.map((row) => {
           const id = `${name}-${row.id}`;
           return (

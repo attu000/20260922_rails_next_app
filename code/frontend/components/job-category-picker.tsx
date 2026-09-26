@@ -1,7 +1,9 @@
 // 職種を「大分類 → 中分類」の2段階で選ぶ入力欄（design/designs/ページ設計.md の 6-5 C3、その他決め事.md の 5-7）。
 // 大分類は常に表示し、チェックを入れた大分類の下に、中分類が開く。開いた中分類は「⌄」のボタンで閉じられる（選んだものは残る）。
-// 募集詳細編集の「主な職種」「関連する職種」と、マイページの「興味のある職種」で使い回す（マイページでは選べない中分類はない）。
-// 選ばれている中分類の番号の一覧は、使う側（フォーム）が持つ。大分類のチェックと開閉は、この部品の中だけで覚える（保存しない）
+// 募集詳細編集の「主な職種」「関連する職種」と、マイページの「興味のある職種」、募集一覧（学生のホーム）の検索の条件で使い回す
+// （マイページと募集一覧では選べない中分類はない）。
+// 選ばれている中分類の番号の一覧は、使う側（フォーム）が持つ。大分類のチェックと開閉は、この部品の中だけで覚える（保存しない）。
+// 募集一覧では「大分類だけ選んだ」ことも条件になるので、大分類のチェックを外に知らせる（onCheckedMajorsChange）
 
 import { useState } from "react";
 import { ChevronDownIcon } from "lucide-react";
@@ -24,6 +26,11 @@ type JobCategoryPickerProps = {
   onChange: (selectedIds: number[]) => void;
   // Rails や画面側の確認で見つかったエラー
   errors?: string[];
+  // 最初にチェックを入れておく大分類（募集一覧で、URL の job_major_category_ids から）。
+  // 省略時は、選んでいる中分類を含む大分類だけにチェックを入れる
+  initialCheckedMajorIds?: number[];
+  // 大分類のチェックが変わったら知らせる（募集一覧で使う）
+  onCheckedMajorsChange?: (majorIds: number[]) => void;
 };
 
 export function JobCategoryPicker({
@@ -35,25 +42,38 @@ export function JobCategoryPicker({
   disabledNote,
   onChange,
   errors,
+  initialCheckedMajorIds = [],
+  onCheckedMajorsChange,
 }: JobCategoryPickerProps) {
-  // チェックを入れている大分類。最初は、選んでいる中分類を含む大分類にチェックを入れておく（編集のとき、選んだものが見えるように）
+  // チェックを入れている大分類。最初は、選んでいる中分類を含む大分類にチェックを入れておく（編集のとき、選んだものが見えるように）。
+  // 募集一覧では、URL で大分類だけ選んでいたものにもチェックを入れる
   const [checkedMajorIds, setCheckedMajorIds] = useState<number[]>(() =>
     majors
-      .filter((major) => major.job_middle_categories.some((middle) => selectedIds.includes(middle.id)))
+      .filter(
+        (major) =>
+          initialCheckedMajorIds.includes(major.id) ||
+          major.job_middle_categories.some((middle) => selectedIds.includes(middle.id)),
+      )
       .map((major) => major.id),
   );
   // チェックは入っているが、「⌄」のボタンで中分類を閉じている大分類
   const [collapsedMajorIds, setCollapsedMajorIds] = useState<number[]>([]);
 
+  // 大分類のチェックを変え、使う側にも知らせる
+  function updateCheckedMajorIds(nextIds: number[]) {
+    setCheckedMajorIds(nextIds);
+    onCheckedMajorsChange?.(nextIds);
+  }
+
   function toggleMajor(major: JobMajorCategory, checked: boolean) {
     if (checked) {
       // チェックを入れたら、中分類を開く
-      setCheckedMajorIds([...checkedMajorIds, major.id]);
+      updateCheckedMajorIds([...checkedMajorIds, major.id]);
       setCollapsedMajorIds(collapsedMajorIds.filter((id) => id !== major.id));
       return;
     }
     // チェックを外したら、閉じて、その大分類の中分類の選択も外す（見えないところで選ばれたまま残らないように）
-    setCheckedMajorIds(checkedMajorIds.filter((id) => id !== major.id));
+    updateCheckedMajorIds(checkedMajorIds.filter((id) => id !== major.id));
     const middleIds = major.job_middle_categories.map((middle) => middle.id);
     onChange(selectedIds.filter((id) => !middleIds.includes(id)));
   }

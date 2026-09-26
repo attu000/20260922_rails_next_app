@@ -74,3 +74,14 @@ export function useOptions(): { options: Options | null; failed: boolean } {
 export function labelOf(enumOptions: EnumOption[], value: string | null): string | null {
   return enumOptions.find((option) => option.value === value)?.label ?? null;
 }
+
+// マスタの番号（13）を、名前（"東京都"）に直す。都道府県・技術・業界・事業形態などで使う。見つからなければ null
+export function nameOf(rows: MasterRow[], id: number | null): string | null {
+  return rows.find((row) => row.id === id)?.name ?? null;
+}
+
+// 職種の中分類の番号の一覧を、名前の一覧に直す（大分類の中を探す）。並びは渡した番号の順
+export function jobMiddleCategoryNames(majors: JobMajorCategory[], ids: number[]): string[] {
+  const middles = majors.flatMap((major) => major.job_middle_categories);
+  return ids.flatMap((id) => middles.find((middle) => middle.id === id)?.name ?? []);
+}

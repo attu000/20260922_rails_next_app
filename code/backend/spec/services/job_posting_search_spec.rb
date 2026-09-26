@@ -36,22 +36,61 @@ RSpec.describe JobPostingSearch do
   end
 
   describe "① フリーワード" do
-    it "7項目のそれぞれで合う。大文字と小文字は区別しない" do
-      by_title = create_posting(title: "Ruby の募集")
-      by_details = create_posting(internship_details: "Ruby で開発します")
-      by_requirements = create_posting(requirements: "Ruby の経験")
-      by_preferred = create_posting(preferred_requirements: "Ruby 歓迎")
-      by_technology_note = create_posting(technology_note: "Ruby 3.4")
+    it "募集の文章の各列、会社名、使用技術の名前のそれぞれで合う。大文字と小文字は区別しない" do
+      by_columns = {
+        title: "Ruby の募集",
+        internship_details: "Ruby で開発します",
+        growth: "Ruby に詳しくなれます",
+        work_style_note: "Ruby 勉強会の日は出社",
+        work_location_note: "Ruby ビル 3階",
+        work_note: "Ruby 会議の週は休み",
+        requirements: "Ruby の経験",
+        preferred_requirements: "Ruby 歓迎",
+        technology_note: "Ruby 3.4"
+      }.map { |column, text| create_posting(column => text) }
       by_company = create(:job_posting, :published)
       by_company.company_profile.update!(name: "Ruby 株式会社")
       by_technology = create_posting
       by_technology.technologies << create(:technology, name: "Ruby on Rails")
       create_posting(title: "Go の募集")
 
-      expect(matched_ids(q: "ruby")).to contain_exactly(
-        by_title.id, by_details.id, by_requirements.id, by_preferred.id,
-        by_technology_note.id, by_company.id, by_technology.id
-      )
+      expect(matched_ids(q: "ruby")).to contain_exactly(*by_columns.map(&:id), by_company.id, by_technology.id)
+    end
+
+    it "職種の名前で合う。中分類の名前でも、大分類の名前でも。説明文には反応しない" do
+      web = create(:job_major_category, name: "Web・アプリ開発")
+      backend = create(:job_middle_category, job_major_category: web, name: "バックエンド")
+      data = create(:job_middle_category, name: "データ分析", description: "Web のアクセスを分析する")
+      as_main = create_posting.tap { |p| p.job_posting_job_categories.create!(job_middle_category: backend, role: :main) }
+      as_related = create_posting.tap { |p| p.job_posting_job_categories.create!(job_middle_category: backend, role: :related) }
+      create_posting.tap { |p| p.job_posting_job_categories.create!(job_middle_category: data, role: :main) }
+
+      # 中分類の名前
+      expect(matched_ids(q: "バックエンド")).to contain_exactly(as_main.id, as_related.id)
+      # 大分類の名前（その中の中分類を持つ募集）。「データ分析」の説明文にある「Web」には反応しない
+      expect(matched_ids(q: "web")).to contain_exactly(as_main.id, as_related.id)
+    end
+
+    it "どんな会社か・事業内容は、募集に書いてあれば募集の文章で探す" do
+      about = create_posting(about: "Ruby が得意な会社です")
+      business = create_posting(business_description: "Ruby の受託開発")
+      create_posting
+
+      expect(matched_ids(q: "ruby")).to contain_exactly(about.id, business.id)
+    end
+
+    it "どんな会社か・事業内容が募集で空欄なら、企業プロフィールの文章で探す" do
+      company.update!(about: "Ruby が得意な会社です", business_description: "Ruby の受託開発")
+      both_blank = create_posting(about: nil, business_description: nil)
+
+      expect(matched_ids(q: "ruby")).to eq([ both_blank.id ])
+    end
+
+    it "募集に書いてあるときは、画面に出ない企業プロフィールの文章では合わない" do
+      company.update!(about: "Ruby が得意な会社です", business_description: "Ruby の受託開発")
+      create_posting(about: "Go が得意な会社です", business_description: "Go の受託開発")
+
+      expect(matched_ids(q: "ruby")).to eq([])
     end
 
     it "全角の空白で区切った2語は、両方を含む募集だけが合う" do
@@ -110,6 +149,89 @@ RSpec.describe JobPostingSearch do
       ids = matched_ids(job_major_category_ids: [ major.id ], job_middle_category_ids: [ other_middle.id ])
 
       expect(ids).to contain_exactly(as_main.id, as_related.id, other.id)
+    end
+  end
+
+  describe "④ 使用技術" do
+    it "選んだ技術のどれか1つを使う募集が合う。どれも使わない募集、技術なしの募集は合わない" do
+      javascript = create(:technology, name: "JavaScript")
+      typescript = create(:technology, name: "TypeScript")
+      go = create(:technology, name: "Go")
+      uses_javascript = create_posting.tap { |p| p.technologies << javascript }
+      uses_both = create_posting.tap { |p| p.technologies << [ javascript, typescript ] }
+      create_posting.tap { |p| p.technologies << go }
+      create_posting
+
+      ids = matched_ids(technology_ids: [ javascript.id, typescript.id ])
+
+      expect(ids).to contain_exactly(uses_javascript.id, uses_both.id)
+    end
+  end
+
+  describe "③ 稼働条件（PR200）" do
+    # 学生が「3まで」を選ぶと、募集の下限が3以下なら合う。空欄は合わない。
+    # 募集の値は、それぞれの選択肢の中から、3より小さい・3・3より大きいものを使う（継続期間の選択肢に2はない）
+    {
+      work_days_per_week: [ :min_work_days_per_week, [ 2, 3, 4 ] ],
+      work_hours_per_day: [ :min_work_hours_per_day, [ 2, 3, 4 ] ],
+      duration_months: [ :min_duration_months, [ 1, 3, 6 ] ]
+    }.each do |param_key, (column, (lower_value, equal_value, higher_value))|
+      it "#{param_key}：募集の下限が選んだ値以下なら合う。大きい募集と空欄の募集は合わない" do
+        lower = create_posting(column => lower_value)
+        equal = create_posting(column => equal_value)
+        create_posting(column => higher_value)
+        create_posting(column => nil)
+
+        expect(matched_ids(param_key => 3)).to contain_exactly(lower.id, equal.id)
+      end
+    end
+
+    describe "開始時期" do
+      include ActiveSupport::Testing::TimeHelpers
+
+      # 今日を 2026年9月15日（日本時間）に固定する。「今月」は 2026年9月
+      around { |example| travel_to(Time.zone.local(2026, 9, 15, 12)) { example.run } }
+
+      it "随時・今月より前に始まった募集・働ける月以降に始まる募集が合う。働ける月より前に始まる募集は合わない" do
+        anytime = create_posting(start_month: nil)
+        already_started = create_posting(start_month: Date.new(2026, 8, 1))
+        same_month = create_posting(start_month: Date.new(2026, 11, 1))
+        later = create_posting(start_month: Date.new(2026, 12, 1))
+        create_posting(start_month: Date.new(2026, 10, 1))
+
+        expect(matched_ids(available_from: "2026-11-01")).to contain_exactly(
+          anytime.id, already_started.id, same_month.id, later.id
+        )
+      end
+
+      it "今月に始まる募集は「今月より前」ではないので、働ける月より前なら合わない" do
+        create_posting(start_month: Date.new(2026, 9, 1))
+
+        expect(matched_ids(available_from: "2026-11-01")).to eq([])
+      end
+    end
+
+    it "勤務形態：募集の勤務形態が、選んだものに含まれれば合う。空欄は合わない" do
+      partial = create_posting(work_style: :partial_remote)
+      onsite = create_posting(work_style: :onsite)
+      create_posting(work_style: :full_remote)
+      create_posting(work_style: nil)
+
+      expect(matched_ids(work_styles: %w[partial_remote onsite])).to contain_exactly(partial.id, onsite.id)
+    end
+
+    it "土日OK：true なら土日OK の募集だけが合う。false なら条件にしない" do
+      weekend = create_posting(weekend_ok: true)
+      weekday = create_posting(weekend_ok: false)
+
+      expect(matched_ids(weekend_ok: "true")).to eq([ weekend.id ])
+      expect(matched_ids(weekend_ok: "false")).to contain_exactly(weekend.id, weekday.id)
+    end
+
+    it "数でない・日付でない・知らない名前の値は、その条件を「指定なし」として扱う" do
+      posting = create_posting(min_work_days_per_week: 5, start_month: Date.new(2030, 1, 1), work_style: :onsite)
+
+      expect(matched_ids(work_days_per_week: "abc", available_from: "zzz", work_styles: [ "unknown" ])).to eq([ posting.id ])
     end
   end
 

@@ -33,7 +33,12 @@ module Api
 
       # 検索の条件として受け取ってよい値だけを通す。ページ番号（page）は Pagy が直接読む
       def search_params
-        params.permit(:q, :sort, prefecture_ids: [], job_major_category_ids: [], job_middle_category_ids: [])
+        # 1つの値を先に、配列（名前: []）をあとに書く（Ruby の決まり）
+        params.permit(:q, :sort,
+                      # 稼働条件（PR200）
+                      :work_days_per_week, :work_hours_per_day, :duration_months, :available_from, :weekend_ok,
+                      prefecture_ids: [], job_major_category_ids: [], job_middle_category_ids: [],
+                      technology_ids: [], work_styles: [])
       end
     end
   end

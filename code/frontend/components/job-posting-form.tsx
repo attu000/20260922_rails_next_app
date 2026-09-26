@@ -24,13 +24,13 @@ import {
   type InputProps,
 } from "@/components/form-fields";
 import { JobCategoryPicker } from "@/components/job-category-picker";
-import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { TechnologyPicker } from "@/components/technology-picker";
+import { Accordion } from "@/components/ui/accordion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError, apiFetch, useApi } from "@/lib/api";
 import {
@@ -507,41 +507,15 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
             <LongTextField {...textProps("requirements")} label="必須要件" />
             <LongTextField {...textProps("preferred_requirements")} label="歓迎要件" />
 
-            {/* 使用技術：区分ごとに開閉できる行にし、選んでいる件数を行に出す。中は順1 のチェックボックスの部品を使い回す */}
-            <FieldSet>
-              <FieldLegend variant="label">使用言語・フレームワーク・技術</FieldLegend>
-              <Accordion multiple className="gap-2">
-                {options.enums.technology_category.map((category) => {
-                  const rows = options.masters.technologies.filter(
-                    (technology) => technology.category === category.value,
-                  );
-                  const selectedCount = rows.filter((row) => values.technology_ids.includes(row.id)).length;
-                  return (
-                    <AccordionItem key={category.value} value={category.value} className="rounded-lg border">
-                      <AccordionTrigger className="items-center px-3 py-2 hover:no-underline">
-                        <span>{category.label}</span>
-                        {selectedCount > 0 && (
-                          <span className="mr-2 ml-auto text-xs font-normal text-muted-foreground">
-                            {selectedCount}件選択中
-                          </span>
-                        )}
-                      </AccordionTrigger>
-                      <AccordionContent keepMounted className="px-3 pb-3">
-                        <MasterCheckboxGroup
-                          name={`technology-${category.value}`}
-                          legend={category.label}
-                          hideLegend
-                          rows={rows}
-                          selectedIds={values.technology_ids}
-                          onChange={(ids) => updateValue("technology_ids", ids)}
-                        />
-                      </AccordionContent>
-                    </AccordionItem>
-                  );
-                })}
-              </Accordion>
-              <FieldError errors={toFieldErrorItems(fieldErrors.technology_ids)} />
-            </FieldSet>
+            {/* 使用技術：区分ごとに開閉できる行にし、選んでいる件数を行に出す（募集一覧の検索の条件と共通の部品） */}
+            <TechnologyPicker
+              name="technology"
+              legend="使用言語・フレームワーク・技術"
+              options={options}
+              selectedIds={values.technology_ids}
+              onChange={(ids) => updateValue("technology_ids", ids)}
+              errors={fieldErrors.technology_ids}
+            />
 
             <LongTextField
               {...textProps("technology_note")}
