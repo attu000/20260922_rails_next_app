@@ -90,6 +90,8 @@ ja:
       # やりとり。reasons は列ではなく、応募のときに送られる理由の一覧（「応募理由を入力してください」などになる）
       candidacy:
         reasons: 応募理由
+      message:
+        body: 本文
 
   # 選択肢（enum）の日本語の表示名。⑦ GET /api/options がここを読んで返す（API設計.md の 16-1-9）。
   # 画面側には選択肢の表を書かない

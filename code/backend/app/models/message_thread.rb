@@ -3,4 +3,7 @@
 class MessageThread < ApplicationRecord
   belongs_to :company_profile
   belongs_to :student_profile
+
+  # スレッドの中のメッセージ
+  has_many :messages
 end

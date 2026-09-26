@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_26_120003) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -220,10 +220,29 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_120003) do
     t.index ["student_profile_id"], name: "index_message_threads_on_student_profile_id"
   end
 
+  create_table "messages", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.bigint "message_thread_id", null: false
+    t.bigint "sender_user_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_thread_id", "created_at"], name: "index_messages_on_message_thread_id_and_created_at"
+    t.index ["sender_user_id"], name: "index_messages_on_sender_user_id"
+  end
+
   create_table "prefectures", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "scout_messages", force: :cascade do |t|
+    t.bigint "candidacy_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "message_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["candidacy_id"], name: "index_scout_messages_on_candidacy_id", unique: true
+    t.index ["message_id"], name: "index_scout_messages_on_message_id", unique: true
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -348,6 +367,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_120003) do
   add_foreign_key "job_postings", "prefectures"
   add_foreign_key "message_threads", "company_profiles"
   add_foreign_key "message_threads", "student_profiles"
+  add_foreign_key "messages", "message_threads"
+  add_foreign_key "messages", "users", column: "sender_user_id"
+  add_foreign_key "scout_messages", "candidacies"
+  add_foreign_key "scout_messages", "messages"
   add_foreign_key "sessions", "users"
   add_foreign_key "student_commutable_prefectures", "prefectures"
   add_foreign_key "student_commutable_prefectures", "student_profiles"

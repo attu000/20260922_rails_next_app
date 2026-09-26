@@ -12,6 +12,8 @@ class Candidacy < ApplicationRecord
 
   # 応募理由・マッチ理由
   has_many :candidacy_reasons
+  # スカウトから始まったやりとりなら、そのスカウト文の記録
+  has_one :scout_message
 
   # 発生元と状態。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。
   # 状態は、【コア】で使わない見送り・合格・不合格も含めて、5つを最初から書く（技術構成.md の 9-1-1 の3）
