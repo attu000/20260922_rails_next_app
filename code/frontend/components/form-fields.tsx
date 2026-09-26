@@ -23,19 +23,55 @@ export function toFieldErrorItems(messages: string[] | undefined) {
   return messages?.map((message) => ({ message }));
 }
 
+// 必須の項目名の横に付ける印（PR231）。見た目は赤い「＊」。
+// 画面の読み上げ（スクリーンリーダー）には「＊」を読ませず、代わりに「（必須）」と読ませる（画面には出さない）
+export function RequiredMark() {
+  return (
+    <>
+      <span aria-hidden="true" className="text-destructive">
+        ＊
+      </span>
+      <span className="sr-only">（必須）</span>
+    </>
+  );
+}
+
+// 項目名と、必須なら印。項目名の部品（FieldLabel）は中身の間に隙間を空けるので、1つの span にまとめて項目名にくっつける
+export function LabelText({ label, required }: { label: string; required?: boolean }) {
+  return (
+    <span>
+      {label}
+      {required && <RequiredMark />}
+    </span>
+  );
+}
+
+// フォームの上に添える一言。印の意味を示す（PR231）
+export function RequiredNote() {
+  return (
+    <p className="text-sm text-muted-foreground">
+      <span className="text-destructive">＊</span>は必須項目です
+    </p>
+  );
+}
+
 // 入力欄の部品が共通で受け取るもの。各フォームの textProps() で作って渡す
 export type InputProps = {
   id: string;
   value: string;
   onChange: (value: string) => void;
   errors: string[] | undefined;
+  // 必須か。true なら項目名の横に赤い「＊」を付ける（PR231）
+  required?: boolean;
 };
 
 // 文字の入力欄（1行）
-export function TextField({ id, value, onChange, errors, label }: InputProps & { label: string }) {
+export function TextField({ id, value, onChange, errors, label, required }: InputProps & { label: string }) {
   return (
     <Field data-invalid={errors ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>
+        <LabelText label={label} required={required} />
+      </FieldLabel>
       <Input
         id={id}
         value={value}
@@ -59,10 +95,13 @@ export function LongTextField({
   label,
   placeholder,
   description,
+  required,
 }: InputProps & { label: string; placeholder?: string; description?: string }) {
   return (
     <Field data-invalid={errors ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>
+        <LabelText label={label} required={required} />
+      </FieldLabel>
       {description && <FieldDescription>{description}</FieldDescription>}
       <Textarea
         id={id}
@@ -90,6 +129,7 @@ export function SelectField({
   choices,
   emptyLabel,
   description,
+  required,
 }: InputProps & {
   label: string;
   choices: { value: string; label: string }[];
@@ -99,7 +139,9 @@ export function SelectField({
 }) {
   return (
     <Field data-invalid={errors ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <FieldLabel htmlFor={id}>
+        <LabelText label={label} required={required} />
+      </FieldLabel>
       <NativeSelect
         id={id}
         value={value}

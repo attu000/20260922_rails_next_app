@@ -17,7 +17,7 @@ import {
   validateCompanyInfo,
   type CompanyInfoValues,
 } from "@/components/company-info-fields";
-import type { FieldErrors } from "@/components/form-fields";
+import { RequiredNote, type FieldErrors } from "@/components/form-fields";
 import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
 import { PageTitle } from "@/components/page-title";
 import {
@@ -186,7 +186,10 @@ export function CompanySignupForm() {
 
   return (
     <main className="mx-auto mt-16 max-w-2xl space-y-6 px-4 pb-16">
-      <PageTitle>新規登録（企業用）</PageTitle>
+      <div className="space-y-2">
+        <PageTitle>新規登録（企業用）</PageTitle>
+        <RequiredNote />
+      </div>
 
       {message && <p className="text-sm text-destructive">{message}</p>}
 

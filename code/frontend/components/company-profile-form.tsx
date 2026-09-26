@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CompanyInfoFields, validateCompanyInfo, type CompanyInfoValues } from "@/components/company-info-fields";
-import { toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
+import { LabelText, RequiredNote, toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
 import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
 import { useRedirectIfUnauthorized, useRefreshMe } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
@@ -195,7 +195,10 @@ export function CompanyProfileForm() {
 
   return (
     <div className="space-y-6">
-      <PageTitle>企業プロフィール編集</PageTitle>
+      <div className="space-y-2">
+        <PageTitle>企業プロフィール編集</PageTitle>
+        <RequiredNote />
+      </div>
 
       {message && <p className="text-sm text-destructive">{message}</p>}
 
@@ -203,7 +206,9 @@ export function CompanyProfileForm() {
       <form ref={formRef} onSubmit={handleSubmit} noValidate className="max-w-2xl">
         <FieldGroup>
           <Field data-invalid={fieldErrors.name ? true : undefined}>
-            <FieldLabel htmlFor="name">会社名（必須）</FieldLabel>
+            <FieldLabel htmlFor="name">
+              <LabelText label="会社名" required />
+            </FieldLabel>
             <Input
               id="name"
               value={values.name}

@@ -3,7 +3,7 @@
 // 守りは Rails にある（最後の「登録する」で、Rails が改めて全部確かめる）。ここでの確認は、全部入力した後にやり直しにならないためだけ。
 // 利用規約・プライバシーポリシーへの同意のチェックは【仕上げ】で足す
 
-import { SHORT_TEXT_MAX_LENGTH, toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
+import { LabelText, SHORT_TEXT_MAX_LENGTH, toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ApiError, apiFetch } from "@/lib/api";
@@ -78,7 +78,7 @@ type SignupAccountFieldsProps = {
   nameAutoComplete: "organization" | "name";
 };
 
-// ステップ1の入力欄：メールアドレス、パスワード、パスワード（確認）、名前
+// ステップ1の入力欄：メールアドレス、パスワード、パスワード（確認）、名前。4つとも必須（項目名の横に赤い「＊」。PR231）
 export function SignupAccountFields({ values, onChange, errors, nameLabel, nameAutoComplete }: SignupAccountFieldsProps) {
   // 1つの欄の組み立て（見出し・入力欄・説明・エラー）
   function textField(
@@ -90,7 +90,9 @@ export function SignupAccountFields({ values, onChange, errors, nameLabel, nameA
   ) {
     return (
       <Field data-invalid={errors[key] ? true : undefined}>
-        <FieldLabel htmlFor={key}>{label}</FieldLabel>
+        <FieldLabel htmlFor={key}>
+          <LabelText label={label} required />
+        </FieldLabel>
         <Input
           id={key}
           type={type}
@@ -107,10 +109,10 @@ export function SignupAccountFields({ values, onChange, errors, nameLabel, nameA
 
   return (
     <>
-      {textField("email", "メールアドレス（必須）", "email", "email")}
-      {textField("password", "パスワード（必須）", "password", "new-password", `${PASSWORD_MIN_LENGTH}文字以上`)}
-      {textField("password_confirmation", "パスワード（確認）（必須）", "password", "new-password")}
-      {textField("name", `${nameLabel}（必須）`, "text", nameAutoComplete)}
+      {textField("email", "メールアドレス", "email", "email")}
+      {textField("password", "パスワード", "password", "new-password", `${PASSWORD_MIN_LENGTH}文字以上`)}
+      {textField("password_confirmation", "パスワード（確認）", "password", "new-password")}
+      {textField("name", nameLabel, "text", nameAutoComplete)}
     </>
   );
 }

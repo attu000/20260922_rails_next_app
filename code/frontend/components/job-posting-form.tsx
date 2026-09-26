@@ -16,6 +16,7 @@ import {
   LONG_TEXT_MAX_LENGTH,
   LongTextField,
   MonthField,
+  RequiredNote,
   SHORT_TEXT_MAX_LENGTH,
   SelectField,
   TextField,
@@ -139,7 +140,7 @@ const EMPTY_VALUES: FormValues = {
 // フォームのまとまり。見出しの行を押すと中身が開く（アコーディオン）。並びはこの順。
 // fields は、そのまとまりに入っている項目の名前（エラーのときに、どのまとまりを開くかを決めるのに使う。Rails の errors のキーと同じ）
 const SECTIONS = [
-  { value: "basic", title: "基本", hint: "募集状態・タイトル（必須）", fields: ["status", "title"] },
+  { value: "basic", title: "基本", hint: "募集状態・タイトル", fields: ["status", "title"] },
   {
     value: "job_categories",
     title: "職種",
@@ -433,7 +434,10 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
 
   return (
     <div className="space-y-6">
-      <PageTitle>{isNew ? "募集新規作成" : "募集詳細編集"}</PageTitle>
+      <div className="space-y-2">
+        <PageTitle>{isNew ? "募集新規作成" : "募集詳細編集"}</PageTitle>
+        <RequiredNote />
+      </div>
 
       {message && <p className="text-sm text-destructive">{message}</p>}
 
@@ -449,7 +453,8 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
           <FormSection {...sectionProps("basic")}>
             <SelectField
               {...textProps("status")}
-              label="募集状態（必須）"
+              label="募集状態"
+              required
               choices={statusOptions}
               description="非公開の募集は学生に見えません。書きかけの保存にも使えます"
             />
@@ -460,7 +465,7 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
               <FieldDescription>会社情報で変更できます</FieldDescription>
             </Field>
 
-            <TextField {...textProps("title")} label="募集タイトル（必須）" />
+            <TextField {...textProps("title")} label="募集タイトル" required />
           </FormSection>
 
           <FormSection {...sectionProps("job_categories")}>

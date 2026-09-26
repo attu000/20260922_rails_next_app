@@ -12,6 +12,7 @@ import {
   LONG_TEXT_MAX_LENGTH,
   LongTextField,
   MonthField,
+  RequiredNote,
   SHORT_TEXT_MAX_LENGTH,
   SelectField,
   TextField,
@@ -112,7 +113,7 @@ const SECTIONS = [
   {
     value: "basic",
     title: "基本",
-    hint: "氏名・活動状況（必須）",
+    hint: "氏名・活動状況・在住の都道府県・アイコン",
     fields: ["name", "activity_status", "prefecture_id", "icon"],
   },
   {
@@ -467,7 +468,10 @@ export function StudentProfileForm() {
 
   return (
     <div className="space-y-6">
-      <PageTitle>マイページ</PageTitle>
+      <div className="space-y-2">
+        <PageTitle>マイページ</PageTitle>
+        <RequiredNote />
+      </div>
 
       {message && <p className="text-sm text-destructive">{message}</p>}
 
@@ -481,10 +485,11 @@ export function StudentProfileForm() {
           className="gap-3"
         >
           <FormSection {...sectionProps("basic")}>
-            <TextField {...textProps("name")} label="氏名（必須）" />
+            <TextField {...textProps("name")} label="氏名" required />
             <SelectField
               {...textProps("activity_status")}
-              label="活動状況（必須）"
+              label="活動状況"
+              required
               emptyLabel="選択してください"
               choices={options.enums.activity_status}
               description="「今は探していない」を選んでも、企業の学生検索には表示されます"
