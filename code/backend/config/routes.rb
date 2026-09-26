@@ -38,9 +38,18 @@ Rails.application.routes.draw do
         post :match, on: :member
       end
       # ㉒ GET /api/company/students（学生検索）、㉓ GET /api/company/students/:id（学生詳細）
-      resources :students, only: %i[index show]
+      resources :students, only: %i[index show] do
+        # ㊲ GET /api/company/students/:student_id/message_thread（その学生とのチャット）、
+        # ㊳ POST /api/company/students/:student_id/message_thread/messages（送信）。
+        # スレッドは企業×学生で1本なので、学生の下に番号を付けない単数形で置く（16-3-7）
+        resource :message_thread, only: :show do
+          resources :messages, only: :create
+        end
+      end
       # ㉔ POST /api/company/scouts（スカウト）
       resources :scouts, only: :create
+      # ㊱ GET /api/company/message_threads（スレッド一覧）
+      resources :message_threads, only: :index
     end
 
     # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、
