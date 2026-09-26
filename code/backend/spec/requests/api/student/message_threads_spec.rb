@@ -85,7 +85,7 @@ RSpec.describe "学生のメッセージ（/api/student/message_threads・/api/s
       before { log_in_as(student_user) }
 
       # スカウト文をマッチ前に読める（権限_バリデーション.md の 17-2-3）
-      it "スカウトが届いただけでも開ける。スカウト文は相手が送ったもので募集が付き、まだ送れない" do
+      it "スカウトが届いただけでも開ける。スカウト文は相手が送ったもので募集が付き、まだ送れない。マッチできるスカウトを返す" do
         scout = Candidacy.send_scout(posting, student, "はじめまして")
         scout_message = scout.scout_message.message
 
@@ -101,11 +101,15 @@ RSpec.describe "学生のメッセージ（/api/student/message_threads・/api/s
               "created_at" => scout_message.created_at.as_json,
               "scout" => { "job_posting" => { "id" => posting.id, "title" => posting.title } }
             }
+          ],
+          # その場で「マッチする」を押せるように（PR222）
+          "matchable_scouts" => [
+            { "candidacy_id" => scout.id, "job_posting" => { "id" => posting.id, "title" => posting.title } }
           ]
         )
       end
 
-      it "マッチしていれば送れる。自分が送ったメッセージは is_mine が true で、scout は null" do
+      it "マッチしていれば送れる。自分が送ったメッセージは is_mine が true で、scout は null。マッチできるスカウトは空" do
         match_company
         mine = create(:message, message_thread: thread, sender_user: student_user, body: "よろしくお願いします")
 
@@ -114,6 +118,16 @@ RSpec.describe "学生のメッセージ（/api/student/message_threads・/api/s
         body = response.parsed_body
         expect(body["can_send"]).to be(true)
         expect(body["messages"].sole).to include("id" => mine.id, "is_mine" => true, "scout" => nil)
+        expect(body["matchable_scouts"]).to eq([])
+      end
+
+      it "スカウトにマッチしたあとは、マッチできるスカウトが空になり、送れるようになる" do
+        scout = Candidacy.send_scout(posting, student, "はじめまして")
+        scout.match_by_student([ "business" ])
+
+        get "/api/student/companies/#{company.id}/message_thread"
+
+        expect(response.parsed_body).to include("can_send" => true, "matchable_scouts" => [])
       end
 
       # 必須テスト：見てよい範囲の外は 404（16-1-10）

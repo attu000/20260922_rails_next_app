@@ -74,6 +74,32 @@ RSpec.describe MessageThread, type: :model do
     end
   end
 
+  describe "今マッチできるスカウト（matchable_scouts。PR222・PR223）" do
+    it "スカウトの未マッチ・見送りで、掲載中の募集のものが、募集ごとにすべて古い順に入る" do
+      first = create(:candidacy, :scout, job_posting: job_posting, student_profile: student)
+      declined = create(:candidacy, :scout, job_posting: create(:job_posting, :published, company_profile: company),
+                                            student_profile: student, status: :declined)
+      first.update_columns(created_at: 1.day.ago)
+
+      expect(thread.matchable_scouts).to eq([ first, declined ])
+    end
+
+    it "募集が終了したスカウト、マッチ済みのスカウト、応募から始まったやりとりは入らない" do
+      create(:candidacy, :scout, job_posting: create(:job_posting, :closed, company_profile: company), student_profile: student)
+      create(:candidacy, :scout, job_posting: job_posting, student_profile: student, status: :matched)
+      create(:candidacy, job_posting: create(:job_posting, :published, company_profile: company), student_profile: student)
+
+      expect(thread.matchable_scouts).to eq([])
+    end
+
+    it "同じ学生への他社のスカウトや、同じ企業からほかの学生へのスカウトは入らない" do
+      create(:candidacy, :scout, job_posting: create(:job_posting, :published), student_profile: student)
+      create(:candidacy, :scout, job_posting: job_posting)
+
+      expect(thread.matchable_scouts).to eq([])
+    end
+  end
+
   describe "並び順（recent_first）" do
     it "最後のメッセージの新しい順。メッセージがないスレッドは作った日時で比べ、先頭に居座らない" do
       old_message = create(:message_thread, last_message_at: 3.days.ago)

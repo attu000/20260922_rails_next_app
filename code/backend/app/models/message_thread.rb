@@ -34,6 +34,20 @@ class MessageThread < ApplicationRecord
              .exists?(student_profile_id: student_profile_id, job_postings: { company_profile_id: company_profile_id })
   end
 
+  # このスレッドの学生が、今マッチできるスカウト（やりとり）の一覧。古い順（学生のチャットの matchable_scouts。PR222）。
+  # 学生のメッセージ管理で、スカウト文を読んだその場で「マッチする」を押せるようにするため。
+  # 同じ企業から複数の募集でスカウトが来ていれば、募集ごとにすべて入る（PR223）。
+  # 判定は、募集詳細の「マッチする」と同じ can_match_by_student? を使う（「ボタンは出ているのに押すと 409」を起こさないため）。
+  # Django の Candidacy.objects.filter(...).select_related("job_posting") を取ってから、内包表記で絞るのにあたる
+  def matchable_scouts
+    Candidacy.listed_in_student_scouts
+             .joins(:job_posting)
+             .where(student_profile_id: student_profile_id, job_postings: { company_profile_id: company_profile_id })
+             .includes(:job_posting)
+             .order(:created_at, :id)
+             .select(&:can_match_by_student?)
+  end
+
   # ㊳㊶ メッセージを送る（API設計.md の 16-3-7）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
   # - 送れない（マッチ以降のやりとりがない）なら、ConflictError を投げる（窓口では 409）
   # - 本文に誤りがあれば、保存せずに、誤り（errors）入りのメッセージを返す（窓口では 422）
