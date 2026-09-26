@@ -67,7 +67,7 @@ export function JobPostingList() {
                 >
                   編集する
                 </Link>
-                {/* 行き先の候補者一覧（C4）は順5 で作る。それまでは「見つかりません」になる */}
+                {/* 候補者一覧（C4）を、この募集のタブを選んだ状態で開く */}
                 <Link
                   href={`/company/candidacies?job_posting_id=${jobPosting.id}`}
                   className={buttonVariants({ variant: "outline", size: "sm" })}

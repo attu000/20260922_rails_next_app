@@ -10,6 +10,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { toFieldErrorItems } from "@/components/form-fields";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
+import { StatusBadge } from "@/components/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -67,11 +68,7 @@ export function StudentCandidacyActions({
   let content: ReactNode;
   if (status.my_status !== "none") {
     // 応募済み・スカウトあり・マッチ済み。企業側で見送り・合格・不合格になっていても、Rails がこの3つのどれかで返す
-    content = (
-      <span className="inline-flex rounded-md bg-secondary px-2 py-1 text-sm font-medium">
-        {labelOf(statusOptions, status.my_status)}
-      </span>
-    );
+    content = <StatusBadge>{labelOf(statusOptions, status.my_status) ?? status.my_status}</StatusBadge>;
   } else if (isOpen) {
     content = (
       <ApplyDialog

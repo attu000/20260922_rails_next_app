@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { ProfileIcon } from "@/components/profile-icon";
+import { StatusBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { formatHourlyWage, formatWorkConditions } from "@/lib/format";
 import { jobMiddleCategoryNames, type Options } from "@/lib/options";
@@ -40,9 +41,11 @@ export function StudentJobPostingRow({ jobPosting, options, tag }: StudentJobPos
           </Link>
           {/* 募集一覧には掲載中しか出ない。募集管理などで、終了した募集に出る */}
           {!jobPosting.is_open && <span className="ml-2 text-sm font-normal text-muted-foreground">募集終了</span>}
-          {/* 見た目は、募集詳細の「応募済み」の表示とそろえる */}
+          {/* 見た目は、募集詳細の「応募済み」の表示とそろえる（同じ部品） */}
           {tag && (
-            <span className="ml-2 inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">{tag}</span>
+            <StatusBadge size="sm" className="ml-2">
+              {tag}
+            </StatusBadge>
           )}
         </p>
         {jobCategoryNames.length > 0 && (
