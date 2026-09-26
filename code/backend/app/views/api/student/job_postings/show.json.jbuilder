@@ -1,15 +1,17 @@
 # ⑲ GET /api/student/job_postings/:id の形（design/designs/API設計.md の 16-3 ⑲）。
 # 返さない項目：状態（代わりに is_open）と、目的・採用につながる可能性・求める人材（学生に見せない項目）。
 # 次のものは、それを作る順で足す（PR189）
-#   - 自分の状態（my_status、my_candidacy_id）：順5
+#   - 自分の状態（my_status、my_candidacy_id）：順5（済み）
 #   - その企業とのスレッドがあるか（has_message_thread）：順6
 #   - 業界・事業形態・工程、カルチャーの5つと自分の性格との比較（culture_comparison）：順9・順10
 
 company = @job_posting.company_profile
 
 json.extract! @job_posting, :id, :title
-# 掲載中なら true。false なら、画面は「募集終了」と出す（順5 から、やりとりがある非公開・終了の募集も開けるようになる）
+# 掲載中なら true。false なら、画面は「募集終了」と出す（やりとりがあれば、非公開・終了の募集も開ける）
 json.is_open @job_posting.published?
+# 自分の状態（形E）
+json.partial! "api/student/candidacies/my_status", candidacy: @candidacy
 json.company do
   json.id company.id
   json.name company.name

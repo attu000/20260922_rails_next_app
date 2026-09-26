@@ -134,11 +134,14 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         "work_style", "work_style_note", "prefecture_id", "work_location_note", "weekend_ok", "work_note",
         "hourly_wage", "requirements", "preferred_requirements", "technology_note",
         "main_job_middle_category_ids", "related_job_middle_category_ids", "technology_ids",
-        "published_at"
+        "published_at", "my_status", "my_candidacy_id"
       )
       expect(body).to include(
         "id" => posting.id,
         "is_open" => true,
+        # やりとりがなければ「関係なし」
+        "my_status" => "none",
+        "my_candidacy_id" => nil,
         "company" => { "id" => company.id, "name" => company.name, "icon_url" => nil },
         "business_description" => "募集に書いた事業内容",
         "start_month" => "2026-11-01",
@@ -164,7 +167,7 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
     end
 
     # 必須テスト：関係のない学生は、掲載中でない募集を開けない（16-1-10）。
-    # 順5 で「自分とやりとりがある募集」は開けるようにし、そのテストを足す
+    # 自分とやりとりがある募集は、非公開・終了でも開ける（下の「自分の状態と、見てよい範囲」）
     {
       "一度も掲載していない募集" => [],
       "掲載したあと非公開に戻した募集" => [ :unpublished_after_published ],
@@ -184,6 +187,54 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
       get "/api/student/job_postings/0"
 
       expect(response).to have_http_status(:not_found)
+    end
+
+    # 順5：自分の状態（形E）と、「自分とやりとりがある募集」を見てよい範囲に足したこと（16-3 ⑲）
+    describe "自分の状態と、見てよい範囲" do
+      let(:student) { student_user.student_profile }
+
+      # 発生元・状態 → 学生から見た状態。見送り・合格・不合格は学生に見せない（データベース.md の 8-7）
+      {
+        [ :application, :unmatched ] => "applied",
+        [ :application, :declined ] => "applied",
+        [ :scout, :unmatched ] => "scouted",
+        [ :application, :passed ] => "matched"
+      }.each do |(origin, status), my_status|
+        it "発生元が #{origin}、状態が #{status} のやりとりがあれば #{my_status} と、やりとりの番号を返す" do
+          posting = create_posting
+          candidacy = create(:candidacy, origin: origin, status: status, job_posting: posting, student_profile: student)
+
+          get "/api/student/job_postings/#{posting.id}"
+
+          expect(response.parsed_body).to include("my_status" => my_status, "my_candidacy_id" => candidacy.id)
+        end
+      end
+
+      {
+        "掲載したあと非公開に戻した募集" => :unpublished,
+        "終了した募集" => :closed
+      }.each do |label, status|
+        it "自分とやりとりがあれば、#{label}も開ける（is_open は false）" do
+          posting = create_posting
+          create(:candidacy, job_posting: posting, student_profile: student)
+          posting.update!(status: status)
+
+          get "/api/student/job_postings/#{posting.id}"
+
+          expect(response).to have_http_status(:ok)
+          expect(response.parsed_body).to include("is_open" => false, "my_status" => "applied")
+        end
+      end
+
+      it "ほかの学生とのやりとりしかない終了した募集は、404" do
+        posting = create_posting
+        create(:candidacy, job_posting: posting)
+        posting.update!(status: :closed)
+
+        get "/api/student/job_postings/#{posting.id}"
+
+        expect(response).to have_http_status(:not_found)
+      end
     end
   end
 end

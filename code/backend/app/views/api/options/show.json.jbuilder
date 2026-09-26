@@ -1,5 +1,5 @@
 # ⑦ GET /api/options の形（design/designs/API設計.md の 16-3 ⑦）。
-# 順1〜順3 で使う選択肢とマスタだけを返す。ほかの項目（工程、性格・カルチャーの5軸など）は、使う順で足す（未決内容.md の 11-2）。
+# 順1〜順5 で使う選択肢とマスタだけを返す。ほかの項目（工程、性格・カルチャーの5軸など）は、使う順で足す（未決内容.md の 11-2）。
 # 選択肢の値はモデルの enum の名前、表示名は config/locales/ja.yml から取る
 
 json.enums do
@@ -37,6 +37,16 @@ json.enums do
   json.skill_level StudentSkill.levels.keys do |value|
     json.value value
     json.label t("enums.student_skill.level.#{value}")
+  end
+  # 応募理由・マッチ理由（12個。画面に出す順。app/models/candidacy_reason.rb）
+  json.candidacy_reason CandidacyReason.reasons.keys do |value|
+    json.value value
+    json.label t("enums.candidacy_reason.reason.#{value}")
+  end
+  # 学生から見た、募集とのやりとりの状態
+  json.my_status Candidacy::MY_STATUSES do |value|
+    json.value value
+    json.label t("enums.candidacy.my_status.#{value}")
   end
 end
 

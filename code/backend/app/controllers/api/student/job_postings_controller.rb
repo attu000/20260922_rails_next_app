@@ -21,14 +21,16 @@ module Api
       # ⑲ 募集詳細。返事は app/views/api/student/job_postings/show.json.jbuilder
       def show
         @job_posting = find_visible_job_posting
+        # この募集との自分のやりとり。なければ nil（返事の my_status は none になる）
+        @candidacy = current_student.candidacies.find_by(job_posting: @job_posting)
       end
 
       private
 
-      # 学生から見てよい募集の中からだけ探す。範囲外の番号は、そのまま 404 になる（16-1-10）。
-      # 今は掲載中の募集だけ。順5 で「自分とやりとりがある募集」（非公開・終了でも開ける）を足す
+      # 学生から見てよい募集（掲載中と、自分とやりとりがある募集）の中からだけ探す。
+      # 範囲外の番号は、そのまま 404 になる（16-1-10）。範囲は StudentProfile#visible_job_postings の1か所で決める
       def find_visible_job_posting
-        JobPosting.published.find(params[:id])
+        current_student.visible_job_postings.find(params[:id])
       end
 
       # 検索の条件として受け取ってよい値だけを通す。ページ番号（page）は Pagy が直接読む

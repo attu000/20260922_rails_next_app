@@ -12,6 +12,8 @@ module ErrorResponses
 
     # 探したデータがない。見てよい範囲の中から探して見つからない場合も、これで 404 になる（16-1-10）
     rescue_from ActiveRecord::RecordNotFound, with: :render_not_found
+    # 今の状態ではできない操作（応募済みの募集への応募など）。モデルの処理が投げる（app/errors/conflict_error.rb）
+    rescue_from ConflictError, with: :render_conflict
     # CSRF の合言葉がない・違う
     rescue_from ActionController::InvalidAuthenticityToken, with: :render_forbidden
     # モデルの検証に通らなかった（save! など）
@@ -36,6 +38,12 @@ module ErrorResponses
 
   def render_forbidden(_exception = nil)
     render_error(:forbidden, I18n.t("api.errors.forbidden"))
+  end
+
+  # 今の状態ではできない（409）。項目ごとではなく、全体に1行だけ出す（権限_バリデーション.md の 17-3-6）。
+  # 画面は、この返事を受けたら最新の状態を読み直す
+  def render_conflict(_exception = nil)
+    render_error(:conflict, I18n.t("api.errors.conflict"))
   end
 
   # 入力の誤り（422）。各窓口からは、モデルの errors を渡して呼ぶ。

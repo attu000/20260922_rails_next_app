@@ -12,6 +12,8 @@ ja:
       too_many_requests: しばらくしてからお試しください
       not_found: 見つかりません
       unprocessable: 入力内容を確認してください
+      # 今の状態ではできない操作（409。権限_バリデーション.md の 17-3-6）
+      conflict: この操作は今はできません。画面を読み込み直してください
       internal_server_error: エラーが起きました
 
   # 項目名。エラーの文が「メールアドレスを入力してください」のように、項目名付きになる
@@ -85,6 +87,9 @@ ja:
         main_job_middle_category_ids: 主な職種
         related_job_middle_category_ids: 関連する職種
         technology_ids: 使用技術
+      # やりとり。reasons は列ではなく、応募のときに送られる理由の一覧（「応募理由を入力してください」などになる）
+      candidacy:
+        reasons: 応募理由
 
   # 選択肢（enum）の日本語の表示名。⑦ GET /api/options がここを読んで返す（API設計.md の 16-1-9）。
   # 画面側には選択肢の表を書かない
@@ -136,6 +141,28 @@ ja:
         v2: v2 基礎的な操作が可能
         v3: v3 人に解説・教えることができる
         v4: v4 実務上でメインで用いた経験あり
+    # 応募理由・マッチ理由（データベース.md の 8-5 candidacy_reasons）
+    candidacy_reason:
+      reason:
+        business: 事業内容
+        industry: 業界
+        job_major_category: 職種（大分類）
+        job_middle_category: 職種（中分類）
+        business_type: 事業形態
+        work_process: 工程
+        internship_details: インターンですること
+        growth: 成長イメージ
+        culture: カルチャー
+        hourly_wage: 時給
+        work_conditions: 稼働条件
+        technologies: 使用技術
+    # 学生から見た、募集とのやりとりの状態（API設計.md の形E）
+    candidacy:
+      my_status:
+        none: 関係なし
+        applied: 応募済み
+        scouted: スカウトあり
+        matched: マッチ済み
 
   # rails-i18n の標準の文言を、設計書の文言に合わせる（17-3-6）
   errors:

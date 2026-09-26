@@ -133,4 +133,29 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
       expect(faculties.second["departments"].map { |department| department["name"] }).to eq(%w[学科B1])
     end
   end
+
+  # 順5（応募 → 企業がマッチ）で足した選択肢
+  describe "応募で使う選択肢" do
+    it "応募理由の12個を、画面に出す順（番号の順ではない）で返す" do
+      get "/api/options"
+
+      reasons = response.parsed_body["enums"]["candidacy_reason"]
+      expect(reasons.map { |option| option["value"] }).to eq(%w[
+        business industry job_major_category job_middle_category business_type work_process
+        internship_details growth culture hourly_wage work_conditions technologies
+      ])
+      expect(reasons.first).to eq("value" => "business", "label" => "事業内容")
+    end
+
+    it "学生から見た状態の4つを、名前と日本語の表示名で返す" do
+      get "/api/options"
+
+      expect(response.parsed_body["enums"]["my_status"]).to eq([
+        { "value" => "none", "label" => "関係なし" },
+        { "value" => "applied", "label" => "応募済み" },
+        { "value" => "scouted", "label" => "スカウトあり" },
+        { "value" => "matched", "label" => "マッチ済み" }
+      ])
+    end
+  end
 end

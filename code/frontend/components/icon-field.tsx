@@ -4,7 +4,7 @@
 // 選んだファイルは、保存を押すまで Rails に送らず、ブラウザの中だけでプレビューを出す。
 // 保存では、本体を保存したあとに uploadIcon で続けて送る（本体の成功後に送る決まり）
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { ProfileIcon } from "@/components/profile-icon";
 import { toFieldErrorItems } from "@/components/form-fields";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
@@ -18,7 +18,9 @@ const ICON_MAX_BYTES = 2 * 1024 * 1024;
 export function useIconPicker() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // ファイルを選ぶ欄の番号。数を変えると、React が欄を捨てて作り直すので、選んだファイル名の表示も空に戻る（PR206）。
+  // 欄を直接つかむ ref を使わないのは、描画の途中で ref を読まない決まり（ESLint の react-hooks/refs）に合わせるため
+  const [inputKey, setInputKey] = useState(0);
 
   // プレビューの URL は、使い終わったら（別のファイルを選んだ、画面を離れた）ブラウザに返す
   useEffect(() => {
@@ -33,14 +35,14 @@ export function useIconPicker() {
     setPreviewUrl(selected ? URL.createObjectURL(selected) : null);
   }
 
-  // 送り終えたら、選んだファイルとプレビューを消す
+  // 送り終えたら、選んだファイルとプレビューを消し、欄を作り直して空にする
   function clear() {
     setFile(null);
     setPreviewUrl(null);
-    if (inputRef.current) inputRef.current.value = "";
+    setInputKey((key) => key + 1);
   }
 
-  return { file, previewUrl, inputRef, handleChange, clear };
+  return { file, previewUrl, inputKey, handleChange, clear };
 }
 
 export type IconPicker = ReturnType<typeof useIconPicker>;
@@ -85,7 +87,7 @@ export function IconField({ picker, currentUrl, name, errors, onFileChange }: Ic
       <div className="flex items-center gap-4">
         <ProfileIcon src={picker.previewUrl ?? currentUrl} name={name} size="lg" />
         <input
-          ref={picker.inputRef}
+          key={picker.inputKey}
           id="icon"
           type="file"
           accept={ICON_CONTENT_TYPES.join(",")}

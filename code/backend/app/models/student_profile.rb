@@ -87,6 +87,13 @@ class StudentProfile < ApplicationRecord
     skill_attribute ? StudentSkill.human_attribute_name(skill_attribute, options) : super
   end
 
+  # 自分が見てよい募集（API設計.md の 16-1-10、16-3 ⑲）。募集詳細と応募の窓口は、ここから番号で探す（範囲の外は 404）。
+  # 掲載中の募集と、自分とやりとりがある募集（非公開・終了でも開ける。画面は「募集終了」と出す）。
+  # 一度も掲載していない募集にはやりとりができないので、ここには入らない
+  def visible_job_postings
+    JobPosting.published.or(JobPosting.where(id: candidacies.select(:job_posting_id)))
+  end
+
   # 学生プロフィールの保存（⑯ PATCH /api/student/profile）。窓口はこれを呼ぶだけにする（技術構成.md の 9-2）。
   # 保存できたら true、入力に誤りがあれば false を返す（誤りは errors に入る）。
   # 企業プロフィール・募集と同じく、「先に全部確かめてから、トランザクションの中で書き込む」順番にしている

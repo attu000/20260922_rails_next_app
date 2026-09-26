@@ -19,4 +19,10 @@ class CandidacyReason < ApplicationRecord
     work_conditions: 7,
     technologies: 8
   }, validate: true
+
+  # 理由の組を、1つの数（reason_mask）にする。理由の番号 i ごとに「2 の i 乗」を足し合わせる。
+  # 例：事業内容（0）とカルチャー（5）なら 1 + 32 = 33。12個すべてなら 4095
+  def self.mask_for(reasons)
+    reasons.sum { |reason| 1 << self.reasons.fetch(reason.to_s) }
+  end
 end

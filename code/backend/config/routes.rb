@@ -48,6 +48,8 @@ Rails.application.routes.draw do
       resources :job_postings, only: %i[index show]
       # ⑳ GET /api/student/companies/:id（企業詳細）
       resources :companies, only: :show
+      # ㉛ POST /api/student/candidacies（応募）
+      resources :candidacies, only: :create
     end
   end
 

@@ -53,6 +53,22 @@ RSpec.describe Candidacy, type: :model do
     end
   end
 
+  # 理由の番号 i ごとに「2 の i 乗」を足し合わせる（データベース.md の 8-5 candidacies の reason_mask）
+  describe "CandidacyReason.mask_for（理由の組を1つの数にする）" do
+    it "理由が1つなら、その番号の桁だけが立つ" do
+      expect(CandidacyReason.mask_for(%w[business])).to eq(1)
+      expect(CandidacyReason.mask_for(%w[job_major_category])).to eq(2048)
+    end
+
+    it "事業内容（0）とカルチャー（5）なら 1 + 32 = 33" do
+      expect(CandidacyReason.mask_for(%w[business culture])).to eq(33)
+    end
+
+    it "12個すべてなら 4095（データベースの範囲の上限）" do
+      expect(CandidacyReason.mask_for(CandidacyReason.reasons.keys)).to eq(4095)
+    end
+  end
+
   describe "データベースの制約" do
     it "同じ募集×学生の2件目は、データベースが拒否する" do
       candidacy = create(:candidacy)
@@ -64,7 +80,7 @@ RSpec.describe Candidacy, type: :model do
 
     # update_columns は、モデルの検証を飛ばして SQL を直接送る（Django の QuerySet.update() に近い）。
     # データベースが一度拒否すると、そのテストの中ではそれ以上 SQL を送れなくなるので、1つのテストで1回だけ確かめる
-    [0, 4096].each do |value|
+    [ 0, 4096 ].each do |value|
       it "reason_mask が #{value}（1〜4095 の範囲外）なら、データベースが拒否する" do
         candidacy = create(:candidacy)
 

@@ -1,6 +1,10 @@
 # やりとり（募集×学生。design/designs/データベース.md の 8-5）。
 # 応募・スカウトのどちらから始まっても同じ「やりとり」になる。状態の移り変わりは権限_バリデーション.md の 17-2-1 が正
 class Candidacy < ApplicationRecord
+  # 学生から見た状態の4つ（API設計.md の形E）。関係がないときの none は、やりとりがないときに窓口の返事で使う。
+  # ⑦ の選択肢（my_status）にも使う
+  MY_STATUSES = %w[none applied scouted matched].freeze
+
   belongs_to :job_posting
   belongs_to :student_profile
 
@@ -20,6 +24,58 @@ class Candidacy < ApplicationRecord
     passed: 3,
     failed: 4
   }, validate: true
+
+  # ㉛ 応募（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
+  # まだないやりとりを作るので、クラスのメソッドにしている（PR204）。
+  # - 今の状態ではできない（募集が掲載中でない、この募集とのやりとりがもうある）なら、ConflictError を投げる（窓口では 409）
+  # - 応募理由に誤りがあれば、保存せずに、誤り（errors）入りのやりとりを返す（窓口では 422）
+  # - 保存できたら、保存したやりとりを返す
+  def self.apply(student_profile, job_posting, reasons)
+    # 状態を先に確かめる。終了した募集への応募は、理由を直しても通らないため
+    raise ConflictError unless job_posting.published?
+    raise ConflictError if exists?(student_profile: student_profile, job_posting: job_posting)
+
+    candidacy = new(student_profile: student_profile, job_posting: job_posting, origin: :application, status: :unmatched)
+    candidacy.validate_reasons(reasons)
+    return candidacy if candidacy.errors.any?
+
+    # やりとり、応募理由、理由の組の写しを、まとめて書き込む（Django の transaction.atomic() にあたる）
+    transaction do
+      candidacy.save!
+      candidacy.save_reasons!(reasons)
+    end
+    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
+    candidacy
+  rescue ActiveRecord::RecordNotUnique
+    # 同時に2回押され、データベースの「同じ募集×学生のやりとりは1件だけ」に弾かれた。応募済みと同じ扱いにする
+    raise ConflictError
+  end
+
+  # 付いている応募理由・マッチ理由の名前の一覧（例：["business", "culture"]）。学生詳細の candidacy.reasons と同じ中身（API設計.md の形D）。
+  # エラーの文を作るとき、Rails は項目の今の値を読みに行く（文の中に %{value} で差し込めるようにするため）。
+  # 応募理由の誤りは reasons の名前で入れるので、この名前で読めないと止まってしまう（学生プロフィールの skills と同じ）
+  def reasons
+    candidacy_reasons.map(&:reason)
+  end
+
+  # 応募理由・マッチ理由が正しいかを確かめる。誤りは errors の reasons に入れる（権限_バリデーション.md の 17-3-4）。
+  # 文言は、業界や技術の番号の一覧と同じもの（「応募理由に選べない値が含まれています」など）。
+  # 応募（apply）と、順6 のスカウトへのマッチで使うので、外から呼べるようにしている
+  def validate_reasons(reasons)
+    reasons = Array(reasons).map(&:to_s)
+    return errors.add(:reasons, :blank) if reasons.empty?
+
+    errors.add(:reasons, :not_selectable) unless (reasons - CandidacyReason.reasons.keys).empty?
+    errors.add(:reasons, :duplicated) if reasons.uniq.size != reasons.size
+  end
+
+  # 応募理由の行と、理由の組の写し（reason_mask）を保存する。validate_reasons で確かめてから、トランザクションの中で呼ぶ。
+  # 写しは応募理由と同じトランザクションで書く決まり（データベース.md の 8-5 candidacies）
+  def save_reasons!(reasons)
+    reasons = Array(reasons).map(&:to_s)
+    reasons.each { |reason| candidacy_reasons.create!(reason: reason) }
+    update!(reason_mask: CandidacyReason.mask_for(reasons))
+  end
 
   # 企業から見た、やりとりの状態のタグ（API設計.md の 16-3 ㉑・形D）。
   # 「未対応応募」は発生元と状態の組み合わせに付けた名前なので、画面側では組み立てず、ここで計算して返す（16-1-9）
