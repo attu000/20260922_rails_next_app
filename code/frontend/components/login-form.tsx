@@ -104,7 +104,7 @@ export function LoginForm({ role }: { role: Role }) {
       </form>
 
       <div className="space-y-2 text-sm">
-        {/* 新規登録（C9・S9）は Phase 6 で作る。それまでは押すと「見つかりません」になる */}
+        {/* 新規登録（C9・S9）へ */}
         <p>
           <Link href={texts.signupPath} className="underline">
             新規登録はこちら

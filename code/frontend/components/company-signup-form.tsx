@@ -9,7 +9,6 @@
 // 利用規約・プライバシーポリシーへの同意と、進み具合の表示（「1／2」）は【仕上げ】で足す
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CompanyInfoFields,
@@ -17,9 +16,8 @@ import {
   validateCompanyInfo,
   type CompanyInfoValues,
 } from "@/components/company-info-fields";
-import { RequiredNote, type FieldErrors } from "@/components/form-fields";
+import type { FieldErrors } from "@/components/form-fields";
 import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
-import { PageTitle } from "@/components/page-title";
 import {
   ACCOUNT_KEYS,
   checkEmail,
@@ -28,10 +26,11 @@ import {
   validateAccountOnScreen,
   type AccountValues,
 } from "@/components/signup-account-fields";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { SignupIconFailed, SignupLayout } from "@/components/signup-layout";
+import { Button } from "@/components/ui/button";
 import { FieldDescription, FieldGroup } from "@/components/ui/field";
 import { ApiError, apiFetch } from "@/lib/api";
-import { homePathFor, loginPathFor, type Me } from "@/lib/auth";
+import { homePathFor, type Me } from "@/lib/auth";
 import { useOptions } from "@/lib/options";
 
 // 名前の項目名（Rails の company_profile.name と同じ）
@@ -172,25 +171,11 @@ export function CompanySignupForm() {
 
   // 登録はできたが、アイコンだけ保存できなかったとき（PR229）
   if (iconFailed) {
-    return (
-      <main className="mx-auto mt-16 max-w-2xl space-y-6 px-4 pb-16">
-        <PageTitle>新規登録（企業用）</PageTitle>
-        <p className="text-sm">登録が完了しました。</p>
-        <p className="text-sm text-destructive">アイコンを保存できませんでした。あとで会社情報から登録してください</p>
-        <Link href={homePathFor("company")} replace className={buttonVariants()}>
-          募集一覧へ進む
-        </Link>
-      </main>
-    );
+    return <SignupIconFailed role="company" />;
   }
 
   return (
-    <main className="mx-auto mt-16 max-w-2xl space-y-6 px-4 pb-16">
-      <div className="space-y-2">
-        <PageTitle>新規登録（企業用）</PageTitle>
-        <RequiredNote />
-      </div>
-
+    <SignupLayout role="company">
       {message && <p className="text-sm text-destructive">{message}</p>}
 
       {step === 1 ? (
@@ -239,12 +224,6 @@ export function CompanySignupForm() {
           </FieldGroup>
         </form>
       )}
-
-      <p className="text-sm">
-        <Link href={loginPathFor("company")} className="underline">
-          すでにアカウントをお持ちの方はこちら
-        </Link>
-      </p>
-    </main>
+    </SignupLayout>
   );
 }
