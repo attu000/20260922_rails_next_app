@@ -23,6 +23,11 @@ gem "json", "< 3"
 # 詳しくは design/designs/権限_バリデーション.md の 17-3-6
 gem "rails-i18n", "~> 8.1"
 
+# 一覧のページ分け（design/designs/API設計.md の 16-1-11・16-1-14）。
+# データベースの結果も Ruby の配列（おすすめ順で並べた結果）も、同じ書き方で分けられる。
+# 大きな版が上がったときに書き方が変わった前例があるので、43 系に固定する
+gem "pagy", "~> 43.6"
+
 # Windows does not include zoneinfo files, so bundle the tzinfo-data gem
 gem "tzinfo-data", platforms: %i[ windows jruby ]
 

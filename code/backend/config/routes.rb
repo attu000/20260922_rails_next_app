@@ -43,6 +43,11 @@ Rails.application.routes.draw do
         # ⑰ POST /api/student/profile/icon（学生のアイコン）
         resource :icon, only: :create, controller: "profile_icons"
       end
+
+      # ⑱ GET /api/student/job_postings（募集検索）、⑲ GET /api/student/job_postings/:id（募集詳細）
+      resources :job_postings, only: %i[index show]
+      # ⑳ GET /api/student/companies/:id（企業詳細）
+      resources :companies, only: :show
     end
   end
 

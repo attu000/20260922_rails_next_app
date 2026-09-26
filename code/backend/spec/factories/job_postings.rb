@@ -13,5 +13,17 @@ FactoryBot.define do
     trait :published do
       status { :published }
     end
+
+    # 終了。新規作成では終了を選べない（権限_バリデーション.md の 17-2-2）ので、掲載中で作ってから終了にする
+    trait :closed do
+      status { :published }
+      after(:create) { |job_posting| job_posting.update!(status: :closed) }
+    end
+
+    # 掲載したことがある非公開。掲載中で作ってから非公開に戻す（最初に掲載した日時は残る）
+    trait :unpublished_after_published do
+      status { :published }
+      after(:create) { |job_posting| job_posting.update!(status: :unpublished) }
+    end
   end
 end
