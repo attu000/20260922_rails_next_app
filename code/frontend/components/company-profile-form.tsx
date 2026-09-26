@@ -2,19 +2,18 @@
 
 // 企業プロフィール編集（C1）の入力フォーム。詳しくは design/designs/ページ設計.md の 6-5 C1、API設計.md の 16-3 ⑦⑧⑨⑩。
 // 開いたら ⑦ 選択肢と ⑧ 自社のプロフィールを SWR で取り、保存で ⑨ を送る。アイコンを選んでいたら、⑨ の成功後に ⑩ を続けて送る。
-// 必須は会社名だけ（その他決め事.md の 5-9）。見た目は shadcn/ui の部品で、最低限だけそろえている
+// 必須は会社名だけ（その他決め事.md の 5-9）。見た目は shadcn/ui の部品で、最低限だけそろえている。
+// 業界〜どんな会社かの欄は、新規登録と共通の部品（components/company-info-fields.tsx）
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { LONG_TEXT_MAX_LENGTH, toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
+import { CompanyInfoFields, validateCompanyInfo, type CompanyInfoValues } from "@/components/company-info-fields";
+import { toFieldErrorItems, type FieldErrors } from "@/components/form-fields";
 import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
-import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { useRedirectIfUnauthorized, useRefreshMe } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { Textarea } from "@/components/ui/textarea";
 import { ApiError, apiFetch, useApi } from "@/lib/api";
 import { useOptions } from "@/lib/options";
 
@@ -30,17 +29,11 @@ type CompanyProfile = {
 };
 
 // フォームが持つ値。空欄は null ではなく "" で持つ（入力欄にそのまま入れるため）
-type FormValues = {
+type FormValues = CompanyInfoValues & {
   name: string;
-  industry_ids: number[];
-  business_type_ids: number[];
-  employee_size: string;
-  business_description: string;
-  about: string;
 };
 
-// 会社名の長さの決まり。Rails と同じ値を使う（権限_バリデーション.md の 17-3-4）。
-// 文章の上限（2,000文字）は components/form-fields.tsx の LONG_TEXT_MAX_LENGTH
+// 会社名の長さの決まり。Rails と同じ値を使う（権限_バリデーション.md の 17-3-4）
 const NAME_MAX_LENGTH = 100;
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
@@ -60,17 +53,12 @@ function toFormValues(profile: CompanyProfile): FormValues {
 // その場で分かる確認だけを行う（17-3-2）。Rails も同じ確認をするので、ここをすり抜けても守られる。
 // 文言は Rails と同じにする
 function validateOnScreen(values: FormValues, iconFile: File | null): FieldErrors {
-  const errors: FieldErrors = {};
+  // 業界〜どんな会社かの確認は、新規登録と共通
+  const errors: FieldErrors = validateCompanyInfo(values);
   if (values.name.trim() === "") {
     errors.name = ["会社名を入力してください"];
   } else if (values.name.length > NAME_MAX_LENGTH) {
     errors.name = [`会社名は${NAME_MAX_LENGTH}文字以内で入力してください`];
-  }
-  if (values.business_description.length > LONG_TEXT_MAX_LENGTH) {
-    errors.business_description = [`事業内容は${LONG_TEXT_MAX_LENGTH}文字以内で入力してください`];
-  }
-  if (values.about.length > LONG_TEXT_MAX_LENGTH) {
-    errors.about = [`どんな会社かは${LONG_TEXT_MAX_LENGTH}文字以内で入力してください`];
   }
   const iconErrors = validateIconFile(iconFile);
   if (iconErrors) {
@@ -225,72 +213,15 @@ export function CompanyProfileForm() {
             <FieldError errors={toFieldErrorItems(fieldErrors.name)} />
           </Field>
 
-          <MasterCheckboxGroup
-            name="industry"
-            legend="業界"
-            rows={options.masters.industries}
-            selectedIds={values.industry_ids}
-            onChange={(ids) => updateValue("industry_ids", ids)}
-            errors={fieldErrors.industry_ids}
+          <CompanyInfoFields
+            values={values}
+            onChange={(change) => {
+              setValues((current) => (current ? { ...current, ...change } : current));
+              setSaved(false);
+            }}
+            errors={fieldErrors}
+            options={options}
           />
-
-          <MasterCheckboxGroup
-            name="business-type"
-            legend="事業形態"
-            rows={options.masters.business_types}
-            selectedIds={values.business_type_ids}
-            onChange={(ids) => updateValue("business_type_ids", ids)}
-            errors={fieldErrors.business_type_ids}
-          />
-
-          <Field data-invalid={fieldErrors.business_description ? true : undefined}>
-            <FieldLabel htmlFor="business_description">事業内容</FieldLabel>
-            <Textarea
-              id="business_description"
-              rows={4}
-              value={values.business_description}
-              onChange={(event) => updateValue("business_description", event.target.value)}
-              aria-invalid={fieldErrors.business_description ? true : undefined}
-            />
-            <FieldDescription>
-              {values.business_description.length}／{LONG_TEXT_MAX_LENGTH}文字
-            </FieldDescription>
-            <FieldError errors={toFieldErrorItems(fieldErrors.business_description)} />
-          </Field>
-
-          <Field data-invalid={fieldErrors.employee_size ? true : undefined}>
-            <FieldLabel htmlFor="employee_size">人数</FieldLabel>
-            <NativeSelect
-              id="employee_size"
-              value={values.employee_size}
-              onChange={(event) => updateValue("employee_size", event.target.value)}
-              aria-invalid={fieldErrors.employee_size ? true : undefined}
-            >
-              <NativeSelectOption value="">選択してください</NativeSelectOption>
-              {/* 選択肢と表示名は Rails が返したものだけを使う（16-1-9） */}
-              {options.enums.employee_size.map((option) => (
-                <NativeSelectOption key={option.value} value={option.value}>
-                  {option.label}
-                </NativeSelectOption>
-              ))}
-            </NativeSelect>
-            <FieldError errors={toFieldErrorItems(fieldErrors.employee_size)} />
-          </Field>
-
-          <Field data-invalid={fieldErrors.about ? true : undefined}>
-            <FieldLabel htmlFor="about">どんな会社か</FieldLabel>
-            <Textarea
-              id="about"
-              rows={4}
-              value={values.about}
-              onChange={(event) => updateValue("about", event.target.value)}
-              aria-invalid={fieldErrors.about ? true : undefined}
-            />
-            <FieldDescription>
-              {values.about.length}／{LONG_TEXT_MAX_LENGTH}文字
-            </FieldDescription>
-            <FieldError errors={toFieldErrorItems(fieldErrors.about)} />
-          </Field>
 
           <IconField
             picker={iconPicker}
