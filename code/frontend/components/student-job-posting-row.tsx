@@ -1,5 +1,5 @@
 // 学生向けの募集の行の見た目（design/designs/ページ設計.md の 6-6 S2「各行」）。
-// 募集一覧（学生のホーム）と企業詳細の募集一覧で使い回す。順5 以降の募集管理・スカウト管理でも使う。
+// 募集一覧（学生のホーム）、企業詳細の募集一覧、募集管理で使い回す。順6 のスカウト管理でも使う。
 // 業界・事業形態・工程は、順9 で Rails が返すようになってから足す。
 // 「ここから条件に合いません」の区切りは、並べる側（募集一覧）が入れる
 
@@ -13,9 +13,11 @@ import type { StudentJobPostingRow as Row } from "@/lib/student-job-postings";
 type StudentJobPostingRowProps = {
   jobPosting: Row;
   options: Options;
+  // タイトルの横に出す札（「応募済み」「マッチ済み」など。任意）。募集管理・スカウト管理で使う
+  tag?: string | null;
 };
 
-export function StudentJobPostingRow({ jobPosting, options }: StudentJobPostingRowProps) {
+export function StudentJobPostingRow({ jobPosting, options, tag }: StudentJobPostingRowProps) {
   const detailHref = `/student/job_postings/${jobPosting.id}`;
   // 職種は、主な職種と関連する職種をまとめて並べる
   const jobCategoryNames = jobMiddleCategoryNames(options.masters.job_major_categories, [
@@ -36,8 +38,12 @@ export function StudentJobPostingRow({ jobPosting, options }: StudentJobPostingR
           <Link href={detailHref} className="hover:underline">
             {jobPosting.title}
           </Link>
-          {/* 今の募集一覧には掲載中しか出ないが、順5 以降の募集管理などで使う */}
+          {/* 募集一覧には掲載中しか出ない。募集管理などで、終了した募集に出る */}
           {!jobPosting.is_open && <span className="ml-2 text-sm font-normal text-muted-foreground">募集終了</span>}
+          {/* 見た目は、募集詳細の「応募済み」の表示とそろえる */}
+          {tag && (
+            <span className="ml-2 inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium">{tag}</span>
+          )}
         </p>
         {jobCategoryNames.length > 0 && (
           <p className="text-sm text-muted-foreground">{jobCategoryNames.join("・")}</p>

@@ -2,16 +2,18 @@
 
 // 募集詳細（S6）の表示。詳しくは design/designs/ページ設計.md の 6-6 S6、API設計.md の 16-3 ⑲。
 // 開いたら ⑲ 募集詳細と ⑦ 選択肢（表示名・マスタの名前）を取り、項目を並べる。
-// 見られない募集（非公開・終了・存在しない番号）は Rails が 404 を返し、「見つかりません」と出る（守りは Rails。16-1-10）。
+// 見られない募集（関係のない非公開・終了の募集、存在しない番号）は Rails が 404 を返し、「見つかりません」と出る（守りは Rails。16-1-10）。
+// 自分とやりとりがある募集は、非公開・終了でも開ける（「募集終了」と出す）。
+// 自分の状態の表示と「応募する」は components/student-candidacy-actions.tsx。
 // 次のものは、それを作る順で足す（PR189）
-//   - 「応募する」「マッチする」、状態の表示（応募済み／マッチ済み）：順5・順6
-//   - 「この企業とのメッセージ」：順6
+//   - 「マッチする」（スカウトありのとき）、「この企業とのメッセージ」：順6
 //   - 業界・事業形態・工程、カルチャーグラフと自分の性格との一致・ずれ：順9・順10
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
+import { StudentCandidacyActions } from "@/components/student-candidacy-actions";
 import { useApi } from "@/lib/api";
 import { formatHourlyWage, formatStartMonth } from "@/lib/format";
 import { jobMiddleCategoryNames, labelOf, nameOf, useOptions } from "@/lib/options";
@@ -56,7 +58,8 @@ function withNote(main: string | null, note: string | null): string | null {
 
 export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string }) {
   const { options, failed: optionsFailed } = useOptions();
-  const { data, error } = useApi<Detail>(`/api/student/job_postings/${jobPostingId}`);
+  // mutate：覚えている中身を書き換える・取り直す関数（応募したあとに使う）
+  const { data, error, mutate } = useApi<Detail>(`/api/student/job_postings/${jobPostingId}`);
 
   if (optionsFailed) {
     return <p className="text-sm text-destructive">{FALLBACK_ERROR_MESSAGE}</p>;
@@ -79,7 +82,7 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
       <div className="space-y-2">
         <PageTitle>
           {data.title}
-          {/* 今は掲載中の募集しか開けないが、順5 から、やりとりがある非公開・終了の募集も開けるようになる */}
+          {/* やりとりがある非公開・終了の募集を開いたとき */}
           {!data.is_open && <span className="ml-2 text-base font-normal text-muted-foreground">募集終了</span>}
         </PageTitle>
         {/* 会社名から企業詳細へ */}
@@ -88,6 +91,19 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
           <span className="text-sm">{data.company.name}</span>
         </Link>
       </div>
+
+      {/* 自分の状態と「応募する」。まず目に入るよう、タイトルと会社名のすぐ下に置く */}
+      <StudentCandidacyActions
+        jobPostingId={data.id}
+        isOpen={data.is_open}
+        status={{ my_status: data.my_status, my_candidacy_id: data.my_candidacy_id }}
+        reasonOptions={options.enums.candidacy_reason}
+        statusOptions={options.enums.my_status}
+        // 応募できたら、返ってきた状態で書き換える（取り直しはしない）
+        onApplied={(status) => mutate({ ...data, ...status }, { revalidate: false })}
+        // 応募できなかったら（409 など）、取り直して最新の状態にする
+        onFailed={() => mutate()}
+      />
 
       {/* 並びは、ページ設計.md の 6-6 S6 の「表示」の順 */}
       <DetailSection title="勤務地・勤務形態・時給">

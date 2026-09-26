@@ -1,0 +1,79 @@
+"use client";
+
+// 募集管理（S3）の中身。詳しくは design/designs/ページ設計.md の 6-6 S3、API設計.md の 16-3 ㉞・16-1-11。
+// 応募した募集（状態は問わない）と、スカウトからマッチした募集を、やりとりが始まった日の新しい順に並べる（Rails が選んで並べる）。
+// 企業側で見送り・合格・不合格になっていても、Rails が「応募済み」「マッチ済み」のまま返す。
+// ページは URL の ?page= に持つ（URL が正。16-1-13）。
+// 応募済み／マッチ済みで絞るタグの切り替え（?status=）は【仕上げ】で足す
+
+import type { ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { PageNav } from "@/components/page-nav";
+import { PageTitle } from "@/components/page-title";
+import { StudentJobPostingRow } from "@/components/student-job-posting-row";
+import { useApi } from "@/lib/api";
+import { labelOf, useOptions } from "@/lib/options";
+import type { StudentCandidacyListResult } from "@/lib/student-job-postings";
+
+// 通信そのものに失敗したとき（Rails の message がないとき）の一言
+const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
+
+const PAGE_PATH = "/student/candidacies";
+
+// ページ番号 → 画面の URL。1ページ目は ?page= を付けない
+function pageUrl(page: number): string {
+  return page > 1 ? `${PAGE_PATH}?page=${page}` : PAGE_PATH;
+}
+
+export function StudentCandidacyList() {
+  const searchParams = useSearchParams();
+  // URL の ?page= を読む。数でなければ1ページ目（Rails も同じ扱い）
+  const requestedPage = Number(searchParams.get("page"));
+  const page = Number.isInteger(requestedPage) && requestedPage > 1 ? requestedPage : 1;
+  const { options, failed: optionsFailed } = useOptions();
+  // 401 は共通の枠（member-only.tsx）がログイン画面へ移す。
+  // keepPreviousData：次のページが届くまで前のページを出したままにする（ページ送りで画面がちらつかないように）
+  const { data, error } = useApi<StudentCandidacyListResult>(`/api/student/candidacies${page > 1 ? `?page=${page}` : ""}`, {
+    keepPreviousData: true,
+  });
+
+  if (optionsFailed) {
+    return <p className="text-sm text-destructive">{FALLBACK_ERROR_MESSAGE}</p>;
+  }
+
+  let content: ReactNode;
+  if (!data && error && error.status !== 401) {
+    content = <p className="text-sm text-destructive">{error.message}</p>;
+  } else if (!options || !data) {
+    content = <p className="text-sm text-muted-foreground">読み込み中…</p>;
+  } else if (data.pagination.total_count === 0) {
+    content = <p className="text-sm text-muted-foreground">応募した募集はまだありません</p>;
+  } else if (data.items.length === 0) {
+    // 範囲外のページ（URL を手で書き換えたときなど）
+    content = <p className="text-sm text-muted-foreground">このページに募集はありません</p>;
+  } else {
+    content = (
+      <>
+        {/* 募集一覧（学生のホーム）と同じ行の部品に、「応募済み」「マッチ済み」の札を付ける */}
+        <ul className="space-y-3">
+          {data.items.map((item) => (
+            <StudentJobPostingRow
+              key={item.candidacy_id}
+              jobPosting={item}
+              options={options}
+              tag={labelOf(options.enums.my_status, item.my_status)}
+            />
+          ))}
+        </ul>
+        <PageNav page={data.pagination.page} totalPages={data.pagination.total_pages} hrefFor={pageUrl} />
+      </>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle>募集管理</PageTitle>
+      {content}
+    </div>
+  );
+}

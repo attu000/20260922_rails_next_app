@@ -38,6 +38,9 @@ export type Options = {
     grade: EnumOption[];
     activity_status: EnumOption[];
     skill_level: EnumOption[];
+    // 応募理由（12個。画面に出す順）と、学生から見た、募集とのやりとりの状態（順5）
+    candidacy_reason: EnumOption[];
+    my_status: EnumOption[];
   };
   // 稼働条件の数値の選択肢（その他決め事.md の 5-6）
   work_conditions: {
