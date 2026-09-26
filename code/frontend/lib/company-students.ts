@@ -57,11 +57,18 @@ export type CompanyStudentRow = {
   duration_months: number | null;
 };
 
-// ㉒ 学生検索の返事。行は形C に matched（指定した条件を全部満たすか。Rails が判定する）を足したもの。
-// 並び順は、matched が true の行がすべて先（16-1-11）。
-// やりとりのタグ用の candidacy・candidacy_count は【仕上げ】で Rails が返すようになる
+// ㉒ 学生検索の返事。行は形C に、次の3つを足したもの。並び順は、matched が true の行がすべて先（16-1-11）。
+// もうスカウトした・見送った・マッチした学生は、Rails が除いて返す（PR220）
 export type CompanyStudentSearchResult = {
-  items: (CompanyStudentRow & { matched: boolean })[];
+  items: (CompanyStudentRow & {
+    // 指定した条件を全部満たすか（Rails が判定する）
+    matched: boolean;
+    // 募集を選んだときの、その募集とのやりとり。なければ null（募集を選ばないときは常に null）。
+    // 除外のあとなので、あるのは未対応応募だけ。tag の表示名は ⑦ の enums.candidacy_tag（PR219）
+    candidacy: { id: number; origin: string; status: string; tag: string } | null;
+    // 自社の募集とのやりとりの件数。募集を選ばないときの「やりとりあり」の札に使う（PR219）
+    candidacy_count: number;
+  })[];
   pagination: {
     page: number;
     per_page: number;

@@ -11,10 +11,11 @@
 //
 // 結果は条件で減らさず、合致の群を先に、合致外の群をあとに並べて返ってくる（Rails が並べる）。
 // 画面は、合致外に変わるところに「ここから条件に合いません」の区切りを入れるだけ（処理設計_類似度.md の 7-3）。
-// 30日以上活動のない学生は、Rails が外して返す。
+// 30日以上活動のない学生と、もうスカウトした・見送った・マッチした学生は、Rails が外して返す（PR216・PR220）。
+// 行には、その募集とのやりとり（未対応応募）か、自社とのやりとりがあることを札で出す（PR219）。
 // 次のものは、それを作る順で足す
 //   - 募集を選ぶと、その募集の稼働条件で条件欄が自動で入る仕組み：後で（PR214）
-//   - 行のやりとりのタグと、最終活動の目安、フリーワードの資格名：【仕上げ】
+//   - 最終活動の目安、フリーワードの資格名：【仕上げ】
 
 import { Fragment, useState, type FormEvent } from "react";
 import Link from "next/link";
@@ -34,6 +35,7 @@ import { PageNav } from "@/components/page-nav";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
 import { SearchConditionDialog } from "@/components/search-condition-dialog";
+import { StatusBadge } from "@/components/status-badge";
 import { TechnologyPicker } from "@/components/technology-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -505,7 +507,12 @@ function SearchResults({ result, options, jobPostingId, hrefFor }: SearchResults
                   <span className="h-px flex-1 bg-border" />
                 </li>
               )}
-              <StudentRow student={item} options={options} jobPostingId={jobPostingId} />
+              <StudentRow
+                student={item}
+                options={options}
+                jobPostingId={jobPostingId}
+                tag={tagOf(item, jobPostingId, options)}
+              />
             </Fragment>
           ))}
         </ul>
@@ -518,14 +525,30 @@ function SearchResults({ result, options, jobPostingId, hrefFor }: SearchResults
 
 // ── 学生1人の行 ──
 
+// 行の名前の横に出す札（PR219）。出さないなら null。
+// タグは Rails が計算したものを日本語にするだけ（画面側では組み立てない。16-1-9）。
+// 除外のあとなので、募集を選んだときに付くのは「未対応応募」だけ（PR220）
+function tagOf(
+  item: CompanyStudentSearchResult["items"][number],
+  jobPostingId: string | null,
+  options: Options,
+): string | null {
+  if (item.candidacy) return labelOf(options.enums.candidacy_tag, item.candidacy.tag) ?? item.candidacy.tag;
+  // 募集を選んでいないとき：自社のどれかの募集とやりとりがあれば「やりとりあり」（ページ設計.md の 6-5 C5）
+  if (jobPostingId === null && item.candidacy_count > 0) return "やりとりあり";
+  return null;
+}
+
 type StudentRowProps = {
   student: CompanyStudentRow;
   options: Options;
   jobPostingId: string | null;
+  // 名前の横に出す札。null なら出さない
+  tag: string | null;
 };
 
-// 名前、学年・卒業年度・活動状況、興味のある職種、プログラミング歴、稼働条件と、「詳細を見る」
-function StudentRow({ student, options, jobPostingId }: StudentRowProps) {
+// 名前（と札）、学年・卒業年度・活動状況、興味のある職種、プログラミング歴、稼働条件と、「詳細を見る」
+function StudentRow({ student, options, jobPostingId, tag }: StudentRowProps) {
   // 学生詳細。募集を選んでいれば、その募集のタブを選んだ状態で開く
   const detailHref = `/company/students/${student.id}${
     jobPostingId === null ? "" : `?job_posting_id=${encodeURIComponent(jobPostingId)}`
@@ -558,6 +581,8 @@ function StudentRow({ student, options, jobPostingId }: StudentRowProps) {
         <Link href={detailHref} className="font-bold hover:underline">
           {student.name}
         </Link>
+        {/* 見た目は、候補者一覧の行のタグとそろえる（同じ部品） */}
+        {tag && <StatusBadge size="sm">{tag}</StatusBadge>}
       </div>
 
       <div className="space-y-1 text-sm">
