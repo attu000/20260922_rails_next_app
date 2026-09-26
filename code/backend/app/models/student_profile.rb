@@ -107,11 +107,23 @@ class StudentProfile < ApplicationRecord
 
   # 学生プロフィールの保存（⑯ PATCH /api/student/profile）。窓口はこれを呼ぶだけにする（技術構成.md の 9-2）。
   # 保存できたら true、入力に誤りがあれば false を返す（誤りは errors に入る）。
-  # 企業プロフィール・募集と同じく、「先に全部確かめてから、トランザクションの中で書き込む」順番にしている
+  # 企業プロフィール・募集と同じく、「先に全部確かめてから（assign_profile）、トランザクションの中で書き込む（write_profile!）」順番にしている。
+  # 新規登録（StudentRegistration）も、この2つを使ってアカウントと一緒に書き込む（PR226）
   def save_profile(attributes)
+    return false unless assign_profile(attributes)
+
+    # まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
+    transaction { write_profile! }
+    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
+    true
+  end
+
+  # 値をモデルに入れて確かめる。まだ何も書き込まない。誤りがなければ true（誤りは errors に入る）。
+  # 中間テーブルに書く番号の一覧と、作り直すプログラミング歴は、write_profile! で使うために覚えておく
+  def assign_profile(attributes)
     attributes = attributes.to_h.symbolize_keys
-    job_middle_category_ids = attributes.delete(:interested_job_middle_category_ids)
-    commutable_prefecture_ids = attributes.delete(:commutable_prefecture_ids)
+    @pending_job_middle_category_ids = attributes.delete(:interested_job_middle_category_ids)
+    @pending_commutable_prefecture_ids = attributes.delete(:commutable_prefecture_ids)
     skill_rows = attributes.delete(:skills)
 
     # ① 本体の値を、保存せずにモデルに入れるだけ
@@ -119,23 +131,19 @@ class StudentProfile < ApplicationRecord
 
     # ② 検証する。③ 番号の一覧と、プログラミング歴の各行を確かめる
     valid?
-    validate_master_ids(:interested_job_middle_category_ids, job_middle_category_ids, JobMiddleCategory)
-    validate_master_ids(:commutable_prefecture_ids, commutable_prefecture_ids, Prefecture)
-    new_skills = build_skills(skill_rows)
+    validate_master_ids(:interested_job_middle_category_ids, @pending_job_middle_category_ids, JobMiddleCategory)
+    validate_master_ids(:commutable_prefecture_ids, @pending_commutable_prefecture_ids, Prefecture)
+    @pending_skills = build_skills(skill_rows)
+    errors.empty?
+  end
 
-    # ④ 誤りが1つでもあれば、何も書き込まずに終わる
-    return false if errors.any?
-
-    # ⑤ まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
-    transaction do
-      save!
-      # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑯）。送られなかった項目は変えない
-      self.interested_job_middle_category_ids = job_middle_category_ids unless job_middle_category_ids.nil?
-      self.commutable_prefecture_ids = commutable_prefecture_ids unless commutable_prefecture_ids.nil?
-      replace_skills(new_skills) unless new_skills.nil?
-    end
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
-    true
+  # assign_profile で確かめた内容を書き込む。トランザクションの中で呼ぶ
+  def write_profile!
+    save!
+    # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑯）。送られなかった項目は変えない
+    self.interested_job_middle_category_ids = @pending_job_middle_category_ids unless @pending_job_middle_category_ids.nil?
+    self.commutable_prefecture_ids = @pending_commutable_prefecture_ids unless @pending_commutable_prefecture_ids.nil?
+    replace_skills(@pending_skills) unless @pending_skills.nil?
   end
 
   # エラーの文を作るとき、Rails は項目の今の値を読みに行く（文の中に %{value} で差し込めるようにするため）。

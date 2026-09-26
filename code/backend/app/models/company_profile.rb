@@ -40,33 +40,41 @@ class CompanyProfile < ApplicationRecord
   # 企業プロフィールの保存（⑨ PATCH /api/company/profile）。窓口はこれを呼ぶだけにする（技術構成.md の 9-2）。
   # 保存できたら true、入力に誤りがあれば false を返す（誤りは errors に入る）。
   #
-  # 「先に全部確かめてから、トランザクションの中で書き込む」順番にしている。
+  # 「先に全部確かめてから（assign_profile）、トランザクションの中で書き込む（write_profile!）」順番にしている。
   # Rails では、保存済みのレコードに industry_ids を代入すると、保存を待たずにその場で中間テーブルが書き換わる。
-  # 確かめる前に代入すると、会社名が空欄で失敗したのに業界だけ変わる、という半端な状態が残るため
+  # 確かめる前に代入すると、会社名が空欄で失敗したのに業界だけ変わる、という半端な状態が残るため。
+  # 新規登録（CompanyRegistration）も、この2つを使ってアカウントと一緒に書き込む（PR226）
   def update_profile(attributes)
+    return false unless assign_profile(attributes)
+
+    # まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
+    transaction { write_profile! }
+    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
+    true
+  end
+
+  # 値をモデルに入れて確かめる。まだ何も書き込まない。誤りがなければ true（誤りは errors に入る）。
+  # 中間テーブルに書く番号の一覧は、write_profile! で使うために覚えておく
+  def assign_profile(attributes)
     attributes = attributes.to_h.symbolize_keys
-    industry_ids = attributes.delete(:industry_ids)
-    business_type_ids = attributes.delete(:business_type_ids)
+    @pending_industry_ids = attributes.delete(:industry_ids)
+    @pending_business_type_ids = attributes.delete(:business_type_ids)
 
     # ① 本体の値（会社名など）を、保存せずにモデルに入れるだけ
     assign_attributes(attributes)
 
     # ② 検証する。③ 番号の一覧を確かめる（Rails に任せると、存在しない番号が 404 になるため。17-3-4 では 422）
     valid?
-    validate_master_ids(:industry_ids, industry_ids, Industry)
-    validate_master_ids(:business_type_ids, business_type_ids, BusinessType)
+    validate_master_ids(:industry_ids, @pending_industry_ids, Industry)
+    validate_master_ids(:business_type_ids, @pending_business_type_ids, BusinessType)
+    errors.empty?
+  end
 
-    # ④ 誤りが1つでもあれば、何も書き込まずに終わる
-    return false if errors.any?
-
-    # ⑤ まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
-    transaction do
-      save!
-      # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑨）。送られなかった項目は変えない
-      self.industry_ids = industry_ids unless industry_ids.nil?
-      self.business_type_ids = business_type_ids unless business_type_ids.nil?
-    end
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
-    true
+  # assign_profile で確かめた内容を書き込む。トランザクションの中で呼ぶ
+  def write_profile!
+    save!
+    # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑨）。送られなかった項目は変えない
+    self.industry_ids = @pending_industry_ids unless @pending_industry_ids.nil?
+    self.business_type_ids = @pending_business_type_ids unless @pending_business_type_ids.nil?
   end
 end
