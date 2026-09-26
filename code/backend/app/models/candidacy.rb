@@ -41,6 +41,8 @@ class Candidacy < ApplicationRecord
   # スカウトから始まったもの（未マッチ・見送り・マッチ以降）と、応募から始まって見送り・マッチ以降になったもの。
   # 検索はスカウトする相手を探すためのものなので、もうスカウトした・見送った・マッチした学生は出さない
   scope :excluded_from_student_search, -> { scout.or(where.not(status: :unmatched)) }
+  # マッチ以降（マッチ・合格・不合格）のやりとり。メッセージを送れるかの判定に使う（権限_バリデーション.md の 17-2-3）
+  scope :after_match, -> { where(status: %i[matched passed failed]) }
 
   # ㉛ 応募（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
   # まだないやりとりを作るので、クラスのメソッドにしている（PR204）。
