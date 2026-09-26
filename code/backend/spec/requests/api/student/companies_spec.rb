@@ -34,7 +34,7 @@ RSpec.describe "学生から見た企業詳細（/api/student/companies/:id）",
       body = response.parsed_body
       expect(body.keys).to contain_exactly(
         "id", "name", "industry_ids", "business_type_ids", "employee_size",
-        "business_description", "about", "icon_url", "job_postings"
+        "business_description", "about", "icon_url", "has_message_thread", "job_postings"
       )
       expect(body).to include(
         "id" => company.id,
@@ -69,6 +69,33 @@ RSpec.describe "学生から見た企業詳細（/api/student/companies/:id）",
 
       expect(response).to have_http_status(:not_found)
       expect(response.parsed_body["message"]).to eq("見つかりません")
+    end
+
+    # 順6：その企業とのスレッドがあるか（16-3 ⑳。募集詳細と同じ判定）
+    describe "その企業とのスレッドがあるか（has_message_thread）" do
+      let(:student) { student_user.student_profile }
+
+      it "スレッドがなければ false" do
+        get "/api/student/companies/#{company.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(false)
+      end
+
+      it "この企業とのスレッドがあれば true" do
+        MessageThread.create!(company_profile: company, student_profile: student)
+
+        get "/api/student/companies/#{company.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(true)
+      end
+
+      it "ほかの企業とのスレッドしかなければ false" do
+        MessageThread.create!(company_profile: create(:company_user).company_profile, student_profile: student)
+
+        get "/api/student/companies/#{company.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(false)
+      end
     end
   end
 end

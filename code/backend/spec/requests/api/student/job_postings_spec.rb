@@ -134,7 +134,7 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         "work_style", "work_style_note", "prefecture_id", "work_location_note", "weekend_ok", "work_note",
         "hourly_wage", "requirements", "preferred_requirements", "technology_note",
         "main_job_middle_category_ids", "related_job_middle_category_ids", "technology_ids",
-        "published_at", "my_status", "my_candidacy_id"
+        "published_at", "my_status", "my_candidacy_id", "has_message_thread"
       )
       expect(body).to include(
         "id" => posting.id,
@@ -234,6 +234,34 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         get "/api/student/job_postings/#{posting.id}"
 
         expect(response).to have_http_status(:not_found)
+      end
+    end
+
+    # 順6：その企業とのスレッドがあるか（16-3 ⑲、権限_バリデーション.md の 17-2-3）
+    describe "その企業とのスレッドがあるか（has_message_thread）" do
+      let(:student) { student_user.student_profile }
+      let(:posting) { create_posting }
+
+      it "スレッドがなければ false" do
+        get "/api/student/job_postings/#{posting.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(false)
+      end
+
+      it "その募集の企業とのスレッドがあれば true（スカウトが届いただけでも、スレッドはある）" do
+        MessageThread.create!(company_profile: company, student_profile: student)
+
+        get "/api/student/job_postings/#{posting.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(true)
+      end
+
+      it "ほかの企業とのスレッドしかなければ false" do
+        MessageThread.create!(company_profile: create(:company_user).company_profile, student_profile: student)
+
+        get "/api/student/job_postings/#{posting.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(false)
       end
     end
   end

@@ -12,6 +12,8 @@ module Api
         @job_postings = @company.job_postings.published
                                 .order(published_at: :desc, id: :desc)
                                 .includes(JobPostingsController::ROW_ASSOCIATIONS)
+        # この企業と、自分とのスレッドがあるか
+        @has_message_thread = MessageThread.exists_between?(@company, current_student)
       end
     end
   end

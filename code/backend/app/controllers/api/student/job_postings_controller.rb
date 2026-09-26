@@ -23,6 +23,8 @@ module Api
         @job_posting = find_visible_job_posting
         # この募集との自分のやりとり。なければ nil（返事の my_status は none になる）
         @candidacy = current_student.candidacies.find_by(job_posting: @job_posting)
+        # この募集の企業と、自分とのスレッドがあるか
+        @has_message_thread = MessageThread.exists_between?(@job_posting.company_profile, current_student)
       end
 
       private

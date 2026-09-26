@@ -33,7 +33,7 @@ RSpec.describe "企業の学生詳細（/api/company/students/:id）", type: :re
 
       expect(response).to have_http_status(:ok)
       body = response.parsed_body
-      expect(body.keys).to contain_exactly("student", "job_postings")
+      expect(body.keys).to contain_exactly("student", "has_message_thread", "job_postings")
       expect(body["student"].keys).to contain_exactly(
         "name", "university_id", "university_other_name", "faculty_id", "department_id", "grade",
         "graduation_year", "prefecture_id", "activity_status",
@@ -110,6 +110,32 @@ RSpec.describe "企業の学生詳細（/api/company/students/:id）", type: :re
       get "/api/company/students/0"
 
       expect(response).to have_http_status(:not_found)
+    end
+
+    # 順6：この学生とのスレッドがあるか（16-3 ㉓、権限_バリデーション.md の 17-2-3。PR208）
+    describe "この学生とのスレッドがあるか（has_message_thread）" do
+      it "スレッドがなければ false" do
+        get "/api/company/students/#{student.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(false)
+      end
+
+      it "この学生とのスレッドがあれば true（スカウトを送っただけでも、スレッドはある）" do
+        MessageThread.create!(company_profile: company, student_profile: student)
+
+        get "/api/company/students/#{student.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(true)
+      end
+
+      it "ほかの学生とのスレッドや、他社とこの学生のスレッドしかなければ false" do
+        MessageThread.create!(company_profile: company, student_profile: create(:student_user).student_profile)
+        MessageThread.create!(company_profile: create(:company_user).company_profile, student_profile: student)
+
+        get "/api/company/students/#{student.id}"
+
+        expect(response.parsed_body["has_message_thread"]).to be(false)
+      end
     end
   end
 end

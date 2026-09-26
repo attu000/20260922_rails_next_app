@@ -1,6 +1,6 @@
 # ㉓ 学生詳細（GET /api/company/students/:id）。
 # 詳しくは design/designs/API設計.md の 16-3-6。学生なら 403 は親（BaseController）が返す。
-# ㉒ 学生検索（index）は順6 で足す
+# ㉒ 学生検索（index）は、このあと順6 で足す
 module Api
   module Company
     class StudentsController < BaseController
@@ -16,6 +16,8 @@ module Api
         # 押せるボタンの判定で、やりとりから募集の状態を見るので、募集も一緒に読む
         @candidacies_by_job_posting_id = current_company.candidacies.where(student_profile: @student)
                                                         .includes(:job_posting).index_by(&:job_posting_id)
+        # 自社と、この学生とのスレッドがあるか（募集ごとではなく、学生ごとの値）
+        @has_message_thread = MessageThread.exists_between?(current_company, @student)
       end
     end
   end
