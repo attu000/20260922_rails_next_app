@@ -4,9 +4,9 @@
 // 開いたら ⑲ 募集詳細と ⑦ 選択肢（表示名・マスタの名前）を取り、項目を並べる。
 // 見られない募集（関係のない非公開・終了の募集、存在しない番号）は Rails が 404 を返し、「見つかりません」と出る（守りは Rails。16-1-10）。
 // 自分とやりとりがある募集は、非公開・終了でも開ける（「募集終了」と出す）。
-// 自分の状態の表示と「応募する」は components/student-candidacy-actions.tsx。
+// 自分の状態の表示と「応募する」「マッチする」は components/student-candidacy-actions.tsx。
 // 次のものは、それを作る順で足す（PR189）
-//   - 「マッチする」（スカウトありのとき）、「この企業とのメッセージ」：順6
+//   - 「この企業とのメッセージ」（has_message_thread を使う）：行き先のメッセージ管理を作る順7（PR213）
 //   - 業界・事業形態・工程、カルチャーグラフと自分の性格との一致・ずれ：順9・順10
 
 import type { ReactNode } from "react";
@@ -58,7 +58,7 @@ function withNote(main: string | null, note: string | null): string | null {
 
 export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string }) {
   const { options, failed: optionsFailed } = useOptions();
-  // mutate：覚えている中身を書き換える・取り直す関数（応募したあとに使う）
+  // mutate：覚えている中身を書き換える・取り直す関数（応募・マッチのあとに使う）
   const { data, error, mutate } = useApi<Detail>(`/api/student/job_postings/${jobPostingId}`);
 
   if (optionsFailed) {
@@ -92,16 +92,16 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
         </Link>
       </div>
 
-      {/* 自分の状態と「応募する」。まず目に入るよう、タイトルと会社名のすぐ下に置く */}
+      {/* 自分の状態と「応募する」「マッチする」。まず目に入るよう、タイトルと会社名のすぐ下に置く */}
       <StudentCandidacyActions
         jobPostingId={data.id}
         isOpen={data.is_open}
         status={{ my_status: data.my_status, my_candidacy_id: data.my_candidacy_id }}
         reasonOptions={options.enums.candidacy_reason}
         statusOptions={options.enums.my_status}
-        // 応募できたら、返ってきた状態で書き換える（取り直しはしない）
-        onApplied={(status) => mutate({ ...data, ...status }, { revalidate: false })}
-        // 応募できなかったら（409 など）、取り直して最新の状態にする
+        // 応募・マッチができたら、返ってきた状態で書き換える（取り直しはしない）
+        onStatusChanged={(status) => mutate({ ...data, ...status }, { revalidate: false })}
+        // 応募・マッチができなかったら（409 など）、取り直して最新の状態にする
         onFailed={() => mutate()}
       />
 

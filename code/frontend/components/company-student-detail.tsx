@@ -1,20 +1,23 @@
 "use client";
 
-// 学生詳細（C6）の中身。詳しくは design/designs/ページ設計.md の 6-5 C6、API設計.md の 16-3 ㉓㉖。
+// 学生詳細（C6）の中身。詳しくは design/designs/ページ設計.md の 6-5 C6、API設計.md の 16-3 ㉓㉔㉖。
 // 開いたら ㉓ 学生詳細と ⑦ 選択肢を取り、学生の名前、募集タブ、選んだ募集での状態とボタン、学生のプロフィールを並べる。
 // 最初に選ぶタブは URL の ?job_posting_id=（候補者一覧から来たときはその募集）。なければ先頭の募集。
 // ボタンは Rails が返す available_actions だけに従う。画面側では状態から組み立てない（16-1-9）。
 // 次のものは、それを作る順で足す
-//   - 「スカウトをする」、「この学生とのメッセージ」（has_message_thread。PR208）：順6
+//   - 「この学生とのメッセージ」（has_message_thread を使う）：行き先のメッセージ管理を作る順7（PR213）
+//   - 送信後の「この学生に似た学生」のポップアップ：順14
 //   - 比較の表示と応募理由の♥印：順10、見送る・見送りを取り消す・合格・不合格：順11
 //   - 最終活動の目安：【仕上げ】
 
 import { useState } from "react";
+import { cn } from "cn";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
+import { ScoutDialog } from "@/components/scout-dialog";
 import { StatusBadge } from "@/components/status-badge";
 import { StudentProfileView } from "@/components/student-profile-view";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -28,6 +31,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 import { ApiError, apiFetch, useApi } from "@/lib/api";
 import type { CompanyJobPostingState, CompanyStudentDetail as Detail } from "@/lib/company-students";
 import { formatDate } from "@/lib/format";
@@ -40,9 +44,9 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
   const searchParams = useSearchParams();
   const { options, failed: optionsFailed } = useOptions();
   // URL の [id] の部分は利用者が書き換えられるので、符号化してから入れる。
-  // mutate：覚えている中身を書き換える・取り直す関数（マッチしたあとに使う）
+  // mutate：覚えている中身を書き換える・取り直す関数（マッチ・スカウトのあとに使う）
   const { data, error, mutate } = useApi<Detail>(`/api/company/students/${encodeURIComponent(studentId)}`);
-  // マッチできなかったときの一言（「この操作は今はできません…」など）。取り直して状態が変わっても出したままにする
+  // マッチ・スカウトができなかったときの一言（「この操作は今はできません…」など）。取り直して状態が変わっても出したままにする
   const [message, setMessage] = useState<string | null>(null);
 
   if (optionsFailed) {
@@ -63,8 +67,8 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
   const selected =
     data.job_postings.find((jobPosting) => jobPosting.id === requestedId) ?? data.job_postings[0] ?? null;
 
-  // マッチできたら、返ってきた「その募集の状態」で、そのタブの中身だけを書き換える（取り直しはしない）
-  function handleMatched(state: CompanyJobPostingState) {
+  // マッチ・スカウトができたら、返ってきた「その募集の状態」で、そのタブの中身だけを書き換える（取り直しはしない）
+  function handleStateChanged(state: CompanyJobPostingState) {
     if (!data) return;
     setMessage(null);
     void mutate(
@@ -76,7 +80,7 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
     );
   }
 
-  // マッチできなかったら（409 など）、一言を出し、取り直して最新の状態にする
+  // マッチ・スカウトができなかったら（409 など）、一言を出し、取り直して最新の状態にする
   function handleFailed(failedMessage: string) {
     setMessage(failedMessage);
     void mutate();
@@ -89,45 +93,62 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
         <PageTitle>{data.student.name}</PageTitle>
       </div>
 
-      {/* 募集タブ：自社の全募集（非公開・終了も含む）。押すと URL の ?job_posting_id= が変わる */}
-      <section className="space-y-3 rounded-lg border p-4">
-        {selected === null ? (
-          <p className="text-sm text-muted-foreground">募集がまだありません</p>
-        ) : (
-          <>
-            <nav aria-label="募集" className="flex flex-wrap gap-2">
-              {data.job_postings.map((jobPosting) => {
-                const isSelected = jobPosting.id === selected.id;
-                return (
-                  <Link
-                    key={jobPosting.id}
-                    href={`/company/students/${encodeURIComponent(studentId)}?job_posting_id=${jobPosting.id}`}
-                    // タブの切り替えは、ブラウザの「戻る」の履歴に積まない
-                    replace
-                    scroll={false}
-                    aria-current={isSelected ? "page" : undefined}
-                    className={buttonVariants({ variant: isSelected ? "secondary" : "ghost", size: "sm" })}
-                  >
-                    {jobPosting.title}
-                  </Link>
-                );
-              })}
-            </nav>
-            <JobPostingPanel
-              // タブを変えたら、確認のポップアップなどの状態を持ち越さない
-              key={selected.id}
-              state={selected}
-              studentName={data.student.name}
-              options={options}
-              onMatched={handleMatched}
-              onFailed={handleFailed}
-            />
-          </>
+      {/* 募集タブと、その中身。タブは枠の外に並べ、選んだタブだけを下の大きな枠とつなげて見せる（PR217）。
+          タブの中身は、その募集での状態・ボタンと、学生のプロフィール（ページ設計.md の 6-5 C6。順10 で比較もここに入る） */}
+      <div>
+        {selected !== null && (
+          // -mb-px：タブを1ピクセル下げて、枠の上の線に重ねる。選んだタブは下の線を背景色にして、枠とつながって見せる
+          <nav aria-label="募集" className="-mb-px flex flex-wrap gap-1">
+            {data.job_postings.map((jobPosting) => {
+              const isSelected = jobPosting.id === selected.id;
+              return (
+                <Link
+                  key={jobPosting.id}
+                  href={`/company/students/${encodeURIComponent(studentId)}?job_posting_id=${jobPosting.id}`}
+                  // タブの切り替えは、ブラウザの「戻る」の履歴に積まない
+                  replace
+                  scroll={false}
+                  aria-current={isSelected ? "page" : undefined}
+                  className={cn(
+                    "rounded-t-lg border px-3 py-1.5 text-sm",
+                    isSelected
+                      ? "border-b-background bg-background font-bold"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {jobPosting.title}
+                </Link>
+              );
+            })}
+          </nav>
         )}
-        {message && <p className="text-sm text-destructive">{message}</p>}
-      </section>
 
-      <StudentProfileView student={data.student} options={options} />
+        {/* 大きな枠：選んだ募集での状態・ボタンと、学生のプロフィールを囲む。
+            先頭のタブが選ばれているときに角が浮かないよう、タブがあれば左上の角は丸めない */}
+        <section className={cn("space-y-6 rounded-lg border p-4", selected !== null && "rounded-tl-none")}>
+          <div className="space-y-3">
+            {selected === null ? (
+              <p className="text-sm text-muted-foreground">募集がまだありません</p>
+            ) : (
+              <JobPostingPanel
+                // タブを変えたら、確認のポップアップなどの状態を持ち越さない
+                key={selected.id}
+                state={selected}
+                studentId={studentId}
+                studentName={data.student.name}
+                options={options}
+                onStateChanged={handleStateChanged}
+                onFailed={handleFailed}
+              />
+            )}
+            {message && <p className="text-sm text-destructive">{message}</p>}
+          </div>
+
+          <Separator />
+
+          <StudentProfileView student={data.student} options={options} />
+        </section>
+      </div>
     </div>
   );
 }
@@ -137,15 +158,18 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
 
 type JobPostingPanelProps = {
   state: CompanyJobPostingState;
+  // 学生の番号（URL の番号）と名前
+  studentId: string;
   studentName: string;
   options: Options;
-  onMatched: (state: CompanyJobPostingState) => void;
-  // マッチできなかったとき。message は画面に出す一言
+  // マッチ・スカウトができたとき。返ってきた「その募集の状態」を渡す
+  onStateChanged: (state: CompanyJobPostingState) => void;
+  // マッチ・スカウトができなかったとき。message は画面に出す一言
   onFailed: (message: string) => void;
 };
 
 // 募集の状態、その学生とのやりとりの状態、押せるボタン
-function JobPostingPanel({ state, studentName, options, onMatched, onFailed }: JobPostingPanelProps) {
+function JobPostingPanel({ state, studentId, studentName, options, onStateChanged, onFailed }: JobPostingPanelProps) {
   const { candidacy } = state;
 
   return (
@@ -171,12 +195,22 @@ function JobPostingPanel({ state, studentName, options, onMatched, onFailed }: J
       )}
 
       {/* ボタンは available_actions にあるものだけ。順11 で見送る・合格・不合格などが増える */}
+      {state.available_actions.includes("scout") && (
+        <ScoutDialog
+          jobPostingId={state.id}
+          jobPostingTitle={state.title}
+          studentId={studentId}
+          studentName={studentName}
+          onScouted={onStateChanged}
+          onFailed={onFailed}
+        />
+      )}
       {candidacy !== null && state.available_actions.includes("match") && (
         <MatchDialog
           candidacyId={candidacy.id}
           studentName={studentName}
           jobPostingTitle={state.title}
-          onMatched={onMatched}
+          onMatched={onStateChanged}
           onFailed={onFailed}
         />
       )}

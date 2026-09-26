@@ -1,7 +1,9 @@
 // 学生から見た募集・企業の型。Rails の app/views/api/student/ の JSON と同じ形
 // （design/designs/API設計.md の 16-3 ⑱⑲⑳、形B）。空欄は null。
 // 企業から見た募集（lib/job-postings.ts）とは返す項目が違うので、別のファイルにしている。
-// 業界・事業形態・工程・カルチャーは順9、その企業とのスレッドがあるかは順6 で足す
+// 業界・事業形態・工程・カルチャーは順9、その企業とのスレッドがあるか（has_message_thread）は、使う順7 で足す
+
+import { idsFromQuery, monthDateFromQuery, numberFromQuery, type QueryReader } from "@/lib/search-query";
 
 // 募集の会社（行と詳細で共通）
 export type StudentJobPostingCompany = {
@@ -70,29 +72,6 @@ export type SearchConditions = {
 
 // 並び順。省略時はおすすめ順（16-3 ⑱）
 export type SearchSort = "recommended" | "newest";
-
-// useSearchParams() の返り値と URLSearchParams の、どちらでも読めるようにする
-type QueryReader = Pick<URLSearchParams, "get" | "getAll">;
-
-// 番号の配列を読む。数でないものは捨てる
-function idsFromQuery(params: QueryReader, name: string): number[] {
-  return params
-    .getAll(`${name}[]`)
-    .map(Number)
-    .filter((id) => Number.isInteger(id) && id > 0);
-}
-
-// 数を1つ読む。正の整数でなければ null（指定なし）
-function numberFromQuery(params: QueryReader, name: string): number | null {
-  const value = Number(params.get(name));
-  return Number.isInteger(value) && value > 0 ? value : null;
-}
-
-// 月の1日の日付を読む（"2026-11-01"）。その形でなければ null（指定なし）
-function monthDateFromQuery(params: QueryReader, name: string): string | null {
-  const value = params.get(name);
-  return value !== null && /^\d{4}-\d{2}-01$/.test(value) ? value : null;
-}
 
 // URL の ? の後ろ → 条件（「戻る」や、リンクから開いたときに条件欄を埋める）
 export function conditionsFromQuery(params: QueryReader): SearchConditions {
@@ -181,7 +160,8 @@ export type StudentJobPostingDetail = MyCandidacyStatus & {
   published_at: string;
 };
 
-// ㉞ 募集管理の返事。行は形B に、やりとりの番号と自分の状態（"applied" か "matched"）を足したもの。
+// ㉞ 募集管理と ㉟ スカウト管理の返事（同じ形）。行は形B に、やりとりの番号と自分の状態を足したもの。
+// 自分の状態は、募集管理なら "applied" か "matched"、スカウト管理なら常に "scouted"。
 // 並び順は、やりとりが始まった日の新しい順（Rails が並べる）
 export type StudentCandidacyListResult = {
   items: (StudentJobPostingRow & { candidacy_id: number; my_status: string })[];

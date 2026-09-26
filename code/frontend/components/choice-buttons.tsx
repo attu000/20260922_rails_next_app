@@ -1,22 +1,23 @@
 // 1つだけ選ぶボタンの並び（「指定なし」「週1日まで」「週2日まで」…）。選んでいるボタンは色を変える。
-// 募集一覧（学生のホーム）の稼働条件のポップアップで使う。
+// 募集一覧（学生のホーム）と学生検索（企業）の条件のポップアップで使う。
 // 押すと、使う側の値が変わるだけ（検索は「検索する」を押したときだけ。PR192）
 
 import { buttonVariants } from "@/components/ui/button";
 import { FieldLegend, FieldSet } from "@/components/ui/field";
 
-type ChoiceButtonsProps = {
+// T は値の型。数（週の日数など）か、文字（勤務形態 "full_remote"、レベル "v2" など）
+type ChoiceButtonsProps<T extends number | string> = {
   legend: string;
-  // 選択肢。value は数（例：3）、label は画面に出す言葉（例：「週3日まで」）
-  choices: { value: number; label: string }[];
+  // 選択肢。value は値（例：3）、label は画面に出す言葉（例：「週3日まで」）
+  choices: { value: T; label: string }[];
   // 選んでいる値。null は「指定なし」
-  value: number | null;
-  onChange: (value: number | null) => void;
+  value: T | null;
+  onChange: (value: T | null) => void;
 };
 
-export function ChoiceButtons({ legend, choices, value, onChange }: ChoiceButtonsProps) {
+export function ChoiceButtons<T extends number | string>({ legend, choices, value, onChange }: ChoiceButtonsProps<T>) {
   // 「指定なし」を先頭に置く
-  const items = [{ value: null, label: "指定なし" }, ...choices];
+  const items: { value: T | null; label: string }[] = [{ value: null, label: "指定なし" }, ...choices];
 
   return (
     <FieldSet>
