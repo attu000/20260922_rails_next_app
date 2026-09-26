@@ -10,6 +10,9 @@ class CompanyProfile < ApplicationRecord
 
   # 自社の募集。窓口では、自社の募集の中からだけ番号で探す（見てよい範囲の外は 404。API設計.md の 16-1-10）
   has_many :job_postings
+  # 自社の募集へのやりとり（応募・スカウト）。Django の Candidacy.objects.filter(job_posting__company_profile=自社) にあたる。
+  # 企業の窓口では、やりとりを必ずここから探す（他社のやりとりは 404。API設計.md の 16-1-10）
+  has_many :candidacies, through: :job_postings
   # 学生とのスレッド
   has_many :message_threads
 

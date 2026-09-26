@@ -157,5 +157,18 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
         { "value" => "matched", "label" => "マッチ済み" }
       ])
     end
+
+    it "企業から見たタグの6つを、名前と日本語の表示名で返す" do
+      get "/api/options"
+
+      expect(response.parsed_body["enums"]["candidacy_tag"]).to eq([
+        { "value" => "pending_application", "label" => "未対応応募" },
+        { "value" => "scouted", "label" => "スカウト済み" },
+        { "value" => "matched", "label" => "マッチ" },
+        { "value" => "declined", "label" => "見送り" },
+        { "value" => "passed", "label" => "合格" },
+        { "value" => "failed", "label" => "不合格" }
+      ])
+    end
   end
 end

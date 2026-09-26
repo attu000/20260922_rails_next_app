@@ -4,6 +4,8 @@ class Candidacy < ApplicationRecord
   # 学生から見た状態の4つ（API設計.md の形E）。関係がないときの none は、やりとりがないときに窓口の返事で使う。
   # ⑦ の選択肢（my_status）にも使う
   MY_STATUSES = %w[none applied scouted matched].freeze
+  # 企業から見たタグの6つ（API設計.md の 16-3 ㉑・形D）。計算は tag。⑦ の選択肢（candidacy_tag）に使う
+  TAGS = %w[pending_application scouted matched declined passed failed].freeze
 
   belongs_to :job_posting
   belongs_to :student_profile

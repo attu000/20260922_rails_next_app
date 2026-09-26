@@ -48,6 +48,11 @@ json.enums do
     json.value value
     json.label t("enums.candidacy.my_status.#{value}")
   end
+  # 企業から見た、やりとりの状態のタグ（候補者一覧・学生詳細）
+  json.candidacy_tag Candidacy::TAGS do |value|
+    json.value value
+    json.label t("enums.candidacy.tag.#{value}")
+  end
 end
 
 # 稼働条件の数値の選択肢。Rails の検証と同じ定数から作る（app/models/concerns/work_conditions.rb）

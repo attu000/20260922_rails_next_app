@@ -32,6 +32,8 @@ Rails.application.routes.draw do
       # ⑬ POST /api/company/job_postings（新規作成）、⑭ PATCH /api/company/job_postings/:id（保存・状態の変更）。
       # 募集は消さず、状態で管理するので、消す窓口（destroy）は作らない（16-3 ⑭）
       resources :job_postings, only: %i[index show create update]
+      # ㉑ GET /api/company/candidacies（候補者一覧）
+      resources :candidacies, only: :index
     end
 
     # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、

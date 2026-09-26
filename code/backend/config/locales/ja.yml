@@ -163,6 +163,14 @@ ja:
         applied: 応募済み
         scouted: スカウトあり
         matched: マッチ済み
+      # 企業から見た、やりとりの状態のタグ（API設計.md の 16-3 ㉑・形D）
+      tag:
+        pending_application: 未対応応募
+        scouted: スカウト済み
+        matched: マッチ
+        declined: 見送り
+        passed: 合格
+        failed: 不合格
 
   # rails-i18n の標準の文言を、設計書の文言に合わせる（17-3-6）
   errors:
