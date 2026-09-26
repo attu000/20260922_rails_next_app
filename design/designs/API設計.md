@@ -376,7 +376,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 開いたとき | ⑪ GET /api/company/job_postings | タブに出す募集の名前 |
 | | 開いたとき・タブや表示の切り替え・ページ送り | ㉑ GET /api/company/candidacies | やりとりの一覧 |
 | | 詳細を見る | `/company/students/[学生id]?job_posting_id=[募集id]` | 画面の移動だけ |
-| | メッセージ（マッチ以降の行のみ。順7 で足す。PR209） | `/company/messages?student_id=[学生id]` | 画面の移動だけ |
+| | メッセージ（㉑ の after_match が true の行だけ。PR209・PR224） | `/company/messages?student_id=[学生id]` | 画面の移動だけ |
 | C5 学生検索 | 画面の URL | `/company/students` | `?job_posting_id=` と検索条件 |
 | | 開いたとき | ⑦ GET /api/options | 条件の選択肢 |
 | | 開いたとき | ⑪ GET /api/company/job_postings | 募集の選択肢 |
@@ -395,11 +395,11 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 合格として保存 | ㉙ POST /api/company/candidacies/:id/pass | |
 | | 不合格として保存 | ㉚ POST /api/company/candidacies/:id/fail | |
 | | この学生とのメッセージ（㉓ の has_message_thread が true のとき） | `/company/messages?student_id=[id]` | 画面の移動だけ。募集タブの外に置く |
-| C7 メッセージ管理 | 画面の URL | `/company/messages` | `?student_id=`（開くスレッド） |
+| C7 メッセージ管理 | 画面の URL | `/company/messages` | `?student_id=`（開くスレッド）、`?page=`（スレッド一覧のページ） |
 | | 開いたとき・ページ送り | ㊱ GET /api/company/message_threads | スレッド一覧 |
 | | 開いたとき（student_id があるとき）・スレッドを選んだとき | ㊲ GET /api/company/students/:id/message_thread | その学生とのチャット |
 | | 送信 | ㊳ POST /api/company/students/:id/message_thread/messages | メッセージを送る |
-| | 学生名・アイコン | `/company/students/[id]` | 画面の移動だけ |
+| | 学生名・アイコン（【仕上げ】） | `/company/students/[id]` | 画面の移動だけ |
 | C8 ログイン | 画面の URL | `/company/login` | |
 | | 開いたとき | ③ GET /api/me | ログイン済みなら種別ごとのホームへ。未ログインでも合言葉の Cookie がそろう |
 | | ログイン | ① POST /api/session | → return_to、なければ `/company/job_postings`（学生アカウントなら `/student/job_postings`） |
@@ -436,11 +436,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | S4 スカウト管理 | 画面の URL | `/student/scouts` | |
 | | 開いたとき・ページ送り | ㉟ GET /api/student/scouts | まだマッチしていないスカウト |
 | | 詳細を見る | `/student/job_postings/[id]` | 画面の移動だけ |
-| S5 メッセージ管理 | 画面の URL | `/student/messages` | `?company_id=`（開くスレッド） |
+| S5 メッセージ管理 | 画面の URL | `/student/messages` | `?company_id=`（開くスレッド）、`?page=`（スレッド一覧のページ） |
 | | 開いたとき・ページ送り | ㊴ GET /api/student/message_threads | スレッド一覧 |
 | | 開いたとき（company_id があるとき）・スレッドを選んだとき | ㊵ GET /api/student/companies/:id/message_thread | その企業とのチャット |
+| | マッチできるスカウトがあるとき | ⑦ GET /api/options | 応募理由の選択肢 |
+| | マッチする（㊵ の matchable_scouts の行ごと。マッチ理由を選ぶ） | ㉜ POST /api/student/candidacies/:id/match | スカウトにマッチする（PR222・PR223）。終わったら㊵を取り直す |
 | | 送信 | ㊶ POST /api/student/companies/:id/message_thread/messages | メッセージを送る |
-| | 企業名・アイコン | `/student/companies/[id]` | 画面の移動だけ |
+| | 企業名・アイコン（【仕上げ】） | `/student/companies/[id]` | 画面の移動だけ |
 | S6 募集詳細 | 画面の URL | `/student/job_postings/[id]` | |
 | | 開いたとき | ⑦ GET /api/options | 表示名、応募理由の選択肢、5軸の説明 |
 | | 開いたとき | ⑲ GET /api/student/job_postings/:id | 募集の中身、自分の状態、カルチャーの比較 |
@@ -1095,7 +1097,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 作る順：項目は、元になるテーブルや列ができる順で足していく
   - 順4（募集を探す）：上の例と説明のうち、次の順で足すもの以外。見られる範囲は掲載中の募集だけ
   - 順5（応募 → 企業がマッチ）：my_status、my_candidacy_id。見られる範囲に「自分とやりとりがある募集」を足す
-  - 順6（スカウト → 学生がマッチ）：has_message_thread（`MessageThread.exists_between?`）。「この企業とのメッセージ」のボタンは、行き先の S5 ができる順7 で画面に足す（PR213）
+  - 順6（スカウト → 学生がマッチ）：has_message_thread（`MessageThread.exists_between?`）。「この企業とのメッセージ」のボタンは、行き先の S5 ができた順7 で画面に足した（PR213）
   - 順9（性格・カルチャー・工程の入力）：industry_ids、business_type_ids、職種と並ぶ工程の配列、culture_ の5つ。順10（比較の表示）：culture_comparison
   - 仮の値（常に「関係なし」など）を先に返すことはしない。仮の値が残ったままになるのを防ぐため
 
@@ -1123,7 +1125,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - job_postings：その企業の掲載中の募集。形B で、ページ分けしない。**最初に掲載した日時の新しい順**（募集検索の新着順とそろえる）
 - has_message_thread：その企業とのスレッドがあるか。true なら「この企業とのメッセージ」のボタンを出す（⑲と同じ判定。本書17-2-3）
 - 段階タグ：【コア】
-- 作る順：has_message_thread は順6（スカウト → 学生がマッチ）で足した。ボタンは順7 で画面に足す（⑲と同じ。PR213）。形B の業界・事業形態・工程は順9 で足す（⑲と同じ考え方）
+- 作る順：has_message_thread は順6（スカウト → 学生がマッチ）で足し、ボタンは順7 で画面に足した（⑲と同じ。PR213）。形B の業界・事業形態・工程は順9 で足す（⑲と同じ考え方）
 
 #### 16-3-6. まとまり4：学生検索・候補者・スカウト・応募・マッチ
 
@@ -1146,6 +1148,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
       "origin": "application",
       "status": "unmatched",
       "tag": "pending_application",
+      "after_match": false,
       "unreplied": false,
       "created_at": "2026-09-21T09:00:00.000+09:00",
       "matched_at": null
@@ -1159,12 +1162,14 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - `pending_application`（未対応応募）：応募で、未マッチ
   - `scouted`（スカウト済み）：スカウトで、未マッチ
   - `matched`（マッチ）／`declined`（見送り）／`passed`（合格）／`failed`（不合格）：状態そのまま
+- after_match（Rails が計算する）：その行がマッチ以降（マッチ・合格・不合格）なら true。画面は true の行に「メッセージ」のボタンを出す（PR224）
+  - 画面が status から「マッチ以降か」を組み立てると、メッセージを送れるかの判定（17-2-3）と同じ判定が2か所になるため、Rails が返す（16-1-9）。判定は `Candidacy#after_match?`（絞り込みの `after_match` と同じ状態の一覧を使う）
 - unreplied（Rails が計算する）：マッチ以降で、スレッドの最後の送信者が学生なら true
   - 状態とは別の軸（返事をしたかどうか）なので、tag に混ぜず項目を分ける
 - 理由：行には「誰が、どの段階か」が分かる最低限を載せる。並び順は単純で予想しやすい形にし、「対応が必要なものを上に並べる」は、タグで見分けられるので作らない
 - job_posting_id は、自社の募集の中から探す。他社の募集や存在しない番号なら 404（16-1-10）
 - 段階タグ：【コア】（show_all は【強み】、unreplied は【仕上げ】）。行の学生情報と並び順は【仕上げ】だったが、順5 で前倒しして作った。名前がないと誰の行か分からず、【コア】の段階でも画面が使えないため（PR207）
-- 作る順：順5 で、show_all と unreplied 以外を作った。show_all は順11（見送りの扱い）。unreplied は、メッセージのテーブルができる順7 より後の【仕上げ】
+- 作る順：順5 で、show_all・unreplied・after_match 以外を作った。after_match は、メッセージのボタンを作る順7 で足した（PR224）。show_all は順11（見送りの扱い）。unreplied は、メッセージのテーブルができた順7 より後の【仕上げ】
 
 **㉒ GET /api/company/students（学生検索）**
 
@@ -1264,7 +1269,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 段階タグ：【コア】（comparison と reasons は【強み】、last_active_range は【仕上げ】）
 - 作る順：⑲と同じく、項目は元になるものができる順で足していく
   - 順5（応募 → 企業がマッチ）：student、job_postings（形D の candidacy のうち reasons 以外と、available_actions）。available_actions は、窓口ができている操作だけを返す（順5 は match だけ。scout は順6、decline・undo_decline・pass・fail は順11 で足す）
-  - 順6（スカウト → 学生がマッチ）：has_message_thread。スレッドは順5 のマッチでもできるが、⑲⑳の has_message_thread と同じ順でそろえる。available_actions に scout を足す。「この学生とのメッセージ」のボタンは、行き先の C7 ができる順7 で画面に足す（PR213）
+  - 順6（スカウト → 学生がマッチ）：has_message_thread。スレッドは順5 のマッチでもできるが、⑲⑳の has_message_thread と同じ順でそろえる。available_actions に scout を足す。「この学生とのメッセージ」のボタンは、行き先の C7 ができた順7 で画面に足した（PR213）
   - 順10（比較の表示）：comparison、candidacy.reasons。【仕上げ】：last_active_range
 
 **状態を変える操作（㉔・㉖〜㉜）の共通の決まり**
@@ -1366,8 +1371,12 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 }
 ```
 
-- partner：相手（企業から見れば学生、学生から見れば企業）
-- 並び順：最後のメッセージの新しい順（last_message_at）
+- partner：相手（企業から見れば学生、学生から見れば企業）。企業・学生で同じ部品（`app/views/api/shared/_partner.json.jbuilder`）
+- last_message_at：最後のメッセージの日時。応募に企業がマッチしただけのスレッドは、メッセージがまだないので null
+- 並び順：最後のメッセージの新しい順。**last_message_at が null のスレッドは、スレッドを作った日時で代わりに比べる**（PR221。`MessageThread.recent_first`）
+  - null のまま新しい順に並べると、PostgreSQL では null が先頭に来て、何か月たっても先頭に居座るため
+  - マッチしたときに last_message_at を入れる案は、列の意味（最後のメッセージの日時）とずれるので採らない
+- 見てよい範囲：自社・自分のスレッドだけ（16-1-10）
 - 段階タグ：【コア】
 
 **㊲ GET /api/company/students/:id/message_thread・㊵ GET /api/student/companies/:id/message_thread（チャット）**
@@ -1387,6 +1396,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
       "created_at": "2026-09-20T10:00:00.000+09:00",
       "scout": { "job_posting": { "id": 12, "title": "自社サービスのバックエンド開発インターン" } }
     }
+  ],
+  "matchable_scouts": [
+    { "candidacy_id": 35, "job_posting": { "id": 13, "title": "フロントエンド開発インターン" } }
   ]
 }
 ```
@@ -1394,19 +1406,29 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - messages：古い順に全件返す。1組の会話は短い想定なので、ページ分けしない（Phase 8 の重さの点検で見直す）
 - is_mine：自分が送ったメッセージなら true（画面で左右に分けて出すため）
   - メッセージ1件ずつにアイコンは持たせない。1対1の会話なので、自分のアイコンは③、相手のアイコンは partner.icon_url から取れる
+  - 学生から見ると、スカウト文は企業が送ったものなので false
 - scout：スカウト文のときだけ、どの募集のスカウトかを入れる（ふつうのメッセージなら null）
-- can_send：今送れるか。Rails が本書5-2 のルール（その企業×学生のやりとりに、マッチ・合格・不合格が1つでもあるか）で判定する。画面は、false なら入力欄を使えなくする
+- メッセージ1件の形は、企業・学生と送信（㊳㊶）で同じ部品（`app/views/api/shared/_message.json.jbuilder`）。is_mine は、今ログインしている人（`Current.user`）と送った人を比べる
+- can_send：今送れるか。Rails が本書5-2 のルール（その企業×学生のやりとりに、マッチ・合格・不合格が1つでもあるか）で判定する（`MessageThread#can_send?`）。募集の状態は見ない。画面は、false なら入力欄とボタンを使えなくする
+- matchable_scouts（**㊵ 学生側だけ**）：その企業からのスカウトのうち、学生が今マッチできるもの（`{ "candidacy_id", "job_posting": { "id", "title" } }`。古い順。なければ空の配列）（PR222）
+  - 学生がメッセージ管理でスカウト文を読んだその場で「マッチする」を押せるようにするため。画面は、ここにある分だけ「マッチする」を出し、押したら㉜に candidacy_id を送る
+  - 同じ企業から複数の募集でスカウトが来ていれば、募集ごとにすべて入る（マッチはやりとりごとの操作なので、まとめてマッチはしない。PR223）
+  - 判定は㉜の「できる状態」と同じ `can_match_by_student?`（スカウトから始まり、未マッチか見送りで、募集が掲載中）。「ボタンは出ているのに押すと 409」を起こさない（`MessageThread#matchable_scouts`）
+  - 企業側（㊲）には返さない
 - matched_job_postings：その相手とマッチしている募集（マッチ・合格・不合格のもの）。学生側にも同じ形で返し、合格・不合格の区別は見せない
   - 画面の上部に名前を並べるだけで、**そこから学生詳細・募集詳細へ飛ぶ導線は作らない**（本書6-5 C7・6-6 S5）
-- 主なエラー：404（相手が存在しない、または、まだスレッドがない）
+- スレッドは、自社・自分のスレッドの中から相手の番号で探す。主なエラー：404（相手が存在しない、まだスレッドがない、ほかの企業・学生とその相手のスレッドしかない）
 - 段階タグ：【コア】（matched_job_postings は【仕上げ】）
+- 作る順：順7 で、matched_job_postings 以外を作った。matched_job_postings は【仕上げ】（仮の値は返さない）
 
 **㊳ POST /api/company/students/:id/message_thread/messages・㊶ POST /api/student/companies/:id/message_thread/messages（送信）**
 
 - 画面・操作：C7・S5 の送信
 - 送るもの：body（本文、必須。長さの上限は本書17-3-4）
+  - 必須のパラメータ（ないと 422 の job_posting_id など）の扱いにはしない。送られていなくても「本文を入力してください」と出すため（㉔のスカウト文と同じ）
 - 返すもの：201。作ったメッセージ1件を、㊲の messages の1要素と同じ形で返す
-- 処理：メッセージを作り、スレッドの last_message_at を更新する（1つのトランザクション）
+- 処理：メッセージを作り、スレッドの last_message_at を更新する（1つのトランザクション）。処理はモデルの `MessageThread#post_message` にまとめ、窓口はそれを呼ぶだけにする
+- 確かめる順番は、状態を変える操作（16-3-6）と同じく「番号（404）→ 状態（409）→ 入力（422）」。送れるかの確かめは、can_send と同じ `can_send?` を使う
 - 主なエラー：404（スレッドがない）、409（can_send が false）、422（本文が空）
 - 段階タグ：【コア】
 
