@@ -1,6 +1,6 @@
 // 学生プロフィールの型。Rails の app/views/api/student/profiles/show.json.jbuilder と同じ形
 // （design/designs/API設計.md の 16-3 ⑮⑯）。空欄は null。
-// 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+// 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
 
 // プログラミング歴の1行。技術をマスタから選んだか、「その他」に名前を書いたかの、どちらか一方
 export type StudentSkill = {
@@ -47,6 +47,7 @@ export type StudentProfile = {
   personality_decision: number;
   personality_atmosphere: number;
   interested_job_middle_category_ids: number[];
+  interested_industry_ids: number[];
   commutable_prefecture_ids: number[];
   skills: StudentSkill[];
   icon_url: string | null;

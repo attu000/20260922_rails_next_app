@@ -3,7 +3,7 @@
 // （design/designs/ページ設計.md の 6-6 S1・S9、API設計.md の 16-3 ⑮⑯⑥）。
 // マイページと登録では欄のまとまり方が違うので、欄を小さな部品に分け、使う側が並べる。
 // 氏名とアイコンは、登録ではステップ1と最後のステップに分かれるので、ここには入れない（会社情報の部品と同じ）。
-// 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+// 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
 
 import { CultureAxesField } from "@/components/culture-axes-field";
 import {
@@ -65,6 +65,7 @@ export type StudentProfileValues = {
   self_pr_weakness: string;
   self_pr_future: string;
   graduation_year: string;
+  interested_industry_ids: number[];
   interested_job_middle_category_ids: number[];
   work_days_per_week: string;
   work_hours_per_day: string;
@@ -99,6 +100,7 @@ export const EMPTY_STUDENT_PROFILE: StudentProfileValues = {
   self_pr_weakness: "",
   self_pr_future: "",
   graduation_year: "",
+  interested_industry_ids: [],
   interested_job_middle_category_ids: [],
   work_days_per_week: "",
   work_hours_per_day: "",
@@ -160,6 +162,7 @@ export function toStudentProfileValues(profile: StudentProfile): StudentProfileV
     self_pr_weakness: toText(profile.self_pr_weakness),
     self_pr_future: toText(profile.self_pr_future),
     graduation_year: toText(profile.graduation_year),
+    interested_industry_ids: profile.interested_industry_ids,
     interested_job_middle_category_ids: profile.interested_job_middle_category_ids,
     work_days_per_week: toText(profile.work_days_per_week),
     work_hours_per_day: toText(profile.work_hours_per_day),
@@ -197,6 +200,7 @@ export function toStudentProfileRequest(values: StudentProfileValues) {
     self_pr_weakness: values.self_pr_weakness,
     self_pr_future: values.self_pr_future,
     graduation_year: toNumberOrNull(values.graduation_year),
+    interested_industry_ids: values.interested_industry_ids,
     interested_job_middle_category_ids: values.interested_job_middle_category_ids,
     work_days_per_week: toNumberOrNull(values.work_days_per_week),
     work_hours_per_day: toNumberOrNull(values.work_hours_per_day),
@@ -360,6 +364,20 @@ export function GraduationYearField(props: StudentFieldsProps & WithCurrentYear)
         value: year,
         label: `${year}年卒`,
       }))}
+    />
+  );
+}
+
+// 興味のある業界（PR254）。会社プロフィール・募集詳細編集の業界と同じ、マスタのチェック欄の部品
+export function InterestedIndustriesField({ values, onChange, errors, options }: StudentFieldsProps) {
+  return (
+    <MasterCheckboxGroup
+      name="interested-industry"
+      legend="興味のある業界"
+      rows={options.masters.industries}
+      selectedIds={values.interested_industry_ids}
+      onChange={(ids) => onChange({ interested_industry_ids: ids })}
+      errors={errors.interested_industry_ids}
     />
   );
 }

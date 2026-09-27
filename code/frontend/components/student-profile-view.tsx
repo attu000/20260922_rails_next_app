@@ -2,7 +2,7 @@
 // 項目はマイページ（S1）の入力項目と同じ。マッチ前でもすべて見せる。
 // 名前とアイコンは、使う側の見出しに出すので、ここには入れない。
 // 空欄の項目は「未入力」と出す（募集詳細と同じ部品）。
-// 性格は順9、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で、Rails が返すようになってから足す
+// 働き方の好み（性格）は、順10 の比較（カルチャーの2点）で見せる。外部リンク・資格・就活希望エリアは【仕上げ】で、Rails が返すようになってから足す
 
 import { DetailItem, DetailSection } from "@/components/student-job-posting-detail";
 import { formatStartMonth } from "@/lib/format";
@@ -77,6 +77,10 @@ export function StudentProfileView({ student, options }: { student: StudentProfi
       </DetailSection>
 
       <DetailSection title="就活状況">
+        <DetailItem
+          label="興味のある業界"
+          value={joinNames(student.interested_industry_ids.flatMap((id) => nameOf(options.masters.industries, id) ?? []))}
+        />
         <DetailItem
           label="興味のある職種"
           value={joinNames(

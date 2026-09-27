@@ -28,6 +28,7 @@ import {
   ActivityStatusField,
   EMPTY_STUDENT_PROFILE,
   GraduationYearField,
+  InterestedIndustriesField,
   InterestedJobCategoriesField,
   PERSONALITY_KEYS,
   ResidencePrefectureField,
@@ -79,7 +80,11 @@ const STEPS: { title: string; notes: string[]; fields: string[] }[] = [
       "prefecture_id",
     ],
   },
-  { title: "興味", notes: [OPTIONAL_NOTE, RECOMMEND_NOTE], fields: ["interested_job_middle_category_ids"] },
+  {
+    title: "興味",
+    notes: [OPTIONAL_NOTE, RECOMMEND_NOTE],
+    fields: ["interested_industry_ids", "interested_job_middle_category_ids"],
+  },
   // プログラミング歴の行の誤り（skills[0].years など）も、このステップ（stepOfField で拾う）
   { title: "スキル", notes: [OPTIONAL_NOTE, RECOMMEND_NOTE], fields: ["skills"] },
   {
@@ -295,7 +300,13 @@ export function StudentSignupForm() {
           </>
         );
       case 3:
-        return <InterestedJobCategoriesField {...fieldsProps} />;
+        // 業界 → 職種の順（マイページ・募集詳細編集と同じ。PR262）
+        return (
+          <>
+            <InterestedIndustriesField {...fieldsProps} />
+            <InterestedJobCategoriesField {...fieldsProps} />
+          </>
+        );
       case 4:
         return (
           <SkillRowsField

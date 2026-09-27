@@ -5,7 +5,7 @@
 // 入力欄は7つのまとまり（基本・学校・自己PR・プログラミング歴・就活状況・働き方の好み・稼働条件）に分け、見出しの行を押すと開く形（アコーディオン）にしている。
 // 氏名とアイコン以外の欄と、値の変換・その場の確認は、新規登録と共通の部品（components/student-profile-fields.tsx）。
 // 必須は氏名と活動状況だけ（その他決め事.md の 5-9）。
-// 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+// 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FormSection, RequiredNote, TextField, type FieldErrors } from "@/components/form-fields";
@@ -16,6 +16,7 @@ import { SkillRowsField, type SkillRow } from "@/components/skill-rows-field";
 import {
   ActivityStatusField,
   GraduationYearField,
+  InterestedIndustriesField,
   InterestedJobCategoriesField,
   PERSONALITY_KEYS,
   ResidencePrefectureField,
@@ -69,8 +70,8 @@ const SECTIONS = [
   {
     value: "job_hunting",
     title: "就活状況",
-    hint: "卒業年度・興味のある職種",
-    fields: ["graduation_year", "interested_job_middle_category_ids"],
+    hint: "卒業年度・興味のある業界・職種",
+    fields: ["graduation_year", "interested_industry_ids", "interested_job_middle_category_ids"],
   },
   {
     value: "work_style_preference",
@@ -362,6 +363,8 @@ export function StudentProfileForm() {
 
           <FormSection {...sectionProps("job_hunting")}>
             <GraduationYearField {...fieldsProps} currentYear={currentYear} />
+            {/* 業界 → 職種の順（募集詳細編集と同じ。PR262） */}
+            <InterestedIndustriesField {...fieldsProps} />
             <InterestedJobCategoriesField {...fieldsProps} />
           </FormSection>
 
