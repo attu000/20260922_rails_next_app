@@ -134,6 +134,24 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
     end
   end
 
+  # 順9（性格・カルチャー・工程の入力）で足した選択肢
+  describe "性格・カルチャーの5軸" do
+    it "5軸を決めた順で、名前と両端の短い名前・説明とともに返す" do
+      get "/api/options"
+
+      axes = response.parsed_body["culture_axes"]
+      expect(axes.map { |axis| axis["key"] }).to eq(%w[pace novelty collaboration decision atmosphere])
+      expect(axes.first).to eq(
+        "key" => "pace",
+        "name" => "進め方",
+        "left_label" => "スピード",
+        "left_description" => "まず動くものを作って見せ、直しながら進める",
+        "right_label" => "緻密さ",
+        "right_description" => "仕様や設計を固めてから作り始める"
+      )
+    end
+  end
+
   # 順5（応募 → 企業がマッチ）で足した選択肢
   describe "応募で使う選択肢" do
     it "応募理由の12個を、画面に出す順（番号の順ではない）で返す" do

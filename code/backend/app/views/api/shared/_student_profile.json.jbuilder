@@ -2,7 +2,7 @@
 # ⑮ マイページと ㉓ 学生詳細（企業が見る。マッチ前でもすべて見せる）で使い回す。
 # 使い方：json.partial! "api/shared/student_profile", student: 学生プロフィール
 # 項目の名前と形は、⑥ 学生の新規登録で送るものと同じ（アカウントの項目は除く）。icon_url を加える。
-# 空欄は null のまま返す。性格の5つは順9、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+# 空欄は null のまま返す。外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
 
 json.extract! student,
               :name, :university_id, :university_other_name, :faculty_id, :department_id, :grade,
@@ -10,6 +10,9 @@ json.extract! student,
               :self_pr_strength, :self_pr_weakness, :self_pr_future,
               :work_days_per_week, :work_hours_per_day, :duration_months, :available_from,
               :can_full_remote, :can_partial_remote, :can_onsite, :work_note,
+              # 働き方の好み（性格）の5軸。−2〜2 の数値
+              :personality_pace, :personality_novelty, :personality_collaboration,
+              :personality_decision, :personality_atmosphere,
               :interested_job_middle_category_ids, :commutable_prefecture_ids
 
 # プログラミング歴。保存のたびに消して作り直すので、各行の番号（id）は返さない

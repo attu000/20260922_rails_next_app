@@ -72,6 +72,8 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
         "self_pr_strength", "self_pr_weakness", "self_pr_future",
         "work_days_per_week", "work_hours_per_day", "duration_months", "available_from",
         "can_full_remote", "can_partial_remote", "can_onsite", "work_note",
+        "personality_pace", "personality_novelty", "personality_collaboration",
+        "personality_decision", "personality_atmosphere",
         "interested_job_middle_category_ids", "commutable_prefecture_ids", "skills", "icon_url"
       )
       expect(body["name"]).to eq("テスト 太郎")
@@ -298,6 +300,32 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["errors"]).to have_key("work_days_per_week")
+    end
+
+    # 順9 で足した、働き方の好み（性格）の5軸
+    describe "働き方の好み" do
+      it "5つを保存でき、返事にも入る" do
+        patch_with_required(
+          personality_pace: -2, personality_novelty: -1, personality_collaboration: 0,
+          personality_decision: 1, personality_atmosphere: 2
+        )
+
+        expect(response).to have_http_status(:ok)
+        body = response.parsed_body
+        expect(body.values_at(
+          "personality_pace", "personality_novelty", "personality_collaboration",
+          "personality_decision", "personality_atmosphere"
+        )).to eq([ -2, -1, 0, 1, 2 ])
+        expect(profile.reload.personality_atmosphere).to eq(2)
+      end
+
+      it "範囲の外（3）なら 422" do
+        patch_with_required(personality_pace: 3)
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"]["personality_pace"]).to eq([ "働き方の好み（進め方）は2以下の値にしてください" ])
+        expect(profile.reload.personality_pace).to eq(0)
+      end
     end
   end
 end

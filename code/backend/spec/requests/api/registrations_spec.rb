@@ -130,5 +130,18 @@ RSpec.describe "新規登録（/api/company_registrations・/api/student_registr
 
       expect(User.sole.role).to eq("student")
     end
+
+    # 順9 で足した、働き方の好み（性格）の5軸。受け取る項目の一覧はマイページと共有している（PERMITTED_PARAMS）
+    it "働き方の好みを送ると保存され、送らなかった軸は0（中央）になる" do
+      register("/api/student_registrations",
+               account.merge(name: "山田 太郎", activity_status: "job_hunting",
+                             personality_pace: -1, personality_atmosphere: 2))
+
+      expect(response).to have_http_status(:created)
+      expect(StudentProfile.sole).to have_attributes(
+        personality_pace: -1, personality_novelty: 0, personality_collaboration: 0,
+        personality_decision: 0, personality_atmosphere: 2
+      )
+    end
   end
 end

@@ -41,6 +41,8 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         "self_pr_strength", "self_pr_weakness", "self_pr_future",
         "work_days_per_week", "work_hours_per_day", "duration_months", "available_from",
         "can_full_remote", "can_partial_remote", "can_onsite", "work_note",
+        "personality_pace", "personality_novelty", "personality_collaboration",
+        "personality_decision", "personality_atmosphere",
         "interested_job_middle_category_ids", "commutable_prefecture_ids", "skills", "icon_url"
       )
       expect(body["student"]).to include("name" => student.name, "self_pr_strength" => "粘り強い", "work_days_per_week" => 3)

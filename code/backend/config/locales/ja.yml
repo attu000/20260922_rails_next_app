@@ -191,6 +191,40 @@ ja:
         passed: 合格
         failed: 不合格
 
+  # 性格・カルチャーの5軸の名前と、両端の短い名前・説明（その他決め事.md の 5-5）。⑦ GET /api/options の culture_axes で返す。
+  # 両端は形容詞ではなく具体的な行動で書き、「良さそうな方」を選びにくくしている
+  culture_axes:
+    pace:
+      name: 進め方
+      left_label: スピード
+      left_description: まず動くものを作って見せ、直しながら進める
+      right_label: 緻密さ
+      right_description: 仕様や設計を固めてから作り始める
+    novelty:
+      name: 新しさ
+      left_label: 新しいものを試す
+      left_description: 新しいライブラリや手法を積極的に試す
+      right_label: 実績あるものを使う
+      right_description: 使い慣れた、実績のある技術や手法を選ぶ
+    collaboration:
+      name: 周囲との関わり
+      left_label: 一人でやり切る
+      left_description: 自分の担当は、自分で調べて一人でやり切る
+      right_label: 相談しながら進める
+      right_description: こまめに相談しながら、チームで進める
+    decision:
+      name: 決め手
+      left_label: データ・根拠
+      left_description: 数字や根拠がそろってから決める
+      right_label: 想い・ビジョン
+      right_description: 実現したいことへの想いを優先して決める
+    atmosphere:
+      name: 職場の雰囲気
+      left_label: 交流が多い
+      left_description: 雑談や交流の場が多く、にぎやか
+      right_label: 集中重視
+      right_description: 各自が集中し、やりとりは必要なときだけ
+
   # rails-i18n の標準の文言を、設計書の文言に合わせる（17-3-6）
   errors:
     messages:

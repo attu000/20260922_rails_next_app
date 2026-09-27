@@ -1,5 +1,5 @@
 # ⑦ GET /api/options の形（design/designs/API設計.md の 16-3 ⑦）。
-# 順1〜順5 で使う選択肢とマスタだけを返す。ほかの項目（工程、性格・カルチャーの5軸など）は、使う順で足す（未決内容.md の 11-2）。
+# 今までに作った順で使う選択肢とマスタだけを返す。ほかの項目は、使う順で足す（未決内容.md の 11-2）。
 # 選択肢の値はモデルの enum の名前、表示名は config/locales/ja.yml から取る
 
 json.enums do
@@ -60,6 +60,18 @@ json.work_conditions do
   json.work_days_per_week WorkConditions::WORK_DAYS_PER_WEEK
   json.work_hours_per_day WorkConditions::WORK_HOURS_PER_DAY
   json.duration_months WorkConditions::DURATION_MONTHS
+end
+
+# 性格・カルチャーの5軸の名前と、両端の説明（その他決め事.md の 5-5）。
+# 軸の並びは、Rails の検証と同じ定数から作る（app/models/concerns/culture_axes.rb）。
+# 学生の働き方の好みと、募集のカルチャーで共通。画面はこれを読んで、スライダーの両端に説明を出す
+json.culture_axes CultureAxes::AXES do |axis|
+  json.key axis
+  json.name t("culture_axes.#{axis}.name")
+  json.left_label t("culture_axes.#{axis}.left_label")
+  json.left_description t("culture_axes.#{axis}.left_description")
+  json.right_label t("culture_axes.#{axis}.right_label")
+  json.right_description t("culture_axes.#{axis}.right_description")
 end
 
 json.masters do
