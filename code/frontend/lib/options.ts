@@ -25,8 +25,22 @@ export type JobMajorCategory = {
 // 技術。category は区分の名前（"language" など。表示名は enums.technology_category）
 export type TechnologyRow = { id: number; name: string; category: string };
 
+// 工程（上流 → 下流の表示順）
+export type WorkProcess = { id: number; name: string };
+
 // 学部。中に学科を持つ（学科は学部の中での表示順）
 export type Faculty = { id: number; name: string; departments: MasterRow[] };
+
+// 性格・カルチャーの5軸の1つ（その他決め事.md の 5-5）。
+// 例：{ key: "pace", name: "進め方", left_label: "スピード", left_description: "まず動くものを作って見せ、…", right_label: "緻密さ", … }
+export type CultureAxis = {
+  key: string;
+  name: string;
+  left_label: string;
+  left_description: string;
+  right_label: string;
+  right_description: string;
+};
 
 export type Options = {
   enums: {
@@ -50,8 +64,12 @@ export type Options = {
     work_hours_per_day: number[];
     duration_months: number[];
   };
+  // 性格・カルチャーの5軸（順9）。学生の働き方の好みと、募集のカルチャーグラフで共通
+  culture_axes: CultureAxis[];
   masters: {
     job_major_categories: JobMajorCategory[];
+    // 工程（順9）
+    work_processes: WorkProcess[];
     technologies: TechnologyRow[];
     industries: MasterRow[];
     business_types: MasterRow[];
@@ -83,6 +101,11 @@ export function labelOf(enumOptions: EnumOption[], value: string | null): string
 // マスタの番号（13）を、名前（"東京都"）に直す。都道府県・技術・業界・事業形態などで使う。見つからなければ null
 export function nameOf(rows: MasterRow[], id: number | null): string | null {
   return rows.find((row) => row.id === id)?.name ?? null;
+}
+
+// マスタの番号の一覧を、名前の一覧に直す。業界・事業形態・工程・技術などで使う。並びは渡した番号の順で、見つからない番号は飛ばす
+export function namesOf(rows: MasterRow[], ids: number[]): string[] {
+  return ids.flatMap((id) => nameOf(rows, id) ?? []);
 }
 
 // 職種の中分類の番号の一覧を、名前の一覧に直す（大分類の中を探す）。並びは渡した番号の順

@@ -1,10 +1,11 @@
 // 学生プロフィールの入力欄と、値の変換・その場の確認。
-// マイページ（S1）と、学生の新規登録（S9）のステップ2〜6で使い回す
+// マイページ（S1）と、学生の新規登録（S9）のステップ2〜7で使い回す
 // （design/designs/ページ設計.md の 6-6 S1・S9、API設計.md の 16-3 ⑮⑯⑥）。
 // マイページと登録では欄のまとまり方が違うので、欄を小さな部品に分け、使う側が並べる。
 // 氏名とアイコンは、登録ではステップ1と最後のステップに分かれるので、ここには入れない（会社情報の部品と同じ）。
-// 性格5軸は順9（【強み】）、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+// 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
 
+import { CultureAxesField } from "@/components/culture-axes-field";
 import {
   LONG_TEXT_MAX_LENGTH,
   LongTextField,
@@ -37,6 +38,18 @@ import type { StudentProfile } from "@/lib/student-profile";
 // 大学の選択欄で「その他（一覧にない大学）」を表す値
 const OTHER_UNIVERSITY = "other";
 
+// 働き方の好み（性格）の5軸の項目名。Rails の列名・エラーのキーと同じ。
+// マイページのまとまりと新規登録のステップが、Rails のエラーからどこを開くかを決めるのにも使う
+export const PERSONALITY_KEYS = [
+  "personality_pace",
+  "personality_novelty",
+  "personality_collaboration",
+  "personality_decision",
+  "personality_atmosphere",
+] as const;
+
+type PersonalityKey = (typeof PERSONALITY_KEYS)[number];
+
 // 学生プロフィールの値（氏名を除く）。入力欄にそのまま入れるため、空欄は "" で持つ（選択欄の数値も文字で持つ）。
 // 大学は「一覧の大学の番号」か「その他」を1つの選択欄で持ち、開始時期は年と月の2つの選択欄に分けて持つ
 export type StudentProfileValues = {
@@ -63,10 +76,17 @@ export type StudentProfileValues = {
   can_onsite: boolean;
   commutable_prefecture_ids: number[];
   work_note: string;
+  // 働き方の好みの5軸は、スライダーの位置（−2〜2）を数のまま持つ（空欄がないため）
+  personality_pace: number;
+  personality_novelty: number;
+  personality_collaboration: number;
+  personality_decision: number;
+  personality_atmosphere: number;
   skills: SkillRow[];
 };
 
-// 何も入れていない値（新規登録の最初）。勤務形態の3つは「可能」（データベースの既定値と同じ。データベース.md の 8-5）
+// 何も入れていない値（新規登録の最初）。データベースの既定値と同じ（データベース.md の 8-5）。
+// 勤務形態の3つは「可能」、働き方の好みの5軸は真ん中（0）
 export const EMPTY_STUDENT_PROFILE: StudentProfileValues = {
   activity_status: "",
   prefecture_id: "",
@@ -90,6 +110,11 @@ export const EMPTY_STUDENT_PROFILE: StudentProfileValues = {
   can_onsite: true,
   commutable_prefecture_ids: [],
   work_note: "",
+  personality_pace: 0,
+  personality_novelty: 0,
+  personality_collaboration: 0,
+  personality_decision: 0,
+  personality_atmosphere: 0,
   skills: [],
 };
 
@@ -146,6 +171,11 @@ export function toStudentProfileValues(profile: StudentProfile): StudentProfileV
     can_onsite: profile.can_onsite,
     commutable_prefecture_ids: profile.commutable_prefecture_ids,
     work_note: toText(profile.work_note),
+    personality_pace: profile.personality_pace,
+    personality_novelty: profile.personality_novelty,
+    personality_collaboration: profile.personality_collaboration,
+    personality_decision: profile.personality_decision,
+    personality_atmosphere: profile.personality_atmosphere,
     skills: toSkillRows(profile.skills),
   };
 }
@@ -177,6 +207,11 @@ export function toStudentProfileRequest(values: StudentProfileValues) {
     can_onsite: values.can_onsite,
     commutable_prefecture_ids: values.commutable_prefecture_ids,
     work_note: values.work_note,
+    personality_pace: values.personality_pace,
+    personality_novelty: values.personality_novelty,
+    personality_collaboration: values.personality_collaboration,
+    personality_decision: values.personality_decision,
+    personality_atmosphere: values.personality_atmosphere,
     skills: toSkillRequest(values.skills),
   };
 }
@@ -337,8 +372,6 @@ export function InterestedJobCategoriesField({ values, onChange, errors, options
       legend="興味のある職種"
       majors={options.masters.job_major_categories}
       selectedIds={values.interested_job_middle_category_ids}
-      disabledIds={[]}
-      disabledNote=""
       onChange={(ids) => onChange({ interested_job_middle_category_ids: ids })}
       errors={errors.interested_job_middle_category_ids}
     />
@@ -440,6 +473,38 @@ export function StudentWorkConditionFields(props: StudentFieldsProps & WithCurre
 
       <LongTextField {...textProps(props, "work_note")} label="稼働条件の備考" placeholder="例：テスト期間は稼働を減らしたい" />
     </>
+  );
+}
+
+// 軸の名前（"pace"）から、働き方の好みの項目名（"personality_pace"）を引く。知らない軸なら undefined
+function personalityKeyOf(axisKey: string): PersonalityKey | undefined {
+  return PERSONALITY_KEYS.find((key) => key === `personality_${axisKey}`);
+}
+
+// 働き方の好み（性格の5軸。PR233）。5本のスライダーの部品に、「軸の名前 → 数」に直して渡す
+export function WorkStylePreferenceField({ values, onChange, errors, options }: StudentFieldsProps) {
+  const axisValues: Record<string, number> = {};
+  const axisErrors: FieldErrors = {};
+  for (const axis of options.culture_axes) {
+    const key = personalityKeyOf(axis.key);
+    if (!key) continue;
+    axisValues[axis.key] = values[key];
+    // Rails のエラー（personality_pace など）を、軸ごとに渡す
+    const messages = errors[key];
+    if (messages) axisErrors[axis.key] = messages;
+  }
+
+  return (
+    <CultureAxesField
+      legend="働き方の好み"
+      axes={options.culture_axes}
+      values={axisValues}
+      onChange={(axisKey, value) => {
+        const key = personalityKeyOf(axisKey);
+        if (key) onChange(changeOf(key, value));
+      }}
+      errors={axisErrors}
+    />
   );
 }
 

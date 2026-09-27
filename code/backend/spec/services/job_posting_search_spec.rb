@@ -33,6 +33,25 @@ RSpec.describe JobPostingSearch do
       expect(result.matched_count).to eq(1)
       expect(matched_ids({})).to eq([ published.id ])
     end
+
+    # 募集管理に載っている募集は出さない（PR253）
+    it "自分が応募した募集（見送られていても）とマッチした募集は出さない。スカウトありの募集と、ほかの学生が応募した募集は出す" do
+      applied = create_posting
+      create(:candidacy, job_posting: applied, student_profile: student)
+      declined_application = create_posting
+      create(:candidacy, job_posting: declined_application, student_profile: student, status: :declined)
+      matched_scout = create_posting
+      create(:candidacy, :scout, job_posting: matched_scout, student_profile: student, status: :matched)
+      scouted = create_posting
+      create(:candidacy, :scout, job_posting: scouted, student_profile: student)
+      applied_by_other = create_posting
+      create(:candidacy, job_posting: applied_by_other)
+
+      result = search
+
+      expect(result.ordered.map(&:id)).to contain_exactly(scouted.id, applied_by_other.id)
+      expect(result.matched_count).to eq(2)
+    end
   end
 
   describe "① フリーワード" do
@@ -168,24 +187,23 @@ RSpec.describe JobPostingSearch do
     end
   end
 
-  # 順9 で足した条件
-  describe "④ 企画・設計から関われる" do
-    it "対象の工程をメインか関われるに持つ募集が合う。対象外の工程だけ・工程なしの募集は合わない。false なら条件にしない" do
-      design = create(:work_process, name: "設計", planning: true)
-      implementation = create(:work_process, name: "実装", planning: false)
+  # 順9 で足した条件（PR251）
+  describe "④ 工程" do
+    it "選んだ工程のどれかを、メインか関われるに持つ募集が合う。持たない募集・工程なしの募集は合わない" do
+      design = create(:work_process, name: "設計")
+      requirements = create(:work_process, name: "企画・要件定義")
+      implementation = create(:work_process, name: "実装")
       as_main = create_posting.tap { |p| p.job_posting_work_processes.create!(work_process: design, role: :main) }
       as_involved = create_posting.tap do |p|
         p.job_posting_work_processes.create!(work_process: implementation, role: :main)
-        p.job_posting_work_processes.create!(work_process: design, role: :involved)
+        p.job_posting_work_processes.create!(work_process: requirements, role: :involved)
       end
-      only_implementation = create_posting.tap do |p|
-        p.job_posting_work_processes.create!(work_process: implementation, role: :main)
-      end
-      no_process = create_posting
+      create_posting.tap { |p| p.job_posting_work_processes.create!(work_process: implementation, role: :main) }
+      create_posting
 
-      expect(matched_ids(planning: "true")).to contain_exactly(as_main.id, as_involved.id)
-      expect(matched_ids(planning: "false"))
-        .to contain_exactly(as_main.id, as_involved.id, only_implementation.id, no_process.id)
+      ids = matched_ids(work_process_ids: [ design.id, requirements.id ])
+
+      expect(ids).to contain_exactly(as_main.id, as_involved.id)
     end
   end
 

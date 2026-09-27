@@ -4,13 +4,16 @@
 // 詳しくは design/designs/ページ設計.md の 6-5 C3、API設計.md の 16-3 ⑦⑧⑫⑬⑭。
 // 開いたら ⑦ 選択肢と ⑧ 自社のプロフィール（会社名と、空欄のときに薄く出す値）を取り、編集なら ⑫ 募集1件も取る。
 // 保存は、新規なら ⑬、編集なら ⑭ を送り、成功したら募集一覧へ戻る。
-// 入力欄は6つのまとまり（基本・職種・募集概要・要件と使用技術・給与・稼働条件）に分け、見出しの行を押すと開く形（アコーディオン）にしている。
+// 入力欄は9つのまとまり（基本・業界と事業形態・職種・工程・募集概要・要件と使用技術・給与・稼働条件・カルチャー）に分け、
+// 見出しの行を押すと開く形（アコーディオン）にしている。
 // 必須は2段（その他決め事.md の 5-9）：常に必須は状態・タイトル。インターンですること・時給は「掲載に必要」（状態が掲載中のときだけ必須）。
-// 工程・業界・事業形態・カルチャーグラフは順9（【強み】）、目的・求める人材は【仕上げ】で足す
+// カルチャーも常に必須だが、最初から真ん中に値があって空にできないので、赤い「＊」は付けない（PR248）。
+// 目的・求める人材は【仕上げ】で足す
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { CultureAxesField } from "@/components/culture-axes-field";
 import {
   FormSection,
   LONG_TEXT_MAX_LENGTH,
@@ -25,9 +28,11 @@ import {
   type InputProps,
 } from "@/components/form-fields";
 import { JobCategoryPicker } from "@/components/job-category-picker";
+import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
 import { TechnologyPicker } from "@/components/technology-picker";
+import { WorkProcessPicker } from "@/components/work-process-picker";
 import { Accordion } from "@/components/ui/accordion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -45,6 +50,7 @@ import {
 } from "@/lib/form-values";
 import type { JobPosting } from "@/lib/job-postings";
 import { useOptions } from "@/lib/options";
+import { roleOf, selectedIdsOf, withRole, withSelectedIds, type Role, type RoleIds } from "@/lib/role-ids";
 
 // ⑧ の返事のうち、この画面で使う項目
 type CompanyDefaults = {
@@ -79,8 +85,34 @@ type FormValues = {
   technology_note: string;
   main_job_middle_category_ids: number[];
   related_job_middle_category_ids: number[];
+  main_work_process_ids: number[];
+  involved_work_process_ids: number[];
   technology_ids: number[];
+  industry_ids: number[];
+  business_type_ids: number[];
+  // カルチャーの5軸は、スライダーの位置（−2〜2）を数のまま持つ（空欄がないため）
+  culture_pace: number;
+  culture_novelty: number;
+  culture_collaboration: number;
+  culture_decision: number;
+  culture_atmosphere: number;
 };
+
+// カルチャーの5軸の項目名。Rails の列名・エラーのキーと同じ
+const CULTURE_KEYS = [
+  "culture_pace",
+  "culture_novelty",
+  "culture_collaboration",
+  "culture_decision",
+  "culture_atmosphere",
+] as const;
+
+type CultureKey = (typeof CULTURE_KEYS)[number];
+
+// 軸の名前（"pace"）から、カルチャーの項目名（"culture_pace"）を引く。知らない軸なら undefined
+function cultureKeyOf(axisKey: string): CultureKey | undefined {
+  return CULTURE_KEYS.find((key) => key === `culture_${axisKey}`);
+}
 
 // 文字の入力欄の名前
 type TextKey = {
@@ -97,6 +129,12 @@ const SHORT_TEXT_LABELS = {
   work_style_note: "勤務形態の補足",
   work_location_note: "最寄り駅など",
 } as const satisfies Partial<Record<TextKey, string>>;
+
+// 職種のメイン／サブの切り替えの選択肢（PR234・PR236）
+const JOB_CATEGORY_ROLES: { value: Role; label: string }[] = [
+  { value: "main", label: "メイン" },
+  { value: "sub", label: "サブ" },
+];
 
 const LONG_TEXT_LABELS = {
   about: "どんな会社か",
@@ -134,7 +172,17 @@ const EMPTY_VALUES: FormValues = {
   technology_note: "",
   main_job_middle_category_ids: [],
   related_job_middle_category_ids: [],
+  main_work_process_ids: [],
+  involved_work_process_ids: [],
   technology_ids: [],
+  industry_ids: [],
+  business_type_ids: [],
+  // カルチャーは真ん中から（データベースの既定値と同じ）
+  culture_pace: 0,
+  culture_novelty: 0,
+  culture_collaboration: 0,
+  culture_decision: 0,
+  culture_atmosphere: 0,
 };
 
 // フォームのまとまり。見出しの行を押すと中身が開く（アコーディオン）。並びはこの順。
@@ -142,10 +190,24 @@ const EMPTY_VALUES: FormValues = {
 const SECTIONS = [
   { value: "basic", title: "基本", hint: "募集状態・タイトル", fields: ["status", "title"] },
   {
+    value: "industries",
+    title: "業界・事業形態",
+    // 会社情報にも同じ欄があるので、「この募集の」値であることを見出しの横で伝える
+    hint: "この募集の事業の分野と形",
+    fields: ["industry_ids", "business_type_ids"],
+  },
+  {
     value: "job_categories",
     title: "職種",
-    hint: "主な職種・関連する職種",
+    hint: "メイン・サブ",
     fields: ["main_job_middle_category_ids", "related_job_middle_category_ids"],
+  },
+  // 職種と別のまとまりにする（職種の一覧は開くと長くなるので、1つのまとまりが長くなりすぎないように。PR247）
+  {
+    value: "work_processes",
+    title: "工程",
+    hint: "メイン・関われる",
+    fields: ["main_work_process_ids", "involved_work_process_ids"],
   },
   {
     value: "overview",
@@ -177,6 +239,7 @@ const SECTIONS = [
       "work_note",
     ],
   },
+  { value: "culture", title: "カルチャー", hint: "進め方・新しさなど5つの軸", fields: CULTURE_KEYS },
 ] as const;
 
 type SectionValue = (typeof SECTIONS)[number]["value"];
@@ -215,7 +278,16 @@ function toFormValues(posting: JobPosting): FormValues {
     technology_note: toText(posting.technology_note),
     main_job_middle_category_ids: posting.main_job_middle_category_ids,
     related_job_middle_category_ids: posting.related_job_middle_category_ids,
+    main_work_process_ids: posting.main_work_process_ids,
+    involved_work_process_ids: posting.involved_work_process_ids,
     technology_ids: posting.technology_ids,
+    industry_ids: posting.industry_ids,
+    business_type_ids: posting.business_type_ids,
+    culture_pace: posting.culture_pace,
+    culture_novelty: posting.culture_novelty,
+    culture_collaboration: posting.culture_collaboration,
+    culture_decision: posting.culture_decision,
+    culture_atmosphere: posting.culture_atmosphere,
   };
 }
 
@@ -341,6 +413,15 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
     setValues((current) => (current ? { ...current, [key]: value } : current));
   }
 
+  // 職種を、主な職種・関連する職種の2つの一覧に分け直して入れる（画面では1つの一覧で見せる。PR234）
+  function updateJobCategories(roleIds: RoleIds) {
+    setValues((current) =>
+      current
+        ? { ...current, main_job_middle_category_ids: roleIds.main, related_job_middle_category_ids: roleIds.sub }
+        : current,
+    );
+  }
+
   // エラーを項目に出す。エラーのある項目を含むまとまりは自動で開き（開いているものは閉じない）、最初のエラーまで画面を動かす。
   // 閉じたまとまりの中にエラーが隠れて、「なぜ保存できないのか分からない」とならないようにするため
   function showErrors(errors: FieldErrors) {
@@ -406,6 +487,38 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
   // ここから下は、値がそろっている（null ではない）
   const formValues = values;
 
+  // 職種の、メイン（主な職種）とサブ（関連する職種）の番号の一覧
+  const jobCategoryRoleIds: RoleIds = {
+    main: values.main_job_middle_category_ids,
+    sub: values.related_job_middle_category_ids,
+  };
+  // 職種のエラー。主な職種・関連する職種のどちらのものも、1つの欄の下にまとめて出す
+  const jobCategoryErrors = [
+    ...(fieldErrors.main_job_middle_category_ids ?? []),
+    ...(fieldErrors.related_job_middle_category_ids ?? []),
+  ];
+
+  // 工程の、メイン（メインで担当する工程）とサブ（関われる工程）の番号の一覧と、まとめたエラー（職種と同じ形）
+  const workProcessRoleIds: RoleIds = {
+    main: values.main_work_process_ids,
+    sub: values.involved_work_process_ids,
+  };
+  const workProcessErrors = [
+    ...(fieldErrors.main_work_process_ids ?? []),
+    ...(fieldErrors.involved_work_process_ids ?? []),
+  ];
+
+  // カルチャーの5軸を、スライダーの部品に渡す「軸の名前 → 数」の形に直す。Rails のエラー（culture_pace など）も軸ごとに渡す
+  const cultureValues: Record<string, number> = {};
+  const cultureErrors: FieldErrors = {};
+  for (const axis of options.culture_axes) {
+    const key = cultureKeyOf(axis.key);
+    if (!key) continue;
+    cultureValues[axis.key] = values[key];
+    const messages = fieldErrors[key];
+    if (messages) cultureErrors[axis.key] = messages;
+  }
+
   // 新規作成のときは「終了」を選べない（権限_バリデーション.md の 17-2-2。Rails も確かめる）
   const statusOptions = options.enums.job_posting_status.filter(
     (option) => !(isNew && option.value === "closed"),
@@ -468,26 +581,56 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
             <TextField {...textProps("title")} label="募集タイトル" required />
           </FormSection>
 
-          <FormSection {...sectionProps("job_categories")}>
-            <JobCategoryPicker
-              name="main-job-category"
-              legend="主な職種"
-              majors={options.masters.job_major_categories}
-              selectedIds={values.main_job_middle_category_ids}
-              disabledIds={values.related_job_middle_category_ids}
-              disabledNote="関連する職種で選択済み"
-              onChange={(ids) => updateValue("main_job_middle_category_ids", ids)}
-              errors={fieldErrors.main_job_middle_category_ids}
+          {/* 業界・事業形態（任意）。会社情報の値とは別に持ち、空欄でも会社情報の値で補わない（その他決め事.md の 5-8） */}
+          <FormSection {...sectionProps("industries")}>
+            <MasterCheckboxGroup
+              name="industry"
+              legend="業界"
+              rows={options.masters.industries}
+              selectedIds={values.industry_ids}
+              onChange={(ids) => updateValue("industry_ids", ids)}
+              errors={fieldErrors.industry_ids}
             />
+            <MasterCheckboxGroup
+              name="business-type"
+              legend="事業形態"
+              rows={options.masters.business_types}
+              selectedIds={values.business_type_ids}
+              onChange={(ids) => updateValue("business_type_ids", ids)}
+              errors={fieldErrors.business_type_ids}
+            />
+          </FormSection>
+
+          <FormSection {...sectionProps("job_categories")}>
+            {/* 1つの一覧で選び、チェックを入れた中分類の横で「メイン｜サブ」を切り替える（PR234）。
+                チェックを入れた時点ではメイン（lib/role-ids.ts の withSelectedIds） */}
             <JobCategoryPicker
-              name="related-job-category"
-              legend="関連する職種"
+              name="job-category"
+              legend="職種"
               majors={options.masters.job_major_categories}
-              selectedIds={values.related_job_middle_category_ids}
-              disabledIds={values.main_job_middle_category_ids}
-              disabledNote="主な職種で選択済み"
-              onChange={(ids) => updateValue("related_job_middle_category_ids", ids)}
-              errors={fieldErrors.related_job_middle_category_ids}
+              selectedIds={selectedIdsOf(jobCategoryRoleIds)}
+              onChange={(ids) => updateJobCategories(withSelectedIds(jobCategoryRoleIds, ids))}
+              errors={jobCategoryErrors.length > 0 ? jobCategoryErrors : undefined}
+              roles={{
+                choices: JOB_CATEGORY_ROLES,
+                roleOf: (id) => roleOf(jobCategoryRoleIds, id),
+                onRoleChange: (id, role) => updateJobCategories(withRole(jobCategoryRoleIds, id, role)),
+              }}
+            />
+          </FormSection>
+
+          <FormSection {...sectionProps("work_processes")}>
+            <WorkProcessPicker
+              workProcesses={options.masters.work_processes}
+              value={workProcessRoleIds}
+              onChange={(roleIds) =>
+                setValues((current) =>
+                  current
+                    ? { ...current, main_work_process_ids: roleIds.main, involved_work_process_ids: roleIds.sub }
+                    : current,
+                )
+              }
+              errors={workProcessErrors.length > 0 ? workProcessErrors : undefined}
             />
           </FormSection>
 
@@ -621,6 +764,20 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
             </Field>
 
             <LongTextField {...textProps("work_note")} label="稼働条件の備考" />
+          </FormSection>
+
+          {/* カルチャーグラフ。学生の働き方の好みと同じ5軸・同じ部品（その他決め事.md の 5-5） */}
+          <FormSection {...sectionProps("culture")}>
+            <CultureAxesField
+              legend="カルチャー"
+              axes={options.culture_axes}
+              values={cultureValues}
+              onChange={(axisKey, value) => {
+                const key = cultureKeyOf(axisKey);
+                if (key) updateValue(key, value);
+              }}
+              errors={cultureErrors}
+            />
           </FormSection>
         </Accordion>
 

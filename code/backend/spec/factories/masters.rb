@@ -29,7 +29,6 @@ FactoryBot.define do
 
   factory :work_process do
     sequence(:name) { |n| "工程#{n}" }
-    planning { false }
     sequence(:position) { |n| n }
   end
 

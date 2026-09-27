@@ -2,10 +2,10 @@
 
 // マイページ（S1 学生プロフィール編集）の入力フォーム。詳しくは design/designs/ページ設計.md の 6-6 S1、API設計.md の 16-3 ⑦⑮⑯⑰。
 // 開いたら ⑦ 選択肢と ⑮ 自分のプロフィールを SWR で取り、保存で ⑯ を送る。アイコンを選んでいたら、⑯ の成功後に ⑰ を続けて送る。
-// 入力欄は6つのまとまり（基本・学校・自己PR・プログラミング歴・就活状況・稼働条件）に分け、見出しの行を押すと開く形（アコーディオン）にしている。
+// 入力欄は7つのまとまり（基本・学校・自己PR・プログラミング歴・就活状況・働き方の好み・稼働条件）に分け、見出しの行を押すと開く形（アコーディオン）にしている。
 // 氏名とアイコン以外の欄と、値の変換・その場の確認は、新規登録と共通の部品（components/student-profile-fields.tsx）。
 // 必須は氏名と活動状況だけ（その他決め事.md の 5-9）。
-// 性格5軸は順9（【強み】）、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+// 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { FormSection, RequiredNote, TextField, type FieldErrors } from "@/components/form-fields";
@@ -17,6 +17,7 @@ import {
   ActivityStatusField,
   GraduationYearField,
   InterestedJobCategoriesField,
+  PERSONALITY_KEYS,
   ResidencePrefectureField,
   StudentSchoolFields,
   StudentSelfPrFields,
@@ -24,6 +25,7 @@ import {
   toStudentProfileRequest,
   toStudentProfileValues,
   validateStudentProfile,
+  WorkStylePreferenceField,
   type StudentProfileValues,
 } from "@/components/student-profile-fields";
 import { Accordion } from "@/components/ui/accordion";
@@ -69,6 +71,12 @@ const SECTIONS = [
     title: "就活状況",
     hint: "卒業年度・興味のある職種",
     fields: ["graduation_year", "interested_job_middle_category_ids"],
+  },
+  {
+    value: "work_style_preference",
+    title: "働き方の好み",
+    hint: "進め方・新しさなど5つの軸",
+    fields: PERSONALITY_KEYS,
   },
   {
     value: "work_conditions",
@@ -355,6 +363,10 @@ export function StudentProfileForm() {
           <FormSection {...sectionProps("job_hunting")}>
             <GraduationYearField {...fieldsProps} currentYear={currentYear} />
             <InterestedJobCategoriesField {...fieldsProps} />
+          </FormSection>
+
+          <FormSection {...sectionProps("work_style_preference")}>
+            <WorkStylePreferenceField {...fieldsProps} />
           </FormSection>
 
           <FormSection {...sectionProps("work_conditions")}>

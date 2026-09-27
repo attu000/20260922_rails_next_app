@@ -97,18 +97,18 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
     end
 
     # 順9 で足した条件。合う・合わないの細かい場合分けは spec/services/job_posting_search_spec.rb で確かめる
-    it "「企画・設計から関われる」を送ると、対象の工程を持つ募集が合致の群に入る" do
-      planning_process = create(:work_process, planning: true)
-      with_planning = create_posting(published_at: 2.hours.ago)
-      with_planning.job_posting_work_processes.create!(work_process: planning_process, role: :involved)
-      without_planning = create_posting(published_at: 1.hour.ago)
+    it "工程を送ると、その工程を持つ募集が合致の群に入る（PR251）" do
+      process = create(:work_process)
+      with_process = create_posting(published_at: 2.hours.ago)
+      with_process.job_posting_work_processes.create!(work_process: process, role: :involved)
+      without_process = create_posting(published_at: 1.hour.ago)
 
-      get "/api/student/job_postings", params: { planning: true, sort: "newest" }
+      get "/api/student/job_postings", params: { work_process_ids: [ process.id ], sort: "newest" }
 
       items = response.parsed_body["items"]
-      expect(items.map { |item| item["id"] }).to eq([ with_planning.id, without_planning.id ])
+      expect(items.map { |item| item["id"] }).to eq([ with_process.id, without_process.id ])
       expect(items.map { |item| item["matched"] }).to eq([ true, false ])
-      expect(items.first["involved_work_process_ids"]).to eq([ planning_process.id ])
+      expect(items.first["involved_work_process_ids"]).to eq([ process.id ])
     end
 
     it "ページ番号が数でなければ、1ページ目を返す" do

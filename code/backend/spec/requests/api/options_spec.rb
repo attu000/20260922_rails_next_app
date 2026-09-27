@@ -151,15 +151,15 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
       )
     end
 
-    it "工程を表示順で、番号・名前・planning の3つだけ返す（共通段階と大分類の対応は返さない。PR239・PR240）" do
-      implementation = create(:work_process, name: "実装", planning: false, position: 2)
-      design = create(:work_process, name: "設計", planning: true, position: 1)
+    it "工程を表示順で、番号・名前の2つだけ返す（共通段階・大分類の対応・planning は返さない。PR239・PR240・PR252）" do
+      implementation = create(:work_process, name: "実装", position: 2)
+      design = create(:work_process, name: "設計", position: 1)
 
       get "/api/options"
 
       expect(response.parsed_body["masters"]["work_processes"]).to eq([
-        { "id" => design.id, "name" => "設計", "planning" => true },
-        { "id" => implementation.id, "name" => "実装", "planning" => false }
+        { "id" => design.id, "name" => "設計" },
+        { "id" => implementation.id, "name" => "実装" }
       ])
     end
   end

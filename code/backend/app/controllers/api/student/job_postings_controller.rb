@@ -44,10 +44,9 @@ module Api
         params.permit(:q, :sort,
                       # 稼働条件（PR200）
                       :work_days_per_week, :work_hours_per_day, :duration_months, :available_from, :weekend_ok,
-                      # 企画・設計から関われる（順9）
-                      :planning,
                       prefecture_ids: [], job_major_category_ids: [], job_middle_category_ids: [],
-                      technology_ids: [], work_styles: [])
+                      # 工程（順9。PR251）
+                      technology_ids: [], work_process_ids: [], work_styles: [])
       end
     end
   end

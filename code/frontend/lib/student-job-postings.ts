@@ -1,7 +1,6 @@
 // 学生から見た募集・企業の型。Rails の app/views/api/student/ の JSON と同じ形
 // （design/designs/API設計.md の 16-3 ⑱⑲⑳、形B）。空欄は null。
-// 企業から見た募集（lib/job-postings.ts）とは返す項目が違うので、別のファイルにしている。
-// 業界・事業形態・工程・カルチャーは順9 で足す
+// 企業から見た募集（lib/job-postings.ts）とは返す項目が違うので、別のファイルにしている
 
 import { idsFromQuery, monthDateFromQuery, numberFromQuery, type QueryReader } from "@/lib/search-query";
 
@@ -19,8 +18,13 @@ export type StudentJobPostingRow = {
   // 掲載中なら true。false なら「募集終了」と出す（非公開か終了かは学生に見せない）
   is_open: boolean;
   company: StudentJobPostingCompany;
+  // その募集の業界・事業形態。会社情報の値では補わない（空なら空の配列）
+  industry_ids: number[];
+  business_type_ids: number[];
   main_job_middle_category_ids: number[];
   related_job_middle_category_ids: number[];
+  main_work_process_ids: number[];
+  involved_work_process_ids: number[];
   prefecture_id: number | null;
   // "partial_remote" など。表示名は ⑦ の enums.work_style
   work_style: string | null;
@@ -58,6 +62,8 @@ export type SearchConditions = {
   job_middle_category_ids: number[];
   // 使用技術。選んだ技術のどれか1つを使う募集が合う（PR199）
   technology_ids: number[];
+  // 工程。選んだ工程のどれか1つを、メインか関われるに持つ募集が合う（PR251）
+  work_process_ids: number[];
   // ③ 稼働条件（PR200）。学生が出せる上限（週◯日まで、1日◯時間まで、◯ヶ月以上続けられる）。null は指定なし
   work_days_per_week: number | null;
   work_hours_per_day: number | null;
@@ -81,6 +87,7 @@ export function conditionsFromQuery(params: QueryReader): SearchConditions {
     job_major_category_ids: idsFromQuery(params, "job_major_category_ids"),
     job_middle_category_ids: idsFromQuery(params, "job_middle_category_ids"),
     technology_ids: idsFromQuery(params, "technology_ids"),
+    work_process_ids: idsFromQuery(params, "work_process_ids"),
     work_days_per_week: numberFromQuery(params, "work_days_per_week"),
     work_hours_per_day: numberFromQuery(params, "work_hours_per_day"),
     duration_months: numberFromQuery(params, "duration_months"),
@@ -105,6 +112,7 @@ export function buildSearchQuery(conditions: SearchConditions, sort: SearchSort,
   conditions.job_major_category_ids.forEach((id) => params.append("job_major_category_ids[]", String(id)));
   conditions.job_middle_category_ids.forEach((id) => params.append("job_middle_category_ids[]", String(id)));
   conditions.technology_ids.forEach((id) => params.append("technology_ids[]", String(id)));
+  conditions.work_process_ids.forEach((id) => params.append("work_process_ids[]", String(id)));
   if (conditions.work_days_per_week !== null) params.set("work_days_per_week", String(conditions.work_days_per_week));
   if (conditions.work_hours_per_day !== null) params.set("work_hours_per_day", String(conditions.work_hours_per_day));
   if (conditions.duration_months !== null) params.set("duration_months", String(conditions.duration_months));
@@ -156,7 +164,18 @@ export type StudentJobPostingDetail = MyCandidacyStatus & {
   technology_note: string | null;
   main_job_middle_category_ids: number[];
   related_job_middle_category_ids: number[];
+  main_work_process_ids: number[];
+  involved_work_process_ids: number[];
   technology_ids: number[];
+  // その募集の業界・事業形態。どんな会社か・事業内容と違い、空でも会社情報の値で補わない
+  industry_ids: number[];
+  business_type_ids: number[];
+  // カルチャーの5軸。−2〜2（負＝左、正＝右、0＝真ん中）
+  culture_pace: number;
+  culture_novelty: number;
+  culture_collaboration: number;
+  culture_decision: number;
+  culture_atmosphere: number;
   published_at: string;
   // その企業とのスレッドがあるか（スカウトが届いたか、マッチしたらできる）。
   // true なら「この企業とのメッセージ」のボタンを出す（権限_バリデーション.md の 17-2-3。PR213）

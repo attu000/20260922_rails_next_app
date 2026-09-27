@@ -1,7 +1,7 @@
 "use client";
 
 // 学生の新規登録（S9）の中身。詳しくは design/designs/ページ設計.md の 6-6 S9、API設計.md の 16-3 ④⑥⑰。
-// アカウント → 基本情報 → 興味 → スキル → 稼働条件 → 自己PR の6ステップ（性格のステップは順9 で足す。PR225）。
+// アカウント → 基本情報 → 興味 → スキル → 稼働条件 → 働き方の好み → 自己PR の7ステップ。
 // 入力は画面の中だけで持ち、最後の「登録する」で ⑥ にまとめて送る（途中でやめた人のデータは残らない。途中で読み込み直すと、入力は消える）。
 // 登録できたら Rails が自動でログインした状態にするので、アイコンを選んでいれば ⑰ に続けて送り、学生のホーム（募集一覧）へ移る。
 // 必須はステップ1のすべてと、ステップ2の活動状況だけ（権限_バリデーション.md の 17-3-5）。
@@ -29,12 +29,14 @@ import {
   EMPTY_STUDENT_PROFILE,
   GraduationYearField,
   InterestedJobCategoriesField,
+  PERSONALITY_KEYS,
   ResidencePrefectureField,
   StudentSchoolFields,
   StudentSelfPrFields,
   StudentWorkConditionFields,
   toStudentProfileRequest,
   validateStudentProfile,
+  WorkStylePreferenceField,
   type StudentProfileValues,
 } from "@/components/student-profile-fields";
 import { Button } from "@/components/ui/button";
@@ -95,6 +97,8 @@ const STEPS: { title: string; notes: string[]; fields: string[] }[] = [
       "work_note",
     ],
   },
+  // 見出しの下の一言は付けない（スライダーを見ればわかるため。画面の文字を増やさない。PR243 は取り下げ）
+  { title: "働き方の好み", notes: [], fields: [...PERSONALITY_KEYS] },
   {
     title: "自己PR",
     notes: ["空欄のままでも登録できます。あとでマイページから入力できます"],
@@ -128,7 +132,7 @@ export function StudentSignupForm() {
   const { options, failed: optionsFailed } = useOptions();
 
   const [step, setStep] = useState(1);
-  // ステップ1の値（氏名を含む）と、ステップ2〜6の値。ステップを行き来しても消えない
+  // ステップ1の値（氏名を含む）と、ステップ2〜7の値。ステップを行き来しても消えない
   const [account, setAccount] = useState<AccountValues>(EMPTY_ACCOUNT);
   const [profile, setProfile] = useState<StudentProfileValues>(EMPTY_STUDENT_PROFILE);
   // 選んだ（まだ送っていない）アイコン（components/icon-field.tsx）
@@ -191,7 +195,7 @@ export function StudentSignupForm() {
     if (step === 1) {
       await goNextFromAccount();
     } else if (step < LAST_STEP) {
-      // ステップ2〜5：全体を確かめ、そのステップの項目の誤りだけを見る。なければ次へ
+      // ステップ2〜6：全体を確かめ、そのステップの項目の誤りだけを見る。なければ次へ
       const stepErrors = errorsOfStep(validateStudentProfile(profile), step);
       if (Object.keys(stepErrors).length > 0) {
         showErrors(stepErrors);
@@ -277,7 +281,7 @@ export function StudentSignupForm() {
     router.replace(homePathFor("student"));
   }
 
-  // ステップ2〜6の欄。選択肢（⑦）がそろってから出す
+  // ステップ2〜7の欄。選択肢（⑦）がそろってから出す
   function profileStepFields(loadedOptions: Options): ReactNode {
     const fieldsProps = { values: profile, onChange: changeProfile, errors: fieldErrors, options: loadedOptions };
     switch (step) {
@@ -305,6 +309,8 @@ export function StudentSignupForm() {
         );
       case 5:
         return <StudentWorkConditionFields {...fieldsProps} currentYear={currentYear} />;
+      case 6:
+        return <WorkStylePreferenceField {...fieldsProps} />;
       default:
         return (
           <>

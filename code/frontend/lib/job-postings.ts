@@ -36,9 +36,20 @@ export type JobPosting = {
   requirements: string | null;
   preferred_requirements: string | null;
   technology_note: string | null;
-  // 職種は「主な／関連する」で配列を分けて持つ（フォームの入力欄とそのまま対応させるため）
+  // カルチャーの5軸。−2〜2（負＝左、正＝右、0＝真ん中）。空欄にはならない
+  culture_pace: number;
+  culture_novelty: number;
+  culture_collaboration: number;
+  culture_decision: number;
+  culture_atmosphere: number;
+  // 職種と工程は「主な／関連する」「メインで担当する／関われる」で配列を分けて持つ（Rails とのやりとりの形）
   main_job_middle_category_ids: number[];
   related_job_middle_category_ids: number[];
+  main_work_process_ids: number[];
+  involved_work_process_ids: number[];
   technology_ids: number[];
+  // この募集の業界・事業形態。会社情報の値とは別に持つ（その他決め事.md の 5-8）
+  industry_ids: number[];
+  business_type_ids: number[];
   updated_at: string;
 };

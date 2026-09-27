@@ -4,14 +4,15 @@
 //
 // 条件・並び順・ページは、すべて URL の ? の後ろに持つ（URL が正。16-1-13）。
 // 画面の URL の ? の後ろを、そのまま ⑱ GET /api/student/job_postings に渡す（形が同じなので変換しない）。
-// - 条件欄は [勤務地][職種][技術](フリーワード)[検索する] の横並び。各ボタンはポップアップを開く（PR201）
+// - 条件欄は [勤務地][職種][技術][工程][稼働条件](フリーワード)[検索する] の横並び。各ボタンはポップアップを開く（PR201）
 // - 条件欄を触っても、画面の中の下書きが変わるだけ。「検索する」を押したときに URL に書き込む（PR192）
 // - 並び順は、選んだらすぐ URL に書き込む（PR196）
 // - URL が変わると SWR が Rails に取りに行く。ブラウザの「戻る」で、条件欄も結果も前の URL の内容に戻る
 //
 // 結果は条件で減らさず、合致の群を先に、合致外の群をあとに並べて返ってくる（Rails が並べる）。
 // 画面は、合致外に変わるところに「ここから条件に合いません」の区切りを入れるだけ（処理設計_類似度.md の 7-3）。
-// 稼働条件のボタン・土日OK・業界・事業形態・「企画・設計から関われる」は【強み】【仕上げ】で足す
+// 自分が応募した募集・マッチした募集は、Rails が結果から除いて返す（PR253）。
+// おすすめ順のときの稼働条件のボタンの自動選択は順13、業界・事業形態の条件は【仕上げ】で足す
 
 import { Fragment, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -218,8 +219,6 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
             legend="職種"
             majors={majors}
             selectedIds={draft.job_middle_category_ids}
-            disabledIds={[]}
-            disabledNote=""
             onChange={(ids) => updateDraft("job_middle_category_ids", ids)}
             initialCheckedMajorIds={checkedMajorIds}
             onCheckedMajorsChange={setCheckedMajorIds}
@@ -240,6 +239,23 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
             options={options}
             selectedIds={draft.technology_ids}
             onChange={(ids) => updateDraft("technology_ids", ids)}
+          />
+        </SearchConditionDialog>
+
+        {/* ④ 工程：関わりたい段階で探す（PR251）。13個を上流 → 下流の表示順で並べる。技術と同じ形 */}
+        <SearchConditionDialog
+          label="工程"
+          count={draft.work_process_ids.length}
+          onClear={() => updateDraft("work_process_ids", [])}
+          description="選んだ工程のどれか1つに関われる募集が、条件に合います"
+        >
+          <MasterCheckboxGroup
+            name="search-work-process"
+            legend="工程"
+            hideLegend
+            rows={options.masters.work_processes}
+            selectedIds={draft.work_process_ids}
+            onChange={(ids) => updateDraft("work_process_ids", ids)}
           />
         </SearchConditionDialog>
 
@@ -319,7 +335,8 @@ function SearchResults({ result, options, sort, onSortChange, hrefFor }: SearchR
       </div>
 
       {pagination.total_count === 0 ? (
-        <p className="text-sm text-muted-foreground">掲載中の募集はまだありません</p>
+        // 応募した募集・マッチした募集は除かれるので（PR253）、「掲載中の募集がない」とは限らない
+        <p className="text-sm text-muted-foreground">表示できる募集はありません</p>
       ) : items.length === 0 ? (
         // 範囲外のページ（URL を手で書き換えたときなど）
         <p className="text-sm text-muted-foreground">このページに募集はありません</p>

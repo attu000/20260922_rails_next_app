@@ -29,11 +29,6 @@ import { ApiError, apiFetch } from "@/lib/api";
 import { labelOf, type EnumOption } from "@/lib/options";
 import type { MyCandidacyStatus } from "@/lib/student-job-postings";
 
-// 応募理由のうち、まだ募集詳細に出ていない4項目（業界・事業形態・工程・カルチャー）。
-// 見えていない項目を理由に選べると迷うので、ポップアップから外す。Rails は12個すべてを受け付ける。
-// 順9 でこれらを募集詳細に出すときに、この定数ごと消す（PR203）
-const REASONS_SHOWN_FROM_ORDER9 = ["industry", "business_type", "work_process", "culture"];
-
 // 応募理由を1つも選ばずに押したときの文言。Rails の 422 と同じ（権限_バリデーション.md の 17-3-6）
 const REASONS_REQUIRED_MESSAGE = "応募理由を入力してください";
 
@@ -155,9 +150,6 @@ export function ReasonsDialog({ triggerLabel, reasonOptions, submit, onDone, onF
   // 送っている途中か。2回押しても、1回だけ送る。ボタンは押せなくしない（権限_バリデーション.md の 17-3-2）
   const [submitting, setSubmitting] = useState(false);
 
-  // 画面に出す順（⑦ の並び）のまま、まだ募集詳細に出ていない項目だけを外す
-  const shownReasons = reasonOptions.filter((option) => !REASONS_SHOWN_FROM_ORDER9.includes(option.value));
-
   // 開くたびに、選んだものとエラーを空にする
   function handleOpenChange(nextOpen: boolean) {
     if (nextOpen) {
@@ -218,7 +210,8 @@ export function ReasonsDialog({ triggerLabel, reasonOptions, submit, onDone, onF
             <FieldSet>
               <FieldLegend variant="label">応募理由</FieldLegend>
               <div className="grid gap-2 sm:grid-cols-2">
-                {shownReasons.map((option) => {
+                {/* 12項目すべてを、⑦ の並び（画面に出す順）のまま出す。順9 で業界・事業形態・工程・カルチャーも募集詳細に出したため（PR203） */}
+                {reasonOptions.map((option) => {
                   const id = `reason-${option.value}`;
                   return (
                     <Field key={option.value} orientation="horizontal">

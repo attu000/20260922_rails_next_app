@@ -6,17 +6,18 @@
 // 自分とやりとりがある募集は、非公開・終了でも開ける（「募集終了」と出す）。
 // 自分の状態の表示と「応募する」「マッチする」は components/student-candidacy-actions.tsx。
 // 「この企業とのメッセージ」は、Rails の has_message_thread が true のときだけ出す（PR213）。
-// 業界・事業形態・工程、カルチャーグラフと自分の性格との一致・ずれは、順9・順10 で足す（PR189）
+// カルチャーグラフと自分の働き方の好みとの一致・ずれは、順10 で足す（PR189）
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { CultureAxesView } from "@/components/culture-axes-field";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
 import { StudentCandidacyActions } from "@/components/student-candidacy-actions";
 import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
 import { formatHourlyWage, formatStartMonth } from "@/lib/format";
-import { jobMiddleCategoryNames, labelOf, nameOf, useOptions } from "@/lib/options";
+import { jobMiddleCategoryNames, labelOf, nameOf, namesOf, useOptions } from "@/lib/options";
 import type { StudentJobPostingDetail as Detail } from "@/lib/student-job-postings";
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
@@ -74,8 +75,16 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
     return <p className="text-sm text-muted-foreground">読み込み中…</p>;
   }
 
-  const majors = options.masters.job_major_categories;
-  const technologyNames = data.technology_ids.flatMap((id) => nameOf(options.masters.technologies, id) ?? []);
+  const { masters } = options;
+  const majors = masters.job_major_categories;
+  // カルチャーの5軸を、見るだけのグラフに渡す「軸の名前 → 数」の形に直す
+  const cultureValues: Record<string, number> = {
+    pace: data.culture_pace,
+    novelty: data.culture_novelty,
+    collaboration: data.culture_collaboration,
+    decision: data.culture_decision,
+    atmosphere: data.culture_atmosphere,
+  };
 
   return (
     <div className="space-y-6">
@@ -130,12 +139,20 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
         <DetailItem label="時給" value={formatHourlyWage(data.hourly_wage)} />
       </DetailSection>
 
-      <DetailSection title="職種">
+      {/* 業界・事業形態は募集の値。会社情報の値では補わない（その他決め事.md の 5-8）。見出しは学生向けの言い方（PR236） */}
+      <DetailSection title="業界・職種・工程">
+        <DetailItem label="業界" value={joinNames(namesOf(masters.industries, data.industry_ids))} />
+        <DetailItem label="事業形態" value={joinNames(namesOf(masters.business_types, data.business_type_ids))} />
         <DetailItem label="主な職種" value={joinNames(jobMiddleCategoryNames(majors, data.main_job_middle_category_ids))} />
         <DetailItem
           label="関連する職種"
           value={joinNames(jobMiddleCategoryNames(majors, data.related_job_middle_category_ids))}
         />
+        <DetailItem
+          label="メインで担当する工程"
+          value={joinNames(namesOf(masters.work_processes, data.main_work_process_ids))}
+        />
+        <DetailItem label="関われる工程" value={joinNames(namesOf(masters.work_processes, data.involved_work_process_ids))} />
       </DetailSection>
 
       <DetailSection title="募集概要">
@@ -145,6 +162,12 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
         <DetailItem label="インターンですること" value={data.internship_details} />
         <DetailItem label="成長イメージ" value={data.growth} />
       </DetailSection>
+
+      {/* カルチャーグラフ（ページ設計.md の 6-6 S6 の並びどおり、募集概要の下）。両端の長い説明も出す（PR250） */}
+      <section className="space-y-3 rounded-lg border p-4">
+        <h2 className="font-bold">カルチャー</h2>
+        <CultureAxesView axes={options.culture_axes} values={cultureValues} />
+      </section>
 
       <DetailSection title="稼働条件">
         <DetailItem
@@ -170,7 +193,7 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
       </DetailSection>
 
       <DetailSection title="使用する言語・フレームワーク・技術">
-        <DetailItem label="使用技術" value={joinNames(technologyNames)} />
+        <DetailItem label="使用技術" value={joinNames(namesOf(masters.technologies, data.technology_ids))} />
         <DetailItem label="補足" value={data.technology_note} />
       </DetailSection>
     </div>

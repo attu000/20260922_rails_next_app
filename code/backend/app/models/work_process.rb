@@ -3,8 +3,6 @@
 class WorkProcess < ApplicationRecord
   validates :name, presence: true, uniqueness: true
   validates :position, presence: true
-  # 真偽値の列は presence だと false を「空」と見なすので、true か false のどちらかであることを確かめる
-  validates :planning, inclusion: { in: [ true, false ] }
 
   # 表示順（上流 → 下流）に並べる。⑦ GET /api/options で返すときに使う
   scope :ordered, -> { order(:position) }

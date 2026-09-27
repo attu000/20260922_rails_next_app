@@ -292,8 +292,6 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
             legend="職種"
             majors={majors}
             selectedIds={draft.job_middle_category_ids}
-            disabledIds={[]}
-            disabledNote=""
             onChange={(ids) => updateDraft("job_middle_category_ids", ids)}
             initialCheckedMajorIds={checkedMajorIds}
             onCheckedMajorsChange={setCheckedMajorIds}

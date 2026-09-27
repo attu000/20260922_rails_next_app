@@ -1,6 +1,5 @@
 // 学生向けの募集の行の見た目（design/designs/ページ設計.md の 6-6 S2「各行」）。
-// 募集一覧（学生のホーム）、企業詳細の募集一覧、募集管理で使い回す。順6 のスカウト管理でも使う。
-// 業界・事業形態・工程は、順9 で Rails が返すようになってから足す。
+// 募集一覧（学生のホーム）、企業詳細の募集一覧、募集管理、スカウト管理で使い回す。
 // 「ここから条件に合いません」の区切りは、並べる側（募集一覧）が入れる
 
 import Link from "next/link";
@@ -8,7 +7,7 @@ import { ProfileIcon } from "@/components/profile-icon";
 import { StatusBadge } from "@/components/status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { formatHourlyWage, formatWorkConditions } from "@/lib/format";
-import { jobMiddleCategoryNames, type Options } from "@/lib/options";
+import { jobMiddleCategoryNames, namesOf, type Options } from "@/lib/options";
 import type { StudentJobPostingRow as Row } from "@/lib/student-job-postings";
 
 type StudentJobPostingRowProps = {
@@ -20,11 +19,20 @@ type StudentJobPostingRowProps = {
 
 export function StudentJobPostingRow({ jobPosting, options, tag }: StudentJobPostingRowProps) {
   const detailHref = `/student/job_postings/${jobPosting.id}`;
-  // 職種は、主な職種と関連する職種をまとめて並べる
-  const jobCategoryNames = jobMiddleCategoryNames(options.masters.job_major_categories, [
-    ...jobPosting.main_job_middle_category_ids,
-    ...jobPosting.related_job_middle_category_ids,
-  ]);
+  const { masters } = options;
+  // 「業界・事業形態 ／ 職種 ／ 工程」の1行（PR250）。どれも募集の値。
+  // 職種は主な職種と関連する職種を、工程はメインと関われるをまとめて並べる。空のまとまりは飛ばす
+  const summary = [
+    [...namesOf(masters.industries, jobPosting.industry_ids), ...namesOf(masters.business_types, jobPosting.business_type_ids)],
+    jobMiddleCategoryNames(masters.job_major_categories, [
+      ...jobPosting.main_job_middle_category_ids,
+      ...jobPosting.related_job_middle_category_ids,
+    ]),
+    namesOf(masters.work_processes, [...jobPosting.main_work_process_ids, ...jobPosting.involved_work_process_ids]),
+  ]
+    .filter((names) => names.length > 0)
+    .map((names) => names.join("・"))
+    .join(" ／ ");
   const hourlyWage = formatHourlyWage(jobPosting.hourly_wage);
 
   return (
@@ -48,9 +56,7 @@ export function StudentJobPostingRow({ jobPosting, options, tag }: StudentJobPos
             </StatusBadge>
           )}
         </p>
-        {jobCategoryNames.length > 0 && (
-          <p className="text-sm text-muted-foreground">{jobCategoryNames.join("・")}</p>
-        )}
+        {summary !== "" && <p className="text-sm text-muted-foreground">{summary}</p>}
         <p className="text-sm">
           {formatWorkConditions(jobPosting, options)}
           {hourlyWage && ` ・ ${hourlyWage}`}
