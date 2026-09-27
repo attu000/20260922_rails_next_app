@@ -61,7 +61,7 @@ function AxisMarks({ from = 0, to }: { from?: number; to: number }) {
   );
 }
 
-// 左右の短い名前（「スピード」「緻密さ」）と、左右の長い説明。入力と見るだけのグラフで同じ並べ方にする
+// 左右の短い名前（「スピード」「緻密さ」）。入力のスライダーだけで使う
 function AxisLabels({ axis }: { axis: CultureAxis }) {
   return (
     <div className="flex justify-between gap-4 text-sm">
@@ -71,6 +71,7 @@ function AxisLabels({ axis }: { axis: CultureAxis }) {
   );
 }
 
+// 左右の長い説明。入力のスライダーと、見るだけのグラフの両方で使う
 function AxisDescriptions({ axis }: { axis: CultureAxis }) {
   return (
     <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground">
@@ -161,7 +162,9 @@ type CultureAxesViewProps = {
 };
 
 // 見るだけのカルチャーグラフ（募集詳細・学生詳細。ページ設計.md の 6-6 S6、6-5 C6、PR250）。
-// 入力のスライダーと同じ見た目（目盛り・線・両端の短い名前と長い説明）で、値の位置に点を置く。
+// 入力のスライダーと同じ目盛り・線で、値の位置に点を置く。
+// 並びは「軸の名前 → 両端の長い説明 → 線と点」。短い名前（「スピード」など）は出さない。軸の名前・短い名前・長い説明が並ぶとくどいため。
+// 入力のスライダーは、選ぶときの目印として短い名前も出したまま。読み上げの言葉（valueText）では短い名前を使う
 // - compare なし：値の位置に濃い点1つと、真ん中からの線
 // - compare あり：本体の値に白丸、相手の値に黒丸を置き、2点の間に線を引く。
 //   「近い・遠い」や「一致・ずれ」の判定はしない（PR258・PR259）。凡例を上に1行だけ出す
@@ -193,8 +196,9 @@ export function CultureAxesView({ axes, values, compare }: CultureAxesViewProps)
                 ? `${compare.baseLabel}：${valueText(axis, value)}、${compare.label}：${valueText(axis, compareValue)}`
                 : valueText(axis, value)}
             </p>
+            {/* 両端の長い説明は、軸の名前のすぐ下、線より上に置く（説明を読んでから点の位置を見る順にする） */}
+            <AxisDescriptions axis={axis} />
             <div aria-hidden="true" className="space-y-2">
-              <AxisLabels axis={axis} />
               {/* 入力のスライダーと同じく、左右に余白を取り、点の中心を目盛りに重ねる */}
               <div className="flex h-6 items-center px-2.5">
                 <div className={TRACK_CLASS}>
@@ -223,7 +227,6 @@ export function CultureAxesView({ axes, values, compare }: CultureAxesViewProps)
                 </div>
               </div>
             </div>
-            <AxisDescriptions axis={axis} />
           </div>
         );
       })}

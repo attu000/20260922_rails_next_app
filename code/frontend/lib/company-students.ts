@@ -1,5 +1,5 @@
 // 企業から見た学生の型。Rails の app/views/api/company/students/ の JSON と同じ形（design/designs/API設計.md の 16-3 ㉒㉓・形C・形D）。
-// 空欄は null。比較（comparison）と応募理由（candidacy.reasons）は順10 で足す
+// 空欄は null。比較（comparison）と応募理由（candidacy.reasons）は順10 で足した
 
 import { idsFromQuery, monthDateFromQuery, numberFromQuery, type QueryReader } from "@/lib/search-query";
 import type { StudentProfile } from "@/lib/student-profile";
@@ -19,11 +19,61 @@ export type CompanyJobPostingState = {
     status: string;
     // 企業から見たタグ（"pending_application" など）。Rails が計算する。表示名は ⑦ の enums.candidacy_tag
     tag: string;
+    // 応募理由・マッチ理由の英語の名前（"business" など）。表示名は ⑦ の enums.candidacy_reason。
+    // スカウトしただけでまだマッチしていなければ空（マッチ理由は、学生がマッチしたときに選ぶ）
+    reasons: string[];
     matched_at: string | null;
   } | null;
   // 今押せるボタンの名前（"match" など）。判定は Rails が行い、画面はここにあるボタンだけを出す（16-1-9）。
   // 今は "scout" と "match"。"decline"・"undo_decline"・"pass"・"fail" は順11 で Rails が返すようになる
   available_actions: string[];
+};
+
+// 番号の重なり（業界・職種・使用技術）。両方にある番号の一覧。どちらかが空なら null（画面は「未入力」と出す）
+export type MatchedIds = { matched: number[] } | null;
+
+// 稼働条件の項目の名前。並びは Rails が返す順（その他決め事.md の 5-6）
+export type WorkConditionItem =
+  | "work_days_per_week"
+  | "work_hours_per_day"
+  | "duration_months"
+  | "start_month"
+  | "work_style"
+  | "work_location";
+
+// 学生と募集の比較（㉓ の comparison。順10）。判定は Rails が行い、画面は結果を見て色を付けるだけ（16-1-9）
+export type StudentJobPostingComparison = {
+  // 右の列に出す募集の値。職種はメインとサブを1つにまとめたもの
+  job_posting: {
+    industry_ids: number[];
+    job_middle_category_ids: number[];
+    technology_ids: number[];
+    min_work_days_per_week: number | null;
+    min_work_hours_per_day: number | null;
+    min_duration_months: number | null;
+    // 月の1日の日付（"2026-11-01"）。null は随時
+    start_month: string | null;
+    // "onsite" など
+    work_style: string | null;
+    prefecture_id: number | null;
+    // カルチャーの5軸（−2〜2）。学生の働き方の好み（黒丸）と重ねる白丸に使う
+    culture_pace: number;
+    culture_novelty: number;
+    culture_collaboration: number;
+    culture_decision: number;
+    culture_atmosphere: number;
+  };
+  industry_ids: MatchedIds;
+  job_middle_category_ids: MatchedIds;
+  technology_ids: MatchedIds;
+  // "match"（一致）／"mismatch"（不一致）／"not_judged"（どちらかが未入力）
+  work_conditions: { item: WorkConditionItem; result: "match" | "mismatch" | "not_judged" }[];
+};
+
+// ㉓ 学生詳細の募集1件：形D に比較を加えたもの。
+// 比較はこの窓口だけが返す（スカウト・マッチの返事の形D には入らない。スカウトやマッチをしても比較は変わらないため）
+export type CompanyStudentJobPosting = CompanyJobPostingState & {
+  comparison: StudentJobPostingComparison;
 };
 
 // ㉓ 学生詳細
@@ -34,7 +84,7 @@ export type CompanyStudentDetail = {
   // true なら「この学生とのメッセージ」のボタンを出す（PR213）
   has_message_thread: boolean;
   // 自社の全募集（非公開・終了も含む。最終更新の新しい順）
-  job_postings: CompanyJobPostingState[];
+  job_postings: CompanyStudentJobPosting[];
 };
 
 // 形C：企業向けの学生の行（㉒ 学生検索）。スカウトするかどうかの判断に使う情報だけ。

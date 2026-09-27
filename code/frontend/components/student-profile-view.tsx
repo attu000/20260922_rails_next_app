@@ -32,8 +32,9 @@ function formatSkill(skill: StudentSkill, options: Options): string {
   return details.length > 0 ? `${name}　${details.join("・")}` : name;
 }
 
-// できる勤務形態（可能にしているものだけ）。表示名は ⑦ の enums.work_style
-function workStyleNames(student: StudentProfile, options: Options): string[] {
+// できる勤務形態（可能にしているものだけ）。表示名は ⑦ の enums.work_style。
+// 学生詳細の比較（components/company-student-comparison.tsx）でも、同じ書き方にするために使う
+export function workStyleNames(student: StudentProfile, options: Options): string[] {
   const styles = [
     student.can_full_remote ? "full_remote" : null,
     student.can_partial_remote ? "partial_remote" : null,
