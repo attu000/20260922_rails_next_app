@@ -1,15 +1,15 @@
 "use client";
 
-// 学生詳細（C6）の中身。詳しくは design/designs/ページ設計.md の 6-5 C6、API設計.md の 16-3 ㉓㉔㉖。
+// 学生詳細（C6）の中身。詳しくは design/designs/ページ設計.md の 6-5 C6、API設計.md の 16-3 ㉓㉔㉖〜㉚。
 // 開いたら ㉓ 学生詳細と ⑦ 選択肢を取り、学生の名前、募集の選択欄、選んだ募集での状態とボタン、
 // 応募理由・マッチ理由と募集との比較（順10。components/company-student-comparison.tsx）、学生のプロフィールを並べる。
 // 最初に選ぶ募集は URL の ?job_posting_id=（候補者一覧から来たときはその募集）。なければ先頭の募集。
 // 募集名は長く、横に並べると折り返すので、タブではなく選択欄で選ぶ（PR267）。
 // ボタンは Rails が返す available_actions だけに従う。画面側では状態から組み立てない（16-1-9）。
+// やりとりを変えるボタン（マッチする・見送る・見送りを取り消す・合格・不合格）は、すべて確認のポップアップを挟む（順11）。
 // 「この学生とのメッセージ」は、募集の選択欄の外（名前の横）に、Rails の has_message_thread が true のときだけ出す（PR213）。
 // 次のものは、それを作る順で足す
 //   - 送信後の「この学生に似た学生」のポップアップ：順14
-//   - 見送る・見送りを取り消す・合格・不合格：順11
 //   - 最終活動の目安：【仕上げ】
 
 import { useState } from "react";
@@ -51,7 +51,7 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
   // URL の [id] の部分は利用者が書き換えられるので、符号化してから入れる。
   // mutate：覚えている中身を書き換える・取り直す関数（マッチ・スカウトのあとに使う）
   const { data, error, mutate } = useApi<Detail>(`/api/company/students/${encodeURIComponent(studentId)}`);
-  // マッチ・スカウトができなかったときの一言（「この操作は今はできません…」など）。取り直して状態が変わっても出したままにする
+  // 操作ができなかったときの一言（「この操作は今はできません…」など）。取り直して状態が変わっても出したままにする
   const [message, setMessage] = useState<string | null>(null);
 
   if (optionsFailed) {
@@ -79,8 +79,8 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
     });
   }
 
-  // マッチ・スカウトができたら、返ってきた「その募集の状態」で、そのタブの中身だけを書き換える（取り直しはしない）。
-  // 返事（形D）には比較が入っていないので、丸ごと置き換えず、元の中身に重ねる（比較はスカウト・マッチでは変わらない）
+  // スカウト・マッチ・見送りなどができたら、返ってきた「その募集の状態」で、選んだ募集の中身だけを書き換える（取り直しはしない）。
+  // 返事（形D）には比較が入っていないので、丸ごと置き換えず、元の中身に重ねる（比較はこれらの操作では変わらない）
   function handleStateChanged(state: CompanyJobPostingState) {
     if (!data) return;
     setMessage(null);
@@ -95,7 +95,7 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
     );
   }
 
-  // マッチ・スカウトができなかったら（409 など）、一言を出し、取り直して最新の状態にする
+  // スカウト・マッチ・見送りなどができなかったら（409 など）、一言を出し、取り直して最新の状態にする
   function handleFailed(failedMessage: string) {
     setMessage(failedMessage);
     void mutate();
@@ -199,9 +199,9 @@ type JobPostingPanelProps = {
   studentId: string;
   studentName: string;
   options: Options;
-  // マッチ・スカウトができたとき。返ってきた「その募集の状態」を渡す
+  // 操作ができたとき。返ってきた「その募集の状態」を渡す
   onStateChanged: (state: CompanyJobPostingState) => void;
-  // マッチ・スカウトができなかったとき。message は画面に出す一言
+  // 操作ができなかったとき。message は画面に出す一言
   onFailed: (message: string) => void;
 };
 
@@ -209,6 +209,10 @@ type JobPostingPanelProps = {
 // 募集名と募集の状態は、すぐ上の選択欄に出ているので、ここでは繰り返さない（PR268）
 function JobPostingPanel({ state, studentId, studentName, options, onStateChanged, onFailed }: JobPostingPanelProps) {
   const { candidacy } = state;
+  // やりとりを変えるボタンのうち、Rails が「今押せる」と返したもの（やりとりがあるときだけ）
+  const candidacyActions =
+    candidacy === null ? [] : CANDIDACY_ACTIONS.filter(({ action }) => state.available_actions.includes(action));
+  const canScout = state.available_actions.includes("scout");
 
   return (
     <div className="space-y-3">
@@ -224,59 +228,130 @@ function JobPostingPanel({ state, studentId, studentName, options, onStateChange
         </div>
       )}
 
-      {/* ボタンは available_actions にあるものだけ。順11 で見送る・合格・不合格などが増える */}
-      {state.available_actions.includes("scout") && (
-        <ScoutDialog
-          jobPostingId={state.id}
-          jobPostingTitle={state.title}
-          studentId={studentId}
-          studentName={studentName}
-          onScouted={onStateChanged}
-          onFailed={onFailed}
-        />
-      )}
-      {candidacy !== null && state.available_actions.includes("match") && (
-        <MatchDialog
-          candidacyId={candidacy.id}
-          studentName={studentName}
-          jobPostingTitle={state.title}
-          onMatched={onStateChanged}
-          onFailed={onFailed}
-        />
+      {/* ボタンは available_actions にあるものだけ。並びは Rails と同じ */}
+      {(canScout || candidacyActions.length > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {canScout && (
+            <ScoutDialog
+              jobPostingId={state.id}
+              jobPostingTitle={state.title}
+              studentId={studentId}
+              studentName={studentName}
+              onScouted={onStateChanged}
+              onFailed={onFailed}
+            />
+          )}
+          {candidacy !== null &&
+            candidacyActions.map((candidacyAction) => (
+              <CandidacyActionDialog
+                key={candidacyAction.action}
+                candidacyAction={candidacyAction}
+                candidacyId={candidacy.id}
+                studentName={studentName}
+                jobPostingTitle={state.title}
+                onDone={onStateChanged}
+                onFailed={onFailed}
+              />
+            ))}
+        </div>
       )}
     </div>
   );
 }
 
-type MatchDialogProps = {
+// やりとりを変えるボタンの中身。
+// action はボタンの名前（available_actions の値）で、送り先の URL の最後の部分と同じ（/api/company/candidacies/:id/decline など）
+type CandidacyAction = {
+  action: "match" | "decline" | "undo_decline" | "pass" | "fail";
+  // ボタンと、ポップアップの「する」ボタンの文字
+  label: string;
+  // ポップアップの見出しと説明
+  title: (studentName: string) => string;
+  description: (jobPostingTitle: string) => string;
+  // 塗りつぶしのボタンにするか（「マッチする」だけ。ほかは枠線だけ）
+  primary: boolean;
+};
+
+// 並びは Rails の available_actions と同じ（match、decline、undo_decline、pass、fail）。
+// 見送り・合格・不合格は学生に見せない（その他決め事.md の 5-1）ので、そのことを説明に添える
+const CANDIDACY_ACTIONS: CandidacyAction[] = [
+  {
+    action: "match",
+    label: "マッチする",
+    title: (studentName) => `${studentName}さんとマッチしますか？`,
+    // マッチは取り消せない（マッチ以降は未マッチ・見送りに戻せない。権限_バリデーション.md の 17-2-1。PR210）
+    description: (jobPostingTitle) => `募集「${jobPostingTitle}」への応募にマッチします。マッチは取り消せません。`,
+    primary: true,
+  },
+  {
+    action: "decline",
+    label: "見送る",
+    title: (studentName) => `${studentName}さんを見送りますか？`,
+    description: (jobPostingTitle) =>
+      `募集「${jobPostingTitle}」でのやりとりを見送りにします。学生には知らされません。あとで取り消せます。`,
+    primary: false,
+  },
+  {
+    action: "undo_decline",
+    label: "見送りを取り消す",
+    title: (studentName) => `${studentName}さんの見送りを取り消しますか？`,
+    description: (jobPostingTitle) => `募集「${jobPostingTitle}」でのやりとりを、見送る前の状態に戻します。`,
+    primary: false,
+  },
+  {
+    action: "pass",
+    label: "合格として保存",
+    title: (studentName) => `${studentName}さんを合格として保存しますか？`,
+    description: (jobPostingTitle) => `募集「${jobPostingTitle}」の結果を合格にします。学生には知らされません。`,
+    primary: false,
+  },
+  {
+    action: "fail",
+    label: "不合格として保存",
+    title: (studentName) => `${studentName}さんを不合格として保存しますか？`,
+    description: (jobPostingTitle) => `募集「${jobPostingTitle}」の結果を不合格にします。学生には知らされません。`,
+    primary: false,
+  },
+];
+
+type CandidacyActionDialogProps = {
+  candidacyAction: CandidacyAction;
   candidacyId: number;
   studentName: string;
   jobPostingTitle: string;
-  onMatched: (state: CompanyJobPostingState) => void;
+  onDone: (state: CompanyJobPostingState) => void;
   onFailed: (message: string) => void;
 };
 
-// 「マッチする」のボタンと、確認のポップアップ（PR210）。
-// マッチは取り消せない（マッチ以降は未マッチ・見送りに戻せない。権限_バリデーション.md の 17-2-1）ので、押し間違いを防ぐ
-function MatchDialog({ candidacyId, studentName, jobPostingTitle, onMatched, onFailed }: MatchDialogProps) {
+// やりとりを変えるボタンと、確認のポップアップ（㉖〜㉚）。
+// マッチは取り消せないので押し間違いを防ぐため（PR210）、ほかの4つも念のため、すべて確認を挟む（順11）
+function CandidacyActionDialog({
+  candidacyAction,
+  candidacyId,
+  studentName,
+  jobPostingTitle,
+  onDone,
+  onFailed,
+}: CandidacyActionDialogProps) {
   const redirectIfUnauthorized = useRedirectIfUnauthorized();
   const [open, setOpen] = useState(false);
   // 送っている途中か。2回押しても、1回だけ送る。ボタンは押せなくしない（権限_バリデーション.md の 17-3-2）
   const [submitting, setSubmitting] = useState(false);
+  const { action, label, title, description, primary } = candidacyAction;
 
   async function handleConfirm() {
     if (submitting) return;
     setSubmitting(true);
     try {
-      // ㉖ マッチする。返事は、その募集の状態（形D）
-      const state = await apiFetch<CompanyJobPostingState>(`/api/company/candidacies/${candidacyId}/match`, {
+      // 返事は、操作したあとの、その募集の状態（形D）
+      const state = await apiFetch<CompanyJobPostingState>(`/api/company/candidacies/${candidacyId}/${action}`, {
         method: "POST",
       });
       setOpen(false);
-      onMatched(state);
+      onDone(state);
     } catch (error) {
       if (redirectIfUnauthorized(error)) return;
-      // 今の状態ではできない（409。別のタブでマッチ済み、募集が終了した、など）ほかは、閉じて一言を出し、取り直す
+      // 今の状態ではできない（409。別のタブで操作済み、募集が終了した、など）ほかは、閉じて一言を出し、取り直す
       setOpen(false);
       onFailed(error instanceof ApiError ? error.message : FALLBACK_ERROR_MESSAGE);
     } finally {
@@ -286,18 +361,16 @@ function MatchDialog({ candidacyId, studentName, jobPostingTitle, onMatched, onF
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger className={buttonVariants()}>マッチする</DialogTrigger>
+      <DialogTrigger className={buttonVariants({ variant: primary ? "default" : "outline" })}>{label}</DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{studentName}さんとマッチしますか？</DialogTitle>
-          <DialogDescription>
-            募集「{jobPostingTitle}」への応募にマッチします。マッチは取り消せません。
-          </DialogDescription>
+          <DialogTitle>{title(studentName)}</DialogTitle>
+          <DialogDescription>{description(jobPostingTitle)}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
           <DialogClose render={<Button type="button" variant="outline" />}>キャンセル</DialogClose>
           <Button type="button" onClick={handleConfirm}>
-            {submitting ? "送信中…" : "マッチする"}
+            {submitting ? "送信中…" : label}
           </Button>
         </DialogFooter>
       </DialogContent>

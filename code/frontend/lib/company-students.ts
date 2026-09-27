@@ -24,8 +24,8 @@ export type CompanyJobPostingState = {
     reasons: string[];
     matched_at: string | null;
   } | null;
-  // 今押せるボタンの名前（"match" など）。判定は Rails が行い、画面はここにあるボタンだけを出す（16-1-9）。
-  // 今は "scout" と "match"。"decline"・"undo_decline"・"pass"・"fail" は順11 で Rails が返すようになる
+  // 今押せるボタンの名前。判定は Rails が行い、画面はここにあるボタンだけを出す（16-1-9）。
+  // "scout"・"match"・"decline"・"undo_decline"・"pass"・"fail" のどれか（並びもこの順）
   available_actions: string[];
 };
 
