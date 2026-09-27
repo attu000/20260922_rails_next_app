@@ -10,6 +10,8 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
   let!(:other_technology) { create(:technology) }
   let!(:middle_a) { create(:job_middle_category) }
   let!(:middle_b) { create(:job_middle_category) }
+  let!(:industry_a) { create(:industry) }
+  let!(:industry_b) { create(:industry) }
   let!(:prefecture) { create(:prefecture) }
   let!(:university) { create(:university) }
   let!(:department) { create(:department) }
@@ -59,6 +61,7 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
     it "自分のプロフィールを、決めた形で返す" do
       profile.update!(grade: :undergrad_3, available_from: Date.new(2026, 11, 1))
       profile.interested_job_middle_categories << middle_a
+      profile.interested_industries << industry_a
       profile.student_skills.create!(technology: technology, years: 1.5, level: :v2)
       log_in_as(student_user)
 
@@ -74,7 +77,7 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
         "can_full_remote", "can_partial_remote", "can_onsite", "work_note",
         "personality_pace", "personality_novelty", "personality_collaboration",
         "personality_decision", "personality_atmosphere",
-        "interested_job_middle_category_ids", "commutable_prefecture_ids", "skills", "icon_url"
+        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids", "skills", "icon_url"
       )
       expect(body["name"]).to eq("テスト 太郎")
       expect(body["grade"]).to eq("undergrad_3")
@@ -83,6 +86,7 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
       # 勤務形態の3つは、初期状態で「可能」
       expect(body.values_at("can_full_remote", "can_partial_remote", "can_onsite")).to eq([ true, true, true ])
       expect(body["interested_job_middle_category_ids"]).to eq([ middle_a.id ])
+      expect(body["interested_industry_ids"]).to eq([ industry_a.id ])
       # 年数は文字列（"1.5"）ではなく数値で返す（16-1-8）
       expect(body["skills"]).to eq([
         { "technology_id" => technology.id, "other_name" => nil, "years" => 1.5, "level" => "v2" }
@@ -94,8 +98,9 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
   describe "⑯ 保存" do
     before { log_in_as(student_user) }
 
-    it "全項目を保存でき、⑮と同じ形で返す。職種・都道府県・プログラミング歴は送った内容に置き換わる" do
+    it "全項目を保存でき、⑮と同じ形で返す。職種・業界・都道府県・プログラミング歴は送った内容に置き換わる" do
       profile.interested_job_middle_categories << middle_a
+      profile.interested_industries << industry_a
       profile.student_skills.create!(technology: other_technology, level: :v4)
 
       patch_profile(
@@ -120,6 +125,7 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
         can_onsite: false,
         work_note: "テスト期間は減らしたい",
         interested_job_middle_category_ids: [ middle_b.id ],
+        interested_industry_ids: [ industry_b.id ],
         commutable_prefecture_ids: [ prefecture.id ],
         skills: [
           { technology_id: technology.id, other_name: nil, years: 1.5, level: "v2" },
@@ -131,6 +137,7 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
       body = response.parsed_body
       expect(body["name"]).to eq("新しい 名前")
       expect(body["interested_job_middle_category_ids"]).to eq([ middle_b.id ])
+      expect(body["interested_industry_ids"]).to eq([ industry_b.id ])
       # 送った順のまま返る
       expect(body["skills"]).to eq([
         { "technology_id" => technology.id, "other_name" => nil, "years" => 1.5, "level" => "v2" },
@@ -286,13 +293,14 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
       expect(response.parsed_body["errors"]).to have_key("available_from")
     end
 
-    it "存在しない大学・職種の番号なら、404 ではなく 422" do
-      patch_with_required(university_id: 0, interested_job_middle_category_ids: [ 0 ])
+    it "存在しない大学・職種・業界の番号なら、404 ではなく 422" do
+      patch_with_required(university_id: 0, interested_job_middle_category_ids: [ 0 ], interested_industry_ids: [ 0 ])
 
       expect(response).to have_http_status(:unprocessable_content)
       errors = response.parsed_body["errors"]
       expect(errors["university_id"]).to eq([ "大学は一覧にありません" ])
       expect(errors["interested_job_middle_category_ids"]).to eq([ "興味のある職種に選べない値が含まれています" ])
+      expect(errors["interested_industry_ids"]).to eq([ "興味のある業界に選べない値が含まれています" ])
     end
 
     it "稼働条件の数値が選択肢にない値なら 422" do

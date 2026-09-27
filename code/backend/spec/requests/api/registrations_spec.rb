@@ -87,12 +87,14 @@ RSpec.describe "新規登録（/api/company_registrations・/api/student_registr
   describe "⑥ 学生の新規登録" do
     it "201 と形A を返し、ログインした状態になる。プロフィールと付属情報も作る" do
       middle = create(:job_middle_category)
+      industry = create(:industry)
       prefecture = create(:prefecture)
       technology = create(:technology)
 
       register("/api/student_registrations",
                account.merge(name: "山田 太郎", activity_status: "job_hunting", grade: "undergrad_3",
                              interested_job_middle_category_ids: [ middle.id ],
+                             interested_industry_ids: [ industry.id ],
                              commutable_prefecture_ids: [ prefecture.id ],
                              skills: [ { technology_id: technology.id, other_name: nil, years: 1.5, level: "v2" } ]))
 
@@ -101,6 +103,7 @@ RSpec.describe "新規登録（/api/company_registrations・/api/student_registr
       profile = StudentProfile.sole
       expect(profile).to have_attributes(activity_status: "job_hunting", grade: "undergrad_3")
       expect(profile.interested_job_middle_categories).to eq([ middle ])
+      expect(profile.interested_industries).to eq([ industry ])
       expect(profile.commutable_prefectures).to eq([ prefecture ])
       expect(profile.student_skills.sole).to have_attributes(technology_id: technology.id, level: "v2")
 
