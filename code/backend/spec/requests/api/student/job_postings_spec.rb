@@ -47,7 +47,9 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
       item = response.parsed_body["items"].first
       expect(item.keys).to contain_exactly(
         "id", "title", "is_open", "company",
+        "industry_ids", "business_type_ids",
         "main_job_middle_category_ids", "related_job_middle_category_ids",
+        "main_work_process_ids", "involved_work_process_ids",
         "prefecture_id", "work_style", "hourly_wage",
         "min_work_days_per_week", "min_work_hours_per_day", "min_duration_months",
         "published_at", "matched"
@@ -94,6 +96,21 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
       end
     end
 
+    # 順9 で足した条件。合う・合わないの細かい場合分けは spec/services/job_posting_search_spec.rb で確かめる
+    it "「企画・設計から関われる」を送ると、対象の工程を持つ募集が合致の群に入る" do
+      planning_process = create(:work_process, planning: true)
+      with_planning = create_posting(published_at: 2.hours.ago)
+      with_planning.job_posting_work_processes.create!(work_process: planning_process, role: :involved)
+      without_planning = create_posting(published_at: 1.hour.ago)
+
+      get "/api/student/job_postings", params: { planning: true, sort: "newest" }
+
+      items = response.parsed_body["items"]
+      expect(items.map { |item| item["id"] }).to eq([ with_planning.id, without_planning.id ])
+      expect(items.map { |item| item["matched"] }).to eq([ true, false ])
+      expect(items.first["involved_work_process_ids"]).to eq([ planning_process.id ])
+    end
+
     it "ページ番号が数でなければ、1ページ目を返す" do
       create_posting
 
@@ -133,7 +150,10 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         "min_work_days_per_week", "min_work_hours_per_day", "min_duration_months", "start_month",
         "work_style", "work_style_note", "prefecture_id", "work_location_note", "weekend_ok", "work_note",
         "hourly_wage", "requirements", "preferred_requirements", "technology_note",
-        "main_job_middle_category_ids", "related_job_middle_category_ids", "technology_ids",
+        "main_job_middle_category_ids", "related_job_middle_category_ids",
+        "main_work_process_ids", "involved_work_process_ids", "technology_ids",
+        "industry_ids", "business_type_ids",
+        "culture_pace", "culture_novelty", "culture_collaboration", "culture_decision", "culture_atmosphere",
         "published_at", "my_status", "my_candidacy_id", "has_message_thread"
       )
       expect(body).to include(
@@ -164,6 +184,29 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
       get "/api/student/job_postings/#{posting.id}"
 
       expect(response.parsed_body["about"]).to be_nil
+    end
+
+    # 順9 で足した項目
+    it "工程・業界・事業形態・カルチャーの値を返す。業界・事業形態は、募集が空なら企業プロフィールの値で補わない" do
+      company.industries << create(:industry)
+      process = create(:work_process)
+      business_type = create(:business_type)
+      posting = create_posting(culture_pace: -2, culture_atmosphere: 1)
+      posting.job_posting_work_processes.create!(work_process: process, role: :main)
+      posting.business_types << business_type
+
+      get "/api/student/job_postings/#{posting.id}"
+
+      body = response.parsed_body
+      expect(body).to include(
+        "main_work_process_ids" => [ process.id ],
+        "involved_work_process_ids" => [],
+        "industry_ids" => [],
+        "business_type_ids" => [ business_type.id ],
+        "culture_pace" => -2,
+        "culture_novelty" => 0,
+        "culture_atmosphere" => 1
+      )
     end
 
     # 必須テスト：関係のない学生は、掲載中でない募集を開けない（16-1-10）。

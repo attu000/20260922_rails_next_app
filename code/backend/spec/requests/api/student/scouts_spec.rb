@@ -72,7 +72,9 @@ RSpec.describe "スカウト管理（/api/student/scouts）", type: :request do
       item = response.parsed_body["items"].sole
       expect(item.keys).to contain_exactly(
         "id", "title", "is_open", "company",
+        "industry_ids", "business_type_ids",
         "main_job_middle_category_ids", "related_job_middle_category_ids",
+        "main_work_process_ids", "involved_work_process_ids",
         "prefecture_id", "work_style", "hourly_wage",
         "min_work_days_per_week", "min_work_hours_per_day", "min_duration_months",
         "published_at", "candidacy_id", "my_status"

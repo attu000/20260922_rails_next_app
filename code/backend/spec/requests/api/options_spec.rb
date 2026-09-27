@@ -135,7 +135,7 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
   end
 
   # 順9（性格・カルチャー・工程の入力）で足した選択肢
-  describe "性格・カルチャーの5軸" do
+  describe "性格・カルチャーの5軸と工程" do
     it "5軸を決めた順で、名前と両端の短い名前・説明とともに返す" do
       get "/api/options"
 
@@ -149,6 +149,18 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
         "right_label" => "緻密さ",
         "right_description" => "仕様や設計を固めてから作り始める"
       )
+    end
+
+    it "工程を表示順で、番号・名前・planning の3つだけ返す（共通段階と大分類の対応は返さない。PR239・PR240）" do
+      implementation = create(:work_process, name: "実装", planning: false, position: 2)
+      design = create(:work_process, name: "設計", planning: true, position: 1)
+
+      get "/api/options"
+
+      expect(response.parsed_body["masters"]["work_processes"]).to eq([
+        { "id" => design.id, "name" => "設計", "planning" => true },
+        { "id" => implementation.id, "name" => "実装", "planning" => false }
+      ])
     end
   end
 

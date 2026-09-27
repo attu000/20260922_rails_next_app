@@ -168,6 +168,27 @@ RSpec.describe JobPostingSearch do
     end
   end
 
+  # 順9 で足した条件
+  describe "④ 企画・設計から関われる" do
+    it "対象の工程をメインか関われるに持つ募集が合う。対象外の工程だけ・工程なしの募集は合わない。false なら条件にしない" do
+      design = create(:work_process, name: "設計", planning: true)
+      implementation = create(:work_process, name: "実装", planning: false)
+      as_main = create_posting.tap { |p| p.job_posting_work_processes.create!(work_process: design, role: :main) }
+      as_involved = create_posting.tap do |p|
+        p.job_posting_work_processes.create!(work_process: implementation, role: :main)
+        p.job_posting_work_processes.create!(work_process: design, role: :involved)
+      end
+      only_implementation = create_posting.tap do |p|
+        p.job_posting_work_processes.create!(work_process: implementation, role: :main)
+      end
+      no_process = create_posting
+
+      expect(matched_ids(planning: "true")).to contain_exactly(as_main.id, as_involved.id)
+      expect(matched_ids(planning: "false"))
+        .to contain_exactly(as_main.id, as_involved.id, only_implementation.id, no_process.id)
+    end
+  end
+
   describe "③ 稼働条件（PR200）" do
     # 学生が「3まで」を選ぶと、募集の下限が3以下なら合う。空欄は合わない。
     # 募集の値は、それぞれの選択肢の中から、3より小さい・3・3より大きいものを使う（継続期間の選択肢に2はない）

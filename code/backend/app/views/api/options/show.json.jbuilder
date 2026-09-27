@@ -80,6 +80,9 @@ json.masters do
     json.extract! major, :id, :code, :name, :description
     json.job_middle_categories major.job_middle_categories, :id, :code, :name, :description
   end
+  # 工程（上流 → 下流の表示順）。planning は「企画・設計から関われる」の対象か。
+  # 共通段階と職種の大分類との対応は持たないので返さない（PR239・PR240）
+  json.work_processes @work_processes, :id, :name, :planning
   json.technologies @technologies, :id, :name, :category
   json.industries @industries, :id, :name
   json.business_types @business_types, :id, :name

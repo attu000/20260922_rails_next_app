@@ -10,6 +10,8 @@ module Api
     def show
       # 大分類の中に中分類を入れて返すので、中分類もまとめて読む（N+1問題を避ける。Django の prefetch_related にあたる）
       @job_major_categories = JobMajorCategory.ordered.includes(:job_middle_categories)
+      # 工程（上流 → 下流の表示順）
+      @work_processes = WorkProcess.ordered
       @technologies = Technology.ordered
       @industries = Industry.ordered
       @business_types = BusinessType.ordered

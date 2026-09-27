@@ -3,9 +3,12 @@
 module Api
   module Student
     class JobPostingsController < BaseController
-      # 学生向けの募集の行（形B）を出すときに、まとめて読み込む関連（会社とそのアイコン、職種）。
-      # 企業詳細（companies_controller.rb）の募集一覧でも使う
-      ROW_ASSOCIATIONS = [ { company_profile: { icon_attachment: :blob } }, :job_posting_job_categories ].freeze
+      # 学生向けの募集の行（形B）を出すときに、まとめて読み込む関連（会社とそのアイコン、職種、工程、業界、事業形態）。
+      # 企業詳細・募集管理・スカウト管理の募集の行でも使う
+      ROW_ASSOCIATIONS = [
+        { company_profile: { icon_attachment: :blob } },
+        :job_posting_job_categories, :job_posting_work_processes, :industries, :business_types
+      ].freeze
 
       # ⑱ 募集検索。条件で結果を減らさず、合致の群を先に並べて返す（処理設計_類似度.md の 7-3）。
       # 検索の本体は app/services/job_posting_search.rb。
@@ -41,6 +44,8 @@ module Api
         params.permit(:q, :sort,
                       # 稼働条件（PR200）
                       :work_days_per_week, :work_hours_per_day, :duration_months, :available_from, :weekend_ok,
+                      # 企画・設計から関われる（順9）
+                      :planning,
                       prefecture_ids: [], job_major_category_ids: [], job_middle_category_ids: [],
                       technology_ids: [], work_styles: [])
       end

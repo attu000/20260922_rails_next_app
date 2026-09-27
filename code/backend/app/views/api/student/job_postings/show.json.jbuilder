@@ -3,7 +3,8 @@
 # 次のものは、それを作る順で足す（PR189）
 #   - 自分の状態（my_status、my_candidacy_id）：順5（済み）
 #   - その企業とのスレッドがあるか（has_message_thread）：順6（済み）
-#   - 業界・事業形態・工程、カルチャーの5つと自分の性格との比較（culture_comparison）：順9・順10
+#   - 業界・事業形態・工程、カルチャーの5つ：順9（済み）
+#   - カルチャーと自分の働き方の好みとの比較（culture_comparison）：順10
 
 company = @job_posting.company_profile
 
@@ -28,7 +29,12 @@ json.extract! @job_posting,
               :min_work_days_per_week, :min_work_hours_per_day, :min_duration_months, :start_month,
               :work_style, :work_style_note, :prefecture_id, :work_location_note, :weekend_ok, :work_note,
               :hourly_wage, :requirements, :preferred_requirements, :technology_note,
-              # 職種は「主な／関連する」で配列を分けて返す（⑫と同じ名前）
+              # 職種と工程は「主な／関連する」「メインで担当する／関われる」で配列を分けて返す（⑫と同じ名前）
               :main_job_middle_category_ids, :related_job_middle_category_ids,
+              :main_work_process_ids, :involved_work_process_ids,
               :technology_ids,
+              # その募集の業界・事業形態。どんな会社か・事業内容と違い、空欄でも企業プロフィールの値で補わない（その他決め事.md の 5-8）
+              :industry_ids, :business_type_ids,
+              # カルチャーの5軸（カルチャーグラフ）。−2〜2 の数値
+              :culture_pace, :culture_novelty, :culture_collaboration, :culture_decision, :culture_atmosphere,
               :published_at

@@ -55,7 +55,11 @@ module Api
           :min_work_days_per_week, :min_work_hours_per_day, :min_duration_months, :start_month,
           :work_style, :work_style_note, :prefecture_id, :work_location_note, :weekend_ok, :work_note,
           :hourly_wage, :requirements, :preferred_requirements, :technology_note,
-          main_job_middle_category_ids: [], related_job_middle_category_ids: [], technology_ids: []
+          # カルチャーの5軸
+          :culture_pace, :culture_novelty, :culture_collaboration, :culture_decision, :culture_atmosphere,
+          main_job_middle_category_ids: [], related_job_middle_category_ids: [],
+          main_work_process_ids: [], involved_work_process_ids: [],
+          technology_ids: [], industry_ids: [], business_type_ids: []
         )
       end
     end

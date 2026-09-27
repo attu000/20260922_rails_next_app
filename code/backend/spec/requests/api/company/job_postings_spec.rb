@@ -94,7 +94,10 @@ RSpec.describe "企業の募集（/api/company/job_postings）", type: :request 
         "min_work_days_per_week", "min_work_hours_per_day", "min_duration_months", "start_month",
         "work_style", "work_style_note", "prefecture_id", "work_location_note", "weekend_ok", "work_note",
         "hourly_wage", "requirements", "preferred_requirements", "technology_note",
-        "main_job_middle_category_ids", "related_job_middle_category_ids", "technology_ids",
+        "culture_pace", "culture_novelty", "culture_collaboration", "culture_decision", "culture_atmosphere",
+        "main_job_middle_category_ids", "related_job_middle_category_ids",
+        "main_work_process_ids", "involved_work_process_ids",
+        "technology_ids", "industry_ids", "business_type_ids",
         "updated_at"
       )
       expect(body["status"]).to eq("unpublished")
@@ -145,6 +148,35 @@ RSpec.describe "企業の募集（/api/company/job_postings）", type: :request 
       expect(job_posting.technology_ids).to eq([ technology_a.id ])
       expect(job_posting.prefecture).to eq(prefecture)
       expect(response.parsed_body["start_month"]).to eq("2026-10-01")
+    end
+
+    # 順9 で足した項目
+    it "カルチャー・工程・業界・事業形態も保存でき、返事にも入る" do
+      main_process = create(:work_process)
+      involved_process = create(:work_process)
+      industry = create(:industry)
+      business_type = create(:business_type)
+
+      post_job_posting(published_params.merge(
+        culture_pace: -2, culture_novelty: -1, culture_collaboration: 0, culture_decision: 1, culture_atmosphere: 2,
+        main_work_process_ids: [ main_process.id ],
+        involved_work_process_ids: [ involved_process.id ],
+        industry_ids: [ industry.id ],
+        business_type_ids: [ business_type.id ]
+      ))
+
+      expect(response).to have_http_status(:created)
+      body = response.parsed_body
+      expect(body.values_at(
+        "culture_pace", "culture_novelty", "culture_collaboration", "culture_decision", "culture_atmosphere"
+      )).to eq([ -2, -1, 0, 1, 2 ])
+      expect(body["main_work_process_ids"]).to eq([ main_process.id ])
+      expect(body["involved_work_process_ids"]).to eq([ involved_process.id ])
+      expect(body["industry_ids"]).to eq([ industry.id ])
+      expect(body["business_type_ids"]).to eq([ business_type.id ])
+      job_posting = JobPosting.last
+      expect(job_posting.main_work_process_ids).to eq([ main_process.id ])
+      expect(job_posting.industry_ids).to eq([ industry.id ])
     end
 
     it "掲載中なのに、インターンですること・時給が空なら 422（掲載に必要）" do
@@ -274,6 +306,18 @@ RSpec.describe "企業の募集（/api/company/job_postings）", type: :request 
       expect(response.parsed_body["errors"]["related_job_middle_category_ids"])
         .to eq([ "関連する職種に、主な職種と同じものが含まれています" ])
       expect(job_posting.reload.main_job_middle_category_ids).to eq([ middle_c.id ])
+    end
+
+    # 画面では1つの工程にメインか関われるの片方しか付けられないので、画面を通さずに呼ばれたときの備え（PR242）
+    it "メインと関われるに同じ工程があれば 422。工程は変わらない" do
+      process = create(:work_process)
+
+      patch_job_posting(job_posting, main_work_process_ids: [ process.id ], involved_work_process_ids: [ process.id ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]["involved_work_process_ids"])
+        .to eq([ "関われる工程に、メインで担当する工程と同じものが含まれています" ])
+      expect(job_posting.reload.job_posting_work_processes).to be_empty
     end
 
     it "マスタにない技術の番号なら、404 ではなく 422" do

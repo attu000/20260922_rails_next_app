@@ -31,7 +31,7 @@ class JobPostingSearch
 
   # student：検索している学生（おすすめの点数に使う）。
   # params：画面から送られた条件（q、prefecture_ids、job_major_category_ids、job_middle_category_ids、technology_ids、
-  #   work_days_per_week、work_hours_per_day、duration_months、available_from、work_styles、weekend_ok、sort）。
+  #   work_days_per_week、work_hours_per_day、duration_months、available_from、work_styles、weekend_ok、planning、sort）。
   #   数でない・日付でない・知らない名前などの値は、その条件を「指定なし」として扱う（並び順・ページ番号と同じゆるさ。PR200）
   def initialize(student:, params:)
     @student = student
@@ -72,7 +72,7 @@ class JobPostingSearch
   # 指定された条件だけを集める。指定がないもの（nil）は入れない
   def conditions
     [
-      keyword_condition, prefecture_condition, job_category_condition, technology_condition,
+      keyword_condition, prefecture_condition, job_category_condition, technology_condition, planning_condition,
       *work_condition_conditions, start_month_condition, work_style_condition, weekend_condition
     ].compact
   end
@@ -203,6 +203,18 @@ class JobPostingSearch
 
     JobPosting.where(
       id: JobPostingTechnology.where(technology_id: technology_ids).select(:job_posting_id)
+    )
+  end
+
+  # ④ 企画・設計から関われる（順9）：true なら、対象の工程（企画・要件定義、設計、課題設定。planning が true）を、
+  #   メインか関われるのどちらかに持つ募集が合う。工程が未入力の募集は合わない（未入力は合致外。その他決め事.md の 5-10）。
+  #   false や指定なしなら条件にしない（土日OK と同じ）。
+  #   職種・使用技術と同じく、結合せず「番号がこの一覧に入っているか」で探す（工程を複数持つ募集が、行に増えないように）
+  def planning_condition
+    return nil unless ActiveModel::Type::Boolean.new.cast(@params[:planning])
+
+    JobPosting.where(
+      id: JobPostingWorkProcess.where(work_process_id: WorkProcess.where(planning: true).select(:id)).select(:job_posting_id)
     )
   end
 
