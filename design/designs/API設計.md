@@ -158,7 +158,7 @@
 - これらは、選択肢の窓口（16-3 ⑦ GET /api/options）で、マスタ（職種・工程・技術・業界・事業形態・都道府県・大学・学部・学科）と一緒に1回で返す
 - 画面側は、これを使ってフォームの選択肢を作り、データの中の名前（`"published"`）を日本語（「掲載中」）に直して表示する。画面側に選択肢の表を手で書かない
 - 判定も Rails で行い、結果を返す。画面側に同じ判定を書かない
-  - 稼働条件の一致、カルチャーの一致・ずれ・近さ（16-3 ⑲・㉓）
+  - 学生と募集の比較：業界・職種・使用技術の重なりと、稼働条件の一致（16-3 ㉓）。カルチャーは判定しない（値を返し、画面は2つの点を重ねて描くだけ。PR258・PR259）
   - 今押せる操作（16-3 ㉓ の available_actions）、メッセージを送れるか（16-3 ㊲ の can_send）
   - やりとりの状態のタグ（16-3 ㉑・㉒・形D の tag）、学生から見た状態（形E の my_status）
 - **迷ったときは Rails 側で計算して返す。画面側では計算しない**
@@ -291,7 +291,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | C3 募集詳細編集（編集） | `/company/job_postings/[id]/edit` |
 | C4 候補者一覧 | `/company/candidacies`（募集別のタブ：`?job_posting_id=12`、見送りなども表示：`?show_all=true`） |
 | C5 学生検索 | `/company/students`（募集を選んだ状態：`?job_posting_id=12`） |
-| C6 学生詳細 | `/company/students/[id]`（募集のタブ：`?job_posting_id=12`） |
+| C6 学生詳細 | `/company/students/[id]`（選んだ募集：`?job_posting_id=12`） |
 | C7 メッセージ管理 | `/company/messages`（学生のスレッドを開いた状態：`?student_id=5`） |
 | C8 ログイン | `/company/login` |
 | C9 新規登録 | `/company/signup` |
@@ -383,7 +383,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 募集を選んだとき | ⑫ GET /api/company/job_postings/:id | その募集の稼働条件を取り、条件のボタンを自動で選ぶ（推薦検索） |
 | | 開いたとき・条件や並び順の変更・ページ送り | ㉒ GET /api/company/students | 学生の一覧 |
 | | 詳細を見る | `/company/students/[id]?job_posting_id=[選んだ募集id]` | 画面の移動だけ |
-| C6 学生詳細 | 画面の URL | `/company/students/[id]` | `?job_posting_id=`（最初に選ぶタブ） |
+| C6 学生詳細 | 画面の URL | `/company/students/[id]` | `?job_posting_id=`（募集の選択欄で選ぶ募集。選び直すと履歴に積まずに書き換える。PR267） |
 | | 開いたとき | ⑦ GET /api/options | 表示名、5軸の説明 |
 | | 開いたとき | ㉓ GET /api/company/students/:id | 学生のプロフィールと、自社の全募集ぶんの状態・比較 |
 | | スカウトをする（文面を入力して送信） | ㉔ POST /api/company/scouts | スカウトを送る |
@@ -394,7 +394,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 見送りを取り消す | ㉘ POST /api/company/candidacies/:id/undo_decline | スカウト由来の見送りを戻す |
 | | 合格として保存 | ㉙ POST /api/company/candidacies/:id/pass | |
 | | 不合格として保存 | ㉚ POST /api/company/candidacies/:id/fail | |
-| | この学生とのメッセージ（㉓ の has_message_thread が true のとき） | `/company/messages?student_id=[id]` | 画面の移動だけ。募集タブの外に置く |
+| | この学生とのメッセージ（㉓ の has_message_thread が true のとき） | `/company/messages?student_id=[id]` | 画面の移動だけ。募集の選択欄の外に置く |
 | C7 メッセージ管理 | 画面の URL | `/company/messages` | `?student_id=`（開くスレッド）、`?page=`（スレッド一覧のページ） |
 | | 開いたとき・ページ送り | ㊱ GET /api/company/message_threads | スレッド一覧 |
 | | 開いたとき（student_id があるとき）・スレッドを選んだとき | ㊲ GET /api/company/students/:id/message_thread | その学生とのチャット |
@@ -445,7 +445,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 企業名・アイコン（【仕上げ】） | `/student/companies/[id]` | 画面の移動だけ |
 | S6 募集詳細 | 画面の URL | `/student/job_postings/[id]` | |
 | | 開いたとき | ⑦ GET /api/options | 表示名、応募理由の選択肢、5軸の説明 |
-| | 開いたとき | ⑲ GET /api/student/job_postings/:id | 募集の中身、自分の状態、カルチャーの比較 |
+| | 開いたとき | ⑲ GET /api/student/job_postings/:id | 募集の中身、自分の状態、自分の働き方の好み（カルチャーグラフに重ねる） |
 | | 応募する（応募理由を選ぶ） | ㉛ POST /api/student/candidacies | 応募する |
 | | 応募の完了後 | ㉝ GET /api/student/job_postings/:id/similar_job_postings | 「この募集に似た募集」のポップアップ |
 | | ポップアップの募集 | `/student/job_postings/[その募集id]` | 画面の移動だけ |
@@ -493,11 +493,11 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | ⑯ | PATCH | /api/student/profile | 学生 | S1 保存 | コア |
 | ⑰ | POST | /api/student/profile/icon | 学生 | S1・S9 アイコン | タグ未付与 |
 | ⑱ | GET | /api/student/job_postings | 学生 | S2 検索 | コア（おすすめ順は強み） |
-| ⑲ | GET | /api/student/job_postings/:id | 学生 | S6 表示 | コア（カルチャーの比較は強み） |
+| ⑲ | GET | /api/student/job_postings/:id | 学生 | S6 表示 | コア（自分の働き方の好みは強み） |
 | ⑳ | GET | /api/student/companies/:id | 学生 | S7 表示 | コア |
 | ㉑ | GET | /api/company/candidacies | 企業 | C4 表示 | コア（隠す切り替えは強み、未返信タグは仕上げ） |
 | ㉒ | GET | /api/company/students | 企業 | C5 検索 | コア（推薦検索・おすすめ順は強み、タグと最終活動の目安は仕上げ） |
-| ㉓ | GET | /api/company/students/:id | 企業 | C6 表示 | コア（比較・♥印は強み、最終活動の目安は仕上げ） |
+| ㉓ | GET | /api/company/students/:id | 企業 | C6 表示 | コア（比較・応募理由は強み、最終活動の目安は仕上げ） |
 | ㉔ | POST | /api/company/scouts | 企業 | C6 スカウトをする | コア |
 | ㉕ | GET | /api/company/students/:id/similar_students | 企業 | C6 スカウト後のポップアップ | 強み |
 | ㉖ | POST | /api/company/candidacies/:id/match | 企業 | C6 マッチする | コア |
@@ -604,7 +604,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - Rails では部品（partial。`app/views/api/company/students/_row.json.jbuilder`）1つにまとめる
 - 作る順：順6 で、last_active_range 以外を作った。last_active_range は【仕上げ】
 
-**形D：企業から見た、募集ごとのやりとりの状態**（㉓の job_postings の要素。㉔・㉖〜㉚の返事）
+**形D：企業から見た、募集ごとのやりとりの状態**（㉓の job_postings の要素（㉓ ではこれに comparison を加える）。㉔・㉖〜㉚の返事）
 
 ```json
 {
@@ -621,7 +621,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 ```
 
 - candidacy：その学生とのやりとり。なければ null
-- candidacy.reasons：応募理由・マッチ理由（C6 の♥印に使う）。値は応募理由の英語の名前（本書8-5 candidacy_reasons）
+- candidacy.reasons：応募理由・マッチ理由（C6 の12個の一覧で、選んだ理由に ✓ を付けるのに使う。PR255）。値は応募理由の英語の名前（本書8-5 candidacy_reasons）。スカウトしただけでまだマッチしていなければ空の配列（マッチ理由は学生がマッチしたときに選ぶ）
+  - 順10 で足した。㉓ では、やりとりと一緒に応募理由をまとめて読む（N+1問題を避ける）
 - candidacy.tag：やりとりの状態のタグ。**Rails が計算する**。`pending_application`（未対応応募）、`scouted`（スカウト済み）、`matched`（マッチ）、`declined`（見送り）、`passed`（合格）、`failed`（不合格）のどれか
   - 日本語は⑦の enums の candidacy_tag。㉑・㉒ と同じ値を使う
   - 「未対応応募」は発生元と状態の組み合わせに付けた名前で、どの選択肢にも存在しない言葉なので、画面側では組み立てない（16-1-9）
@@ -735,7 +736,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | 1 | email、password、password_confirmation、terms_agreed（ここまで⑤と同じ）、name（氏名） | ○（すべて） |
 | 2 | **activity_status（活動状況）** | **○** |
 | 2 | university_id、university_other_name（一覧にない大学の名前）、faculty_id、department_id、grade、graduation_year、prefecture_id | |
-| 3 | interested_job_middle_category_ids（興味のある職種）、interested_industry_ids（興味のある業界）、job_hunting_prefecture_ids（就活希望エリア） | |
+| 3 | interested_industry_ids（興味のある業界）、interested_job_middle_category_ids（興味のある職種）、job_hunting_prefecture_ids（就活希望エリア） | |
 | 4 | skills（プログラミング歴）、links（外部リンク）、certifications（資格） | |
 | 5 | work_days_per_week、work_hours_per_day、duration_months、available_from、can_full_remote、can_partial_remote、can_onsite、commutable_prefecture_ids（出社できる都道府県）、work_note | |
 | 6 | personality_pace、personality_novelty、personality_collaboration、personality_decision、personality_atmosphere | |
@@ -778,7 +779,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 段階タグ：【コア】
 - 作る順：順8 で、今ある列とテーブルの項目（⑯と同じ）を作った
   - personality_ の5つは、列を作った順9 で足した（⑯ の `PERMITTED_PARAMS` に足したので、この窓口も受け取る。S9 のステップ6 もそのとき差し込んだ。PR225）
-  - interested_industry_ids、job_hunting_prefecture_ids、links、certifications は、表を作る【仕上げ】で足す。terms_agreed も【仕上げ】
+  - interested_industry_ids は、表を順10 で前倒しして作ったときに足した（⑯ の `PERMITTED_PARAMS` に足したので、この窓口も受け取る。PR254）
+  - job_hunting_prefecture_ids、links、certifications は、表を作る【仕上げ】で足す。terms_agreed も【仕上げ】
   - 似た学生リストを作るジョブは順12
 
 **⑦ GET /api/options（選択肢とマスタ）**
@@ -1021,9 +1023,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 主なエラー：422
   - skills の行ごとの誤りは、行の番号（0から数える）を付けた名前で返す。例：`"skills[0].years": ["年数は50以下の値にしてください"]`。画面はその行の下に出す
   - 行の数の上限や、同じ技術が2行あるなど、欄全体の誤りは `skills` の名前で返す
-- 処理：student_profiles と付属テーブル7つを、1つのトランザクションで保存する（【コア】の順3 で作る付属テーブルは、プログラミング歴・興味のある職種・出社できる都道府県の3つ。残りは【仕上げ】で足す）
+- 処理：student_profiles と付属テーブル7つを、1つのトランザクションで保存する（【コア】の順3 で作った付属テーブルは、プログラミング歴・興味のある職種・出社できる都道府県の3つ。興味のある業界は順10 で前倒しして作った（PR254）。残りは【仕上げ】で足す）
 - 裏側のジョブ：その学生の似た学生リストを作り直す（本書7-5）【強み】
-- 段階タグ：【コア】（働き方の好み（性格）の5軸は【強み】で、順9 で足した。外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】。本書6-6 S1）
+- 段階タグ：【コア】（働き方の好み（性格）の5軸は【強み】で、順9 で足した。興味のある業界（interested_industry_ids）は【仕上げ】だったが、㉓ の比較に使うので順10 で足した。外部リンク・資格・就活希望エリアは【仕上げ】。本書6-6 S1）
 - 働き方の好みの5軸（personality_ の5つ）：−2〜2 の整数。範囲の外や小数は 422（「働き方の好み（進め方）は2以下の値にしてください」など）。確かめは、募集のカルチャーと同じ部品（`app/models/concerns/culture_axes.rb`）
 - ⑮⑯ の項目は、㉓ 学生詳細（企業が見る）でも同じ部品で返す（`app/views/api/shared/_student_profile.json.jbuilder`）。働き方の好みも、マッチ前から企業に見せる（本書6-6 S1「入力した情報は、マッチ前でも企業にすべて見せる」）
 
@@ -1101,10 +1103,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "business_description": "受託開発と自社サービスの運営",
   "internship_details": "…",
   "growth": null,
-  "culture_comparison": [
-    { "axis": "pace", "job_posting_value": -1, "my_value": 1, "result": "mismatch" },
-    { "axis": "novelty", "job_posting_value": 2, "my_value": 0, "result": "not_judged" }
-  ],
+  "culture_pace": -1,
+  "my_personality_pace": 1,
+  "my_personality_novelty": 0,
   "my_status": "scouted",
   "my_candidacy_id": 34,
   "has_message_thread": true
@@ -1115,17 +1116,19 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 返さない項目：status（代わりに is_open）、purpose、hiring_possibility、target_grades、target_graduation_year_from、target_graduation_year_to、target_other（学生に見せない項目）
 - about・business_description：募集側が空欄なら、企業プロフィールの値を入れて返す（学生の画面では区別が要らないため）
 - industry_ids・business_type_ids：その募集の値だけを返す。about などと違い、空欄でも企業プロフィールの値で補わない（本書5-8）
-- culture_comparison：result は Rails が本書5-5 のルールで判定する。`match`（一致）、`mismatch`（ずれ）、`not_judged`（どちらかが中央なので判定しない）のどれか。㉓の比較と同じ部品を使う
+- my_personality_ の5つ（my_personality_pace、my_personality_novelty、my_personality_collaboration、my_personality_decision、my_personality_atmosphere）：自分の働き方の好み（−2〜2）。画面はカルチャーグラフに黒丸で重ねる（PR258）
+  - 名前に my_ を付けて、募集のカルチャー（culture_）と区別する（my_status と同じ付け方）。並びは `CultureAxes::AXES` から作る
+  - 一致・ずれの判定は返さない。自分で答えた値なので、重ねて見れば比べられるため（PR258）
 - my_status・my_candidacy_id：形E
 - has_message_thread：**その企業とのスレッドがあるか**。true なら画面に「この企業とのメッセージ」のボタンを出す（本書17-2-3）
   - 送れるかどうか（can_send）とは別。スカウトが届いてまだマッチしていない相手でも、スカウト文を読みに行けるようにするため
   - スレッドができるのは「スカウトを受けたとき」か「応募がマッチしたとき」（本書5-2）
-- 段階タグ：【コア】（culture_comparison は【強み】）
+- 段階タグ：【コア】（my_personality_ の5つは【強み】）
 - 作る順：項目は、元になるテーブルや列ができる順で足していく
   - 順4（募集を探す）：上の例と説明のうち、次の順で足すもの以外。見られる範囲は掲載中の募集だけ
   - 順5（応募 → 企業がマッチ）：my_status、my_candidacy_id。見られる範囲に「自分とやりとりがある募集」を足す
   - 順6（スカウト → 学生がマッチ）：has_message_thread（`MessageThread.exists_between?`）。「この企業とのメッセージ」のボタンは、行き先の S5 ができた順7 で画面に足した（PR213）
-  - 順9（性格・カルチャー・工程の入力）：industry_ids、business_type_ids、職種と並ぶ工程の配列（main_work_process_ids、involved_work_process_ids）、culture_ の5つ（済み）。順10（比較の表示）：culture_comparison
+  - 順9（性格・カルチャー・工程の入力）：industry_ids、business_type_ids、職種と並ぶ工程の配列（main_work_process_ids、involved_work_process_ids）、culture_ の5つ（済み）。順10（比較の表示）：my_personality_ の5つ（済み）
   - 仮の値（常に「関係なし」など）を先に返すことはしない。仮の値が残ったままになるのを防ぐため
 
 **⑳ GET /api/student/companies/:id（企業詳細）**
@@ -1269,14 +1272,23 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
       },
       "available_actions": ["match", "decline"],
       "comparison": {
-        "work_conditions": [
-          { "item": "work_days_per_week", "student_value": 3, "job_posting_value": 2, "result": "match" }
-        ],
-        "job_middle_category_ids": { "matched": [2] },
-        "technology_ids": { "matched": [1] },
+        "job_posting": {
+          "industry_ids": [1, 3], "job_middle_category_ids": [2, 5], "technology_ids": [1],
+          "min_work_days_per_week": 2, "min_work_hours_per_day": 4, "min_duration_months": 3,
+          "start_month": null, "work_style": "onsite", "prefecture_id": 13,
+          "culture_pace": -2, "culture_novelty": 0, "culture_collaboration": 1,
+          "culture_decision": 0, "culture_atmosphere": -1
+        },
         "industry_ids": { "matched": [1] },
-        "culture": [
-          { "axis": "pace", "student_value": -1, "job_posting_value": -2, "distance": 1, "close": true }
+        "job_middle_category_ids": null,
+        "technology_ids": { "matched": [] },
+        "work_conditions": [
+          { "item": "work_days_per_week", "result": "match" },
+          { "item": "work_hours_per_day", "result": "mismatch" },
+          { "item": "duration_months", "result": "not_judged" },
+          { "item": "start_month", "result": "match" },
+          { "item": "work_style", "result": "match" },
+          { "item": "work_location", "result": "not_judged" }
         ]
       }
     }
@@ -1286,13 +1298,24 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 - student：学生のプロフィールの全項目（マッチ前でもすべて見せる）
 - has_message_thread：**その学生とのスレッドがあるか**。募集ごとではなく学生ごとの値なので、job_postings の中ではなく外に置く
-  - true なら、どの募集タブを見ていても「この学生とのメッセージ」のボタンを出す（本書17-2-3、6-5 C6）
+  - true なら、どの募集を選んでいても「この学生とのメッセージ」のボタンを出す（本書17-2-3、6-5 C6）
   - 送れるかどうか（can_send）とは別。自分が送ったスカウト文を読み直せるようにするため
-- job_postings：自社の全募集（掲載中以外も含む）。各要素は形D に comparison を加えたもの。並び順は⑪と同じ。最初に選ぶタブは画面側が決める（遷移元の job_posting_id、なければ先頭）
-- comparison（Rails が計算する。⑲と同じ部品）
-  - work_conditions：稼働条件の項目ごとに `match`（一致）、`mismatch`（不一致）、`not_judged`（どちらかが未入力）。照合のルールは本書5-6
-  - job_middle_category_ids・technology_ids・industry_ids：一致した id の一覧。どちらかが未入力なら null（画面は「未入力」と出す）。industry_ids は、募集の業界と学生の興味のある業界を比べる（企業プロフィールの値は使わない。本書5-8）
-  - culture：軸ごとの値と距離。close は、距離が1以下で、どちらも中央でないときに true（画面は背景を薄いオレンジにする）
+- job_postings：自社の全募集（掲載中以外も含む）。各要素は形D に comparison を加えたもの。並び順は⑪と同じ。最初に選ぶ募集は画面側が決める（遷移元の job_posting_id、なければ先頭）
+- comparison（学生と、その募集の比較。順10）
+  - この窓口だけに入れる。形D を返すスカウト・マッチの返事（㉔㉖）には入れない。スカウトやマッチをしても比較は変わらないため。画面は、返事を元の中身に重ねて書き換える
+  - job_posting：右の列に出す募集の値。左の列（学生の値）は student をそのまま使う
+    - job_middle_category_ids は、メインとサブを1つにまとめた一覧（学生の興味のある職種にもメイン・サブがなく、並べやすいため）
+    - culture_ の5つは、学生の働き方の好み（黒丸）と重ねる白丸に使う。距離や「近いかどうか」は返さない（画面は背景を塗らず、2点の間に線を引くだけ。PR259）
+  - industry_ids・job_middle_category_ids・technology_ids：`{ "matched": 両方にある番号の一覧 }`。どちらかが空なら null（画面は「未入力」と出す）。両方入っていて重なりがなければ空の配列
+    - industry_ids は、募集の業界と学生の興味のある業界を比べる（企業プロフィールの値は使わない。本書5-8）
+    - job_middle_category_ids の募集側は、メインとサブの両方
+    - technology_ids の学生側は、プログラミング歴のうちマスタから選んだ技術だけ（「その他」の行は番号がないので比べない）
+  - work_conditions：稼働条件の6項目（work_days_per_week、work_hours_per_day、duration_months、start_month、work_style、work_location）を、この順で、`match`（一致）／`mismatch`（不一致）／`not_judged`（どちらかが未入力）で返す。照合のルールは本書5-6
+    - start_month：募集が随時か、開始月が今月より前なら、学生が空でも match
+    - work_style：募集が空なら not_judged（学生の勤務形態は、未入力と「すべて可能」を区別しないので、学生側の空はない）
+    - work_location：募集がフルリモートなら match。募集の都道府県が空、または学生の出社できる都道府県が空なら not_judged（通えないのではなく、答えていないだけのため。PR257）。検索（⑱㉒）では、未入力は今のまま合致外（PR261）
+  - 判定は `app/services/student_job_posting_comparison.rb`（`StudentJobPostingComparison`）の1か所。形は `app/views/api/company/students/_comparison.json.jbuilder`
+  - 比較に使う関連（学生の興味のある業界・興味のある職種・プログラミング歴・出社できる都道府県、募集の業界・職種・使用技術）は、最初にまとめて読み込む。募集が何件あっても、問い合わせの回数は増えない
 - 段階タグ：【コア】（comparison と reasons は【強み】、last_active_range は【仕上げ】）
 - 作る順：⑲と同じく、項目は元になるものができる順で足していく
   - 順5（応募 → 企業がマッチ）：student、job_postings（形D の candidacy のうち reasons 以外と、available_actions）。available_actions は、窓口ができている操作だけを返す（順5 は match だけ。scout は順6、decline・undo_decline・pass・fail は順11 で足す）
