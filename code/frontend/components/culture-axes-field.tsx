@@ -2,7 +2,7 @@
 // 学生の働き方の好み（マイページ・新規登録。PR233）と、募集のカルチャーグラフ（募集詳細編集）で使い回す。
 // 軸の名前と両端の説明は、⑦ GET /api/options の culture_axes をそのまま出す（画面側に軸ごとの文言を書かない。API設計.md の 16-1-9）。
 // 値は「軸の名前 → 数（−2〜2）」の形で受け取るので、学生の personality_pace にも募集の culture_pace にもつなげられる。
-// 募集詳細（学生）の見るだけのカルチャーグラフ（CultureAxesView）も、同じ見た目の部品でここに置く。
+// 募集詳細（学生）・学生詳細（企業）の見るだけのカルチャーグラフ（CultureAxesView）も、同じ見た目の部品でここに置く。
 //
 // スライダーは shadcn/ui の部品ではなく、その中身の Base UI のスライダーをここで組み立てる（PR244）。
 // 棒の中に、5つの目盛りと「真ん中から今の位置までの線」を入れるため。
@@ -36,11 +36,12 @@ function valueText(axis: CultureAxis, value: number): string {
 // 棒の見た目。入力のスライダーと、見るだけのグラフで同じにする
 const TRACK_CLASS = "relative h-1 w-full rounded-full bg-muted";
 
-// 棒の中に入れるもの：真ん中から値の位置までの線（薄いオレンジ。PR245）と、5つの目盛り。
-// 入力のスライダーと、見るだけのグラフで使い回す。線は左右どちらに寄せても同じ色（どちらが良いとは見せない）
-function AxisMarks({ value }: { value: number }) {
-  const lineStart = Math.min(percentOf(0), percentOf(value));
-  const lineWidth = Math.abs(percentOf(value) - percentOf(0));
+// 棒の中に入れるもの：from から to までの線（薄いオレンジ。PR245）と、5つの目盛り。
+// 入力のスライダーと、見るだけのグラフで使い回す。線は左右どちらに寄せても同じ色（どちらが良いとは見せない）。
+// from を渡さなければ真ん中から。2つの点を比べるグラフでは、2点の間に引く（PR259）
+function AxisMarks({ from = 0, to }: { from?: number; to: number }) {
+  const lineStart = Math.min(percentOf(from), percentOf(to));
+  const lineWidth = Math.abs(percentOf(to) - percentOf(from));
   return (
     <>
       <div
@@ -119,7 +120,7 @@ export function CultureAxesField({ legend, axes, values, onChange, errors }: Cul
               <Slider.Control className="relative flex h-8 w-full touch-none items-center select-none">
                 <Slider.Track className={TRACK_CLASS}>
                   {/* 目盛りを押すと、その段に動く（棒を押したのと同じ扱い） */}
-                  <AxisMarks value={value} />
+                  <AxisMarks to={value} />
                 </Slider.Track>
                 {/* つまみ。目盛りより一回り大きい丸。キーボードの左右の矢印でも動かせる */}
                 <Slider.Thumb
@@ -138,29 +139,87 @@ export function CultureAxesField({ legend, axes, values, onChange, errors }: Cul
   );
 }
 
-// 見るだけのカルチャーグラフ（募集詳細。ページ設計.md の 6-6 S6、PR250）。
-// 入力のスライダーと同じ見た目（目盛り・真ん中からの線・両端の短い名前と長い説明）で、値の位置に濃い点を置く。
-// 順10 で、ここに学生自身の点を重ねて「一致・ずれ」を出す予定
-export function CultureAxesView({ axes, values }: { axes: CultureAxis[]; values: Record<string, number> }) {
+// 2つの点を比べるときの丸（PR256）。白丸（募集）は大きめの枠線だけ、黒丸（学生）は小さめの塗りつぶし。
+// 大きさを変えておくと、同じ位置に来たときに「白丸の中に黒丸」の形になり、どちらの点も隠れない
+const RING_CLASS = "rounded-full border-2 border-primary bg-background size-5";
+const DOT_CLASS = "rounded-full bg-primary size-2.5";
+
+// 比べる相手（黒丸）。値は「軸の名前 → 数」。label は黒丸の名前（「あなた」「学生」）、
+// baseLabel は白丸（values の側）の名前（「この募集」「募集」）
+type CultureCompare = {
+  values: Record<string, number>;
+  label: string;
+  baseLabel: string;
+};
+
+type CultureAxesViewProps = {
+  axes: CultureAxis[];
+  // グラフの本体の値（募集のカルチャー）
+  values: Record<string, number>;
+  // 渡すと、2つの点を重ねて比べる形になる（順10。PR256・PR258）
+  compare?: CultureCompare;
+};
+
+// 見るだけのカルチャーグラフ（募集詳細・学生詳細。ページ設計.md の 6-6 S6、6-5 C6、PR250）。
+// 入力のスライダーと同じ見た目（目盛り・線・両端の短い名前と長い説明）で、値の位置に点を置く。
+// - compare なし：値の位置に濃い点1つと、真ん中からの線
+// - compare あり：本体の値に白丸、相手の値に黒丸を置き、2点の間に線を引く。
+//   「近い・遠い」や「一致・ずれ」の判定はしない（PR258・PR259）。凡例を上に1行だけ出す
+export function CultureAxesView({ axes, values, compare }: CultureAxesViewProps) {
   return (
     <div className="space-y-5">
+      {compare && (
+        // 凡例。読み上げには軸ごとの1文で名前を伝えるので、ここは読ませない
+        <div aria-hidden="true" className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <span className="inline-flex items-center gap-1.5">
+            <span className={`inline-block ${DOT_CLASS}`} />
+            {compare.label}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className={`inline-block ${RING_CLASS}`} />
+            {compare.baseLabel}
+          </span>
+        </div>
+      )}
       {axes.map((axis) => {
         const value = values[axis.key] ?? 0;
+        const compareValue = compare ? (compare.values[axis.key] ?? 0) : null;
         return (
           <div key={axis.key} className="space-y-2">
             <p className="text-sm font-medium">{axis.name}</p>
-            {/* 読み上げには、1軸を1文で伝える（例：「ややスピード」）。絵の部分は読ませない */}
-            <p className="sr-only">{valueText(axis, value)}</p>
+            {/* 読み上げには、1軸を1文で伝える（例：「ややスピード」「この募集：ややスピード、あなた：緻密さ」）。絵の部分は読ませない */}
+            <p className="sr-only">
+              {compare && compareValue !== null
+                ? `${compare.baseLabel}：${valueText(axis, value)}、${compare.label}：${valueText(axis, compareValue)}`
+                : valueText(axis, value)}
+            </p>
             <div aria-hidden="true" className="space-y-2">
               <AxisLabels axis={axis} />
               {/* 入力のスライダーと同じく、左右に余白を取り、点の中心を目盛りに重ねる */}
               <div className="flex h-6 items-center px-2.5">
                 <div className={TRACK_CLASS}>
-                  <AxisMarks value={value} />
-                  <span
-                    className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-primary"
-                    style={{ left: `${percentOf(value)}%` }}
-                  />
+                  {compareValue === null ? (
+                    <>
+                      <AxisMarks to={value} />
+                      <span
+                        className="absolute top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-primary"
+                        style={{ left: `${percentOf(value)}%` }}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <AxisMarks from={value} to={compareValue} />
+                      {/* 白丸を先に置き、黒丸をその上に重ねる */}
+                      <span
+                        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${RING_CLASS}`}
+                        style={{ left: `${percentOf(value)}%` }}
+                      />
+                      <span
+                        className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${DOT_CLASS}`}
+                        style={{ left: `${percentOf(compareValue)}%` }}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
             </div>

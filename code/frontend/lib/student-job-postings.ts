@@ -180,6 +180,12 @@ export type StudentJobPostingDetail = MyCandidacyStatus & {
   // その企業とのスレッドがあるか（スカウトが届いたか、マッチしたらできる）。
   // true なら「この企業とのメッセージ」のボタンを出す（権限_バリデーション.md の 17-2-3。PR213）
   has_message_thread: boolean;
+  // 自分の働き方の好みの5軸。−2〜2。カルチャーグラフに黒丸で重ねる（順10。PR258）
+  my_personality_pace: number;
+  my_personality_novelty: number;
+  my_personality_collaboration: number;
+  my_personality_decision: number;
+  my_personality_atmosphere: number;
 };
 
 // ㉞ 募集管理と ㉟ スカウト管理の返事（同じ形）。行は形B に、やりとりの番号と自分の状態を足したもの。

@@ -22,6 +22,7 @@ usage() {
   reset   コンテナとデータをすべて消して、setup からやり直す（確認あり）
   test    Rails のテストを実行する
   lint    画面側（Next.js）の型のチェックと、コードの点検をする
+  demo    仮のデータ（企業5社・募集20件・学生20人など）を入れる。何度実行してもよい
   logs    ログを出し続ける（例：bash dev.sh logs backend）。Ctrl+C で止める
   help    この説明を出す
 EOF
@@ -87,6 +88,12 @@ cmd_lint() {
   echo "型のチェックと、コードの点検が通りました。"
 }
 
+cmd_demo() {
+  # 仮のデータを入れる（code/backend/lib/tasks/demo.rake）。前回の仮のデータは消して作り直す。
+  # 試しのアカウント（company@example.com など）と、画面から登録したアカウントは消さない
+  docker compose run --rm -T backend bin/rails demo:load
+}
+
 cmd_logs() {
   docker compose logs -f "$@"
 }
@@ -101,6 +108,7 @@ case "$command" in
   reset) cmd_reset ;;
   test) cmd_test ;;
   lint) cmd_lint ;;
+  demo) cmd_demo ;;
   logs) cmd_logs "$@" ;;
   help | -h | --help) usage ;;
   *)

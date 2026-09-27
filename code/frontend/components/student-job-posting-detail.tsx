@@ -6,7 +6,7 @@
 // 自分とやりとりがある募集は、非公開・終了でも開ける（「募集終了」と出す）。
 // 自分の状態の表示と「応募する」「マッチする」は components/student-candidacy-actions.tsx。
 // 「この企業とのメッセージ」は、Rails の has_message_thread が true のときだけ出す（PR213）。
-// カルチャーグラフと自分の働き方の好みとの一致・ずれは、順10 で足す（PR189）
+// カルチャーグラフには、自分の働き方の好みを黒丸で重ねる（順10。一致・ずれの判定は出さない。PR258）
 
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -84,6 +84,14 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
     collaboration: data.culture_collaboration,
     decision: data.culture_decision,
     atmosphere: data.culture_atmosphere,
+  };
+  // 自分の働き方の好みも、同じ形に直す（黒丸で重ねる）
+  const myValues: Record<string, number> = {
+    pace: data.my_personality_pace,
+    novelty: data.my_personality_novelty,
+    collaboration: data.my_personality_collaboration,
+    decision: data.my_personality_decision,
+    atmosphere: data.my_personality_atmosphere,
   };
 
   return (
@@ -163,10 +171,15 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
         <DetailItem label="成長イメージ" value={data.growth} />
       </DetailSection>
 
-      {/* カルチャーグラフ（ページ設計.md の 6-6 S6 の並びどおり、募集概要の下）。両端の長い説明も出す（PR250） */}
+      {/* カルチャーグラフ（ページ設計.md の 6-6 S6 の並びどおり、募集概要の下）。両端の長い説明も出す（PR250）。
+          募集の値を白丸、自分の働き方の好みを黒丸で重ねる（PR258） */}
       <section className="space-y-3 rounded-lg border p-4">
         <h2 className="font-bold">カルチャー</h2>
-        <CultureAxesView axes={options.culture_axes} values={cultureValues} />
+        <CultureAxesView
+          axes={options.culture_axes}
+          values={cultureValues}
+          compare={{ values: myValues, label: "あなた", baseLabel: "この募集" }}
+        />
       </section>
 
       <DetailSection title="稼働条件">
