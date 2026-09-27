@@ -27,6 +27,12 @@ FactoryBot.define do
     sequence(:position) { |n| n }
   end
 
+  factory :work_process do
+    sequence(:name) { |n| "工程#{n}" }
+    planning { false }
+    sequence(:position) { |n| n }
+  end
+
   factory :technology do
     sequence(:name) { |n| "技術#{n}" }
     category { :language }

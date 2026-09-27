@@ -1,9 +1,11 @@
 # 学生プロフィール（design/designs/データベース.md の 8-5）。
 # 必須は氏名と活動状況だけで、マイページでも新規登録でも同じ（その他決め事.md の 5-9）。
-# 順3 で作る項目（【コア】）だけを持つ。性格の5つは順9（【強み】）、外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+# 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
 class StudentProfile < ApplicationRecord
   # 稼働条件の選択肢と検証。募集と共通（concerns/work_conditions.rb）
   include WorkConditions
+  # 働き方の好み（性格）の5軸。募集のカルチャーと共通（concerns/culture_axes.rb）
+  include CultureAxes
   # 番号の確認（validate_master_ids・validate_master_id）。企業プロフィール・募集と共通（concerns/master_ids_validation.rb）
   include MasterIdsValidation
   # アイコンの添付と検証（形式・2MB）。企業プロフィールと共通（concerns/icon_attachment.rb）
@@ -77,6 +79,8 @@ class StudentProfile < ApplicationRecord
   validates_work_conditions days: :work_days_per_week,
                             hours: :work_hours_per_day,
                             months: :duration_months
+  # 働き方の好みの5軸は、−2〜2 の整数（concerns/culture_axes.rb）
+  validates_culture_axes :personality
   # 勤務形態の可否は true か false（データベースで空欄不可）
   validates :can_full_remote, :can_partial_remote, :can_onsite, inclusion: { in: [ true, false ] }
   validate :available_from_must_be_first_day

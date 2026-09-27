@@ -57,6 +57,12 @@ ja:
         interested_job_middle_category_ids: 興味のある職種
         skills: プログラミング歴
         icon: アイコン
+        # 性格の5軸。画面での呼び名は「働き方の好み」（PR233）
+        personality_pace: 働き方の好み（進め方）
+        personality_novelty: 働き方の好み（新しさ）
+        personality_collaboration: 働き方の好み（周囲との関わり）
+        personality_decision: 働き方の好み（決め手）
+        personality_atmosphere: 働き方の好み（職場の雰囲気）
       # プログラミング歴の1行。行のエラー（skills[0].years など）の項目名にも使う（StudentProfile.human_attribute_name）
       student_skill:
         technology_id: 技術
@@ -86,7 +92,16 @@ ja:
         technology_note: 使用技術の補足
         main_job_middle_category_ids: 主な職種
         related_job_middle_category_ids: 関連する職種
+        main_work_process_ids: メインで担当する工程
+        involved_work_process_ids: 関われる工程
         technology_ids: 使用技術
+        industry_ids: 業界
+        business_type_ids: 事業形態
+        culture_pace: カルチャー（進め方）
+        culture_novelty: カルチャー（新しさ）
+        culture_collaboration: カルチャー（周囲との関わり）
+        culture_decision: カルチャー（決め手）
+        culture_atmosphere: カルチャー（職場の雰囲気）
       # やりとり。reasons は列ではなく、応募のときに送られる理由の一覧（「応募理由を入力してください」などになる）。
       # body も列ではなく、スカウトのときに送られるスカウト文（「スカウト文を入力してください」などになる）
       candidacy:
@@ -188,6 +203,9 @@ ja:
       # 募集の関連する職種に、主な職種と同じ中分類がある（その他決め事.md の 5-7）。
       # 「関連する職種に、主な職種と同じものが含まれています」になる
       overlaps_main_job_categories: に、主な職種と同じものが含まれています
+      # 募集の関われる工程に、メインで担当する工程と同じものがある（職種と同じ決まり。PR242）。
+      # 「関われる工程に、メインで担当する工程と同じものが含まれています」になる
+      overlaps_main_work_processes: に、メインで担当する工程と同じものが含まれています
       # アイコンの形式と大きさ（技術構成.md の 9-3）
       invalid_content_type: はPNG・JPEG・WebPのいずれかにしてください
       file_too_large: は2MB以下にしてください
