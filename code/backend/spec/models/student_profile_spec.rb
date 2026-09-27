@@ -2,7 +2,7 @@ require "rails_helper"
 
 # 学生プロフィールまわりのモデルのテスト。
 # - データベースの CHECK：モデルの検証をすり抜けても、データベースが「どちらか一方だけ」や値の範囲の決まりを守ること
-# - 働き方の好み（性格の5軸。順9）の保存
+# - 働き方の好み（性格の5軸。順9）と、興味のある業界（順10）の保存
 # 詳しくは design/designs/データベース.md の 8-5 student_profiles・student_skills
 RSpec.describe StudentProfile, type: :model do
   let(:profile) { create(:student_user).student_profile }
@@ -54,6 +54,36 @@ RSpec.describe StudentProfile, type: :model do
 
       expect(result).to be(true)
       expect(profile.reload.personality_pace).to eq(-2)
+    end
+  end
+
+  # 窓口が興味のある業界を受け取るのは 10-2 からなので、ここではモデルを直接呼んで確かめる
+  describe "#save_profile（興味のある業界。PR254）" do
+    let(:industries) { create_list(:industry, 2) }
+
+    it "送った業界の一覧で丸ごと置き換える" do
+      profile.save_profile(interested_industry_ids: [ industries.first.id ])
+
+      result = profile.save_profile(interested_industry_ids: industries.map(&:id))
+
+      expect(result).to be(true)
+      expect(profile.reload.interested_industry_ids).to match_array(industries.map(&:id))
+    end
+
+    it "送らなければ変えない" do
+      profile.save_profile(interested_industry_ids: [ industries.first.id ])
+
+      profile.save_profile(name: "新しい名前")
+
+      expect(profile.reload.interested_industry_ids).to eq([ industries.first.id ])
+    end
+
+    it "一覧にない番号があると保存されない" do
+      result = profile.save_profile(interested_industry_ids: [ industries.first.id, 0 ])
+
+      expect(result).to be(false)
+      expect(profile.errors.full_messages_for(:interested_industry_ids)).to eq([ "興味のある業界に選べない値が含まれています" ])
+      expect(profile.reload.interested_industry_ids).to eq([])
     end
   end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_27_130001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_27_140001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -305,6 +305,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_130001) do
     t.index ["student_profile_id"], name: "index_student_commutable_prefectures_on_student_profile_id"
   end
 
+  create_table "student_interested_industries", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "industry_id", null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["industry_id"], name: "index_student_interested_industries_on_industry_id"
+    t.index ["student_profile_id", "industry_id"], name: "idx_on_student_profile_id_industry_id_de8bc58605", unique: true
+    t.index ["student_profile_id"], name: "index_student_interested_industries_on_student_profile_id"
+  end
+
   create_table "student_interested_job_categories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "job_middle_category_id", null: false
@@ -439,6 +449,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_130001) do
   add_foreign_key "sessions", "users"
   add_foreign_key "student_commutable_prefectures", "prefectures"
   add_foreign_key "student_commutable_prefectures", "student_profiles"
+  add_foreign_key "student_interested_industries", "industries"
+  add_foreign_key "student_interested_industries", "student_profiles"
   add_foreign_key "student_interested_job_categories", "job_middle_categories"
   add_foreign_key "student_interested_job_categories", "student_profiles"
   add_foreign_key "student_profiles", "departments"

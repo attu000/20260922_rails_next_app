@@ -1,6 +1,6 @@
 # 学生プロフィール（design/designs/データベース.md の 8-5）。
 # 必須は氏名と活動状況だけで、マイページでも新規登録でも同じ（その他決め事.md の 5-9）。
-# 外部リンク・資格・興味のある業界・就活希望エリアは【仕上げ】で足す
+# 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は、学生詳細の比較に使うので順10 で前倒しした。PR254）
 class StudentProfile < ApplicationRecord
   # 稼働条件の選択肢と検証。募集と共通（concerns/work_conditions.rb）
   include WorkConditions
@@ -26,10 +26,12 @@ class StudentProfile < ApplicationRecord
 
   # プログラミング歴。送られた順のまま返すため、作った順（id の順）に並べる
   has_many :student_skills, -> { order(:id) }
-  # 興味のある職種・出社できる都道府県。Django の ManyToManyField(through=...) にあたる。
-  # through を書くと、interested_job_middle_category_ids・commutable_prefecture_ids が自動でできる
+  # 興味のある職種・興味のある業界・出社できる都道府県。Django の ManyToManyField(through=...) にあたる。
+  # through を書くと、interested_job_middle_category_ids・interested_industry_ids・commutable_prefecture_ids が自動でできる
   has_many :student_interested_job_categories
   has_many :interested_job_middle_categories, through: :student_interested_job_categories, source: :job_middle_category
+  has_many :student_interested_industries
+  has_many :interested_industries, through: :student_interested_industries, source: :industry
   has_many :student_commutable_prefectures
   has_many :commutable_prefectures, through: :student_commutable_prefectures, source: :prefecture
   # 自分のやりとり（応募・スカウト）と、企業とのスレッド。窓口では、自分の分の中からだけ番号で探す（API設計.md の 16-1-10）
@@ -127,6 +129,7 @@ class StudentProfile < ApplicationRecord
   def assign_profile(attributes)
     attributes = attributes.to_h.symbolize_keys
     @pending_job_middle_category_ids = attributes.delete(:interested_job_middle_category_ids)
+    @pending_industry_ids = attributes.delete(:interested_industry_ids)
     @pending_commutable_prefecture_ids = attributes.delete(:commutable_prefecture_ids)
     skill_rows = attributes.delete(:skills)
 
@@ -136,6 +139,7 @@ class StudentProfile < ApplicationRecord
     # ② 検証する。③ 番号の一覧と、プログラミング歴の各行を確かめる
     valid?
     validate_master_ids(:interested_job_middle_category_ids, @pending_job_middle_category_ids, JobMiddleCategory)
+    validate_master_ids(:interested_industry_ids, @pending_industry_ids, Industry)
     validate_master_ids(:commutable_prefecture_ids, @pending_commutable_prefecture_ids, Prefecture)
     @pending_skills = build_skills(skill_rows)
     errors.empty?
@@ -146,6 +150,7 @@ class StudentProfile < ApplicationRecord
     save!
     # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑯）。送られなかった項目は変えない
     self.interested_job_middle_category_ids = @pending_job_middle_category_ids unless @pending_job_middle_category_ids.nil?
+    self.interested_industry_ids = @pending_industry_ids unless @pending_industry_ids.nil?
     self.commutable_prefecture_ids = @pending_commutable_prefecture_ids unless @pending_commutable_prefecture_ids.nil?
     replace_skills(@pending_skills) unless @pending_skills.nil?
   end

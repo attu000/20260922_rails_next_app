@@ -55,6 +55,7 @@ ja:
         work_note: 稼働条件の備考
         commutable_prefecture_ids: 出社できる都道府県
         interested_job_middle_category_ids: 興味のある職種
+        interested_industry_ids: 興味のある業界
         skills: プログラミング歴
         icon: アイコン
         # 性格の5軸。画面での呼び名は「働き方の好み」（PR233）
