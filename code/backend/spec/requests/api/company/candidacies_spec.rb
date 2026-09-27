@@ -62,7 +62,7 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
         )
       end
 
-      # 「メッセージ」のボタンを出すか（PR224）
+      # 「メッセージ」のボタンを出すか（PR224）。見送り・合格の行は既定で隠れるので、show_all を付けて確かめる
       it "after_match は、未マッチ・見送りの行は false、マッチ・合格の行は true" do
         expected = {
           create(:candidacy, job_posting: posting) => false,
@@ -71,7 +71,7 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
           create(:candidacy, job_posting: posting, status: :passed) => true
         }
 
-        get "/api/company/candidacies"
+        get "/api/company/candidacies", params: { show_all: true }
 
         expect(response.parsed_body["items"].to_h { |item| [ item["id"], item["after_match"] ] })
           .to eq(expected.transform_keys(&:id))
@@ -134,6 +134,41 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
         expect(response.parsed_body["pagination"]).to eq(
           "page" => 2, "per_page" => 20, "total_count" => 21, "total_pages" => 2
         )
+      end
+
+      # 見送り・合格・不合格を既定で隠す切り替え（順11。ページ設計.md の 6-5 C4）
+      describe "show_all（見送りなども表示）" do
+        let!(:shown) { %i[unmatched matched].map { |status| create(:candidacy, job_posting: posting, status: status) } }
+        let!(:hidden) { %i[declined passed failed].map { |status| create(:candidacy, job_posting: posting, status: status) } }
+
+        it "送らなければ、見送り・合格・不合格の行を隠し、件数も隠したあとの行で数える" do
+          get "/api/company/candidacies"
+
+          expect(response.parsed_body["items"].map { |item| item["id"] }).to match_array(shown.map(&:id))
+          expect(response.parsed_body["pagination"]["total_count"]).to eq(2)
+        end
+
+        it "false でも隠す" do
+          get "/api/company/candidacies", params: { show_all: false }
+
+          expect(response.parsed_body["items"].map { |item| item["id"] }).to match_array(shown.map(&:id))
+        end
+
+        it "true なら、すべての行を返す" do
+          get "/api/company/candidacies", params: { show_all: true }
+
+          expect(response.parsed_body["items"].map { |item| item["id"] }).to match_array((shown + hidden).map(&:id))
+          expect(response.parsed_body["pagination"]["total_count"]).to eq(5)
+        end
+
+        it "job_posting_id と一緒に使える" do
+          other_posting = create(:job_posting, :published, company_profile: company)
+          create(:candidacy, job_posting: other_posting, status: :declined)
+
+          get "/api/company/candidacies", params: { job_posting_id: posting.id, show_all: true }
+
+          expect(response.parsed_body["items"].map { |item| item["id"] }).to match_array((shown + hidden).map(&:id))
+        end
       end
     end
   end
@@ -237,6 +272,88 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
         post_match(0)
 
         expect(response).to have_http_status(:not_found)
+      end
+    end
+  end
+
+  # ㉗〜㉚ 見送り・見送りの取り消し・合格・不合格（順11。API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。
+  # できる状態の細かい組み合わせは spec/models/candidacy_spec.rb で確かめるので、ここでは窓口としての動きを確かめる
+  {
+    "㉗ 見送り" => { path: "decline", from: :unmatched, to: :declined, forbidden: :matched, actions: %w[match undo_decline] },
+    "㉘ 見送りの取り消し" => { path: "undo_decline", from: :declined, to: :unmatched, forbidden: :unmatched, actions: %w[match decline] },
+    "㉙ 合格" => { path: "pass", from: :matched, to: :passed, forbidden: :unmatched, actions: %w[fail] },
+    "㉚ 不合格" => { path: "fail", from: :matched, to: :failed, forbidden: :declined, actions: %w[pass] }
+  }.each do |label, spec|
+    describe label do
+      let(:student) { create(:student_user).student_profile }
+
+      # テストでも CSRF 対策は有効なので、合言葉を付ける
+      def post_operation(path, candidacy_id)
+        post "/api/company/candidacies/#{candidacy_id}/#{path}", headers: { "X-CSRF-Token" => csrf_token }, as: :json
+      end
+
+      it "学生なら 403。状態は変わらない" do
+        candidacy = create(:candidacy, job_posting: posting, status: spec[:from])
+        log_in_as(create(:student_user))
+
+        post_operation(spec[:path], candidacy.id)
+
+        expect(response).to have_http_status(:forbidden)
+        expect(candidacy.reload.status).to eq(spec[:from].to_s)
+      end
+
+      context "ログインしている企業" do
+        before { log_in_as(company_user) }
+
+        it "200 と、操作したあとの募集の状態（形D）を返す。押せるボタンも変わる" do
+          candidacy = create(:candidacy, job_posting: posting, student_profile: student, status: spec[:from])
+
+          post_operation(spec[:path], candidacy.id)
+
+          expect(response).to have_http_status(:ok)
+          expect(candidacy.reload.status).to eq(spec[:to].to_s)
+          expect(response.parsed_body).to include(
+            "id" => posting.id, "title" => posting.title, "status" => "published",
+            "candidacy" => include("id" => candidacy.id, "status" => spec[:to].to_s),
+            "available_actions" => spec[:actions]
+          )
+        end
+
+        it "終了した募集のやりとりでもできる" do
+          closed = create(:job_posting, :closed, company_profile: company)
+          candidacy = create(:candidacy, job_posting: closed, student_profile: student, status: spec[:from])
+
+          post_operation(spec[:path], candidacy.id)
+
+          expect(response).to have_http_status(:ok)
+          expect(candidacy.reload.status).to eq(spec[:to].to_s)
+        end
+
+        it "今の状態ではできないなら 409。状態は変わらない" do
+          candidacy = create(:candidacy, job_posting: posting, student_profile: student, status: spec[:forbidden])
+
+          post_operation(spec[:path], candidacy.id)
+
+          expect(response).to have_http_status(:conflict)
+          expect(response.parsed_body["message"]).to eq("この操作は今はできません。画面を読み込み直してください")
+          expect(candidacy.reload.status).to eq(spec[:forbidden].to_s)
+        end
+
+        # 必須テスト：他社のやりとりの番号は 404（16-1-10）
+        it "他社の募集へのやりとりの番号なら 404。状態は変わらない" do
+          other_candidacy = create(:candidacy, status: spec[:from])
+
+          post_operation(spec[:path], other_candidacy.id)
+
+          expect(response).to have_http_status(:not_found)
+          expect(other_candidacy.reload.status).to eq(spec[:from].to_s)
+        end
+
+        it "存在しない番号なら 404" do
+          post_operation(spec[:path], 0)
+
+          expect(response).to have_http_status(:not_found)
+        end
       end
     end
   end

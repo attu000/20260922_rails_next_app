@@ -39,10 +39,19 @@ Rails.application.routes.draw do
       # ⑬ POST /api/company/job_postings（新規作成）、⑭ PATCH /api/company/job_postings/:id（保存・状態の変更）。
       # 募集は消さず、状態で管理するので、消す窓口（destroy）は作らない（16-3 ⑭）
       resources :job_postings, only: %i[index show create update]
-      # ㉑ GET /api/company/candidacies（候補者一覧）、㉖ POST /api/company/candidacies/:id/match（マッチ）。
+      # ㉑ GET /api/company/candidacies（候補者一覧）、㉖ POST /api/company/candidacies/:id/match（マッチ）、
+      # ㉗ …/decline（見送り）、㉘ …/undo_decline（見送りの取り消し）、㉙ …/pass（合格）、㉚ …/fail（不合格）。
       # 状態を変える操作は、1件ごとの操作（member）として、やりとりの番号の後ろに操作の名前を付ける（16-1-4）
       resources :candidacies, only: :index do
-        post :match, on: :member
+        member do
+          post :match
+          post :decline
+          post :undo_decline
+          # URL は /pass・/fail のまま、つなぐ先のメソッドの名前だけ変える。
+          # fail は Ruby に最初からある命令（raise の別名）なので、同じ名前のメソッドを作らない（PR269）
+          post :pass, action: :mark_passed
+          post :fail, action: :mark_failed
+        end
       end
       # ㉒ GET /api/company/students（学生検索）、㉓ GET /api/company/students/:id（学生詳細）
       resources :students, only: %i[index show] do
