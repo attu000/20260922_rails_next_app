@@ -115,6 +115,30 @@ technologies.each.with_index(1) do |(category, name), position|
   Technology.find_or_initialize_by(name: name).update!(category: category, position: position)
 end
 
+# 工程。上流 → 中流 → 下流の順に並べ、並びがそのまま表示順（1〜13）になる（その他決め事.md の 5-8）。
+# 2つ目の値は「企画・設計から関われる」の対象か。対象は企画・要件定義、設計、課題設定の3つだけ
+# （「テスト計画・リスク評価」は上流だが、対象にすると表示名と中身がずれるので外す）
+[
+  # 上流
+  [ "企画・要件定義", true ],
+  [ "設計", true ],
+  [ "課題設定", true ],
+  [ "テスト計画・リスク評価", false ],
+  # 中流
+  [ "実装", false ],
+  [ "構築・自動化", false ],
+  [ "データ収集・整備", false ],
+  [ "分析・モデル開発・実験", false ],
+  # 下流
+  [ "テスト・評価", false ],
+  [ "リリース・本番導入", false ],
+  [ "運用・改善", false ],
+  [ "監視・障害対応", false ],
+  [ "発表・論文化", false ]
+].each.with_index(1) do |(name, planning), position|
+  WorkProcess.find_or_initialize_by(name: name).update!(planning: planning, position: position)
+end
+
 # 都道府県。id に JIS コードを指定して入れる（データベース.md の 8-5）。並びがそのまま番号になる
 %w[
   北海道 青森県 岩手県 宮城県 秋田県 山形県 福島県

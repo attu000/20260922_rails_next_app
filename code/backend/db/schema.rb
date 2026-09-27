@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_27_120006) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -156,6 +156,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
     t.index ["job_major_category_id"], name: "index_job_middle_categories_on_job_major_category_id"
   end
 
+  create_table "job_posting_business_types", force: :cascade do |t|
+    t.bigint "business_type_id", null: false
+    t.datetime "created_at", null: false
+    t.bigint "job_posting_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["business_type_id"], name: "index_job_posting_business_types_on_business_type_id"
+    t.index ["job_posting_id", "business_type_id"], name: "idx_on_job_posting_id_business_type_id_4bf92bf436", unique: true
+    t.index ["job_posting_id"], name: "index_job_posting_business_types_on_job_posting_id"
+  end
+
+  create_table "job_posting_industries", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "industry_id", null: false
+    t.bigint "job_posting_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["industry_id"], name: "index_job_posting_industries_on_industry_id"
+    t.index ["job_posting_id", "industry_id"], name: "index_job_posting_industries_on_job_posting_id_and_industry_id", unique: true
+    t.index ["job_posting_id"], name: "index_job_posting_industries_on_job_posting_id"
+  end
+
   create_table "job_posting_job_categories", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "job_middle_category_id", null: false
@@ -177,11 +197,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
     t.index ["technology_id"], name: "index_job_posting_technologies_on_technology_id"
   end
 
+  create_table "job_posting_work_processes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_posting_id", null: false
+    t.integer "role", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "work_process_id", null: false
+    t.index ["job_posting_id", "work_process_id"], name: "idx_on_job_posting_id_work_process_id_fc7dbb1523", unique: true
+    t.index ["job_posting_id"], name: "index_job_posting_work_processes_on_job_posting_id"
+    t.index ["work_process_id"], name: "index_job_posting_work_processes_on_work_process_id"
+  end
+
   create_table "job_postings", force: :cascade do |t|
     t.text "about"
     t.text "business_description"
     t.bigint "company_profile_id", null: false
     t.datetime "created_at", null: false
+    t.integer "culture_atmosphere", limit: 2, default: 0, null: false
+    t.integer "culture_collaboration", limit: 2, default: 0, null: false
+    t.integer "culture_decision", limit: 2, default: 0, null: false
+    t.integer "culture_novelty", limit: 2, default: 0, null: false
+    t.integer "culture_pace", limit: 2, default: 0, null: false
     t.text "growth"
     t.integer "hourly_wage"
     t.text "internship_details"
@@ -205,6 +241,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
     t.index ["company_profile_id"], name: "index_job_postings_on_company_profile_id"
     t.index ["prefecture_id"], name: "index_job_postings_on_prefecture_id"
     t.index ["status", "published_at"], name: "index_job_postings_on_status_and_published_at"
+    t.check_constraint "culture_atmosphere >= '-2'::integer AND culture_atmosphere <= 2", name: "job_postings_culture_atmosphere_range"
+    t.check_constraint "culture_collaboration >= '-2'::integer AND culture_collaboration <= 2", name: "job_postings_culture_collaboration_range"
+    t.check_constraint "culture_decision >= '-2'::integer AND culture_decision <= 2", name: "job_postings_culture_decision_range"
+    t.check_constraint "culture_novelty >= '-2'::integer AND culture_novelty <= 2", name: "job_postings_culture_novelty_range"
+    t.check_constraint "culture_pace >= '-2'::integer AND culture_pace <= 2", name: "job_postings_culture_pace_range"
     t.check_constraint "hourly_wage > 0", name: "job_postings_hourly_wage_positive"
     t.check_constraint "status <> 1 OR internship_details IS NOT NULL AND hourly_wage IS NOT NULL", name: "job_postings_published_requires_details"
   end
@@ -287,6 +328,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
     t.integer "grade"
     t.integer "graduation_year"
     t.string "name", null: false
+    t.integer "personality_atmosphere", limit: 2, default: 0, null: false
+    t.integer "personality_collaboration", limit: 2, default: 0, null: false
+    t.integer "personality_decision", limit: 2, default: 0, null: false
+    t.integer "personality_novelty", limit: 2, default: 0, null: false
+    t.integer "personality_pace", limit: 2, default: 0, null: false
     t.bigint "prefecture_id"
     t.text "self_pr_future"
     t.text "self_pr_strength"
@@ -303,6 +349,11 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
     t.index ["prefecture_id"], name: "index_student_profiles_on_prefecture_id"
     t.index ["university_id"], name: "index_student_profiles_on_university_id"
     t.index ["user_id"], name: "index_student_profiles_on_user_id", unique: true
+    t.check_constraint "personality_atmosphere >= '-2'::integer AND personality_atmosphere <= 2", name: "student_profiles_personality_atmosphere_range"
+    t.check_constraint "personality_collaboration >= '-2'::integer AND personality_collaboration <= 2", name: "student_profiles_personality_collaboration_range"
+    t.check_constraint "personality_decision >= '-2'::integer AND personality_decision <= 2", name: "student_profiles_personality_decision_range"
+    t.check_constraint "personality_novelty >= '-2'::integer AND personality_novelty <= 2", name: "student_profiles_personality_novelty_range"
+    t.check_constraint "personality_pace >= '-2'::integer AND personality_pace <= 2", name: "student_profiles_personality_pace_range"
     t.check_constraint "university_id IS NULL OR university_other_name IS NULL", name: "student_profiles_university_or_other_name"
   end
 
@@ -347,6 +398,15 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
     t.index ["email"], name: "index_users_on_email", unique: true
   end
 
+  create_table "work_processes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.boolean "planning", default: false, null: false
+    t.integer "position", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_work_processes_on_name", unique: true
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "candidacies", "job_postings"
@@ -359,10 +419,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_26_130002) do
   add_foreign_key "company_profiles", "users"
   add_foreign_key "departments", "faculties"
   add_foreign_key "job_middle_categories", "job_major_categories"
+  add_foreign_key "job_posting_business_types", "business_types"
+  add_foreign_key "job_posting_business_types", "job_postings"
+  add_foreign_key "job_posting_industries", "industries"
+  add_foreign_key "job_posting_industries", "job_postings"
   add_foreign_key "job_posting_job_categories", "job_middle_categories"
   add_foreign_key "job_posting_job_categories", "job_postings"
   add_foreign_key "job_posting_technologies", "job_postings"
   add_foreign_key "job_posting_technologies", "technologies"
+  add_foreign_key "job_posting_work_processes", "job_postings"
+  add_foreign_key "job_posting_work_processes", "work_processes"
   add_foreign_key "job_postings", "company_profiles"
   add_foreign_key "job_postings", "prefectures"
   add_foreign_key "message_threads", "company_profiles"
