@@ -50,8 +50,8 @@ RSpec.describe "スカウト（/api/company/scouts）", type: :request do
           # マッチ理由は学生がマッチしたときに選ぶので、スカウトした直後は空
           "tag" => "scouted", "reasons" => [], "matched_at" => nil
         },
-        # スカウトしたあとは、押せるボタンがなくなる（企業はスカウトにマッチできない）
-        "available_actions" => []
+        # スカウトしたあとは「見送る」だけ（企業はスカウトにマッチできない）
+        "available_actions" => [ "decline" ]
       )
     end
 

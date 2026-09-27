@@ -45,6 +45,9 @@ class Candidacy < ApplicationRecord
   scope :excluded_from_student_search, -> { scout.or(where.not(status: :unmatched)) }
   # マッチ以降（マッチ・合格・不合格）のやりとり。メッセージを送れるかの判定に使う（権限_バリデーション.md の 17-2-3）
   scope :after_match, -> { where(status: AFTER_MATCH_STATUSES) }
+  # 企業の候補者一覧（C4。API設計.md の 16-3 ㉑）に既定で出すやりとり。状態が未マッチかマッチのもの。
+  # 見送り・合格・不合格は既定で隠し、show_all のときだけ出す（ページ設計.md の 6-5 C4）
+  scope :listed_in_company_candidacies, -> { where(status: %i[unmatched matched]) }
 
   # ㉛ 応募（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1）。窓口はこれを呼ぶだけにする（技術構成.md の 9-1-1 の4）。
   # まだないやりとりを作るので、クラスのメソッドにしている（PR204）。
@@ -148,11 +151,17 @@ class Candidacy < ApplicationRecord
 
   # 企業がその募集で今押せるボタンの名前の一覧（形D の available_actions。API設計.md の 16-3-2）。
   # 状態遷移表（権限_バリデーション.md の 17-2-1）にしたがって、判定をここ1か所で行う。画面はここに入っているボタンだけを出す。
-  # 窓口ができている操作だけを返す（PR202）。順11 で "decline"・"undo_decline"・"pass"・"fail" を足す
+  # 並びは形D の一覧と同じ（scout、match、decline、undo_decline、pass、fail）
   def self.available_actions_for(job_posting, candidacy)
     actions = []
     actions << "scout" if can_scout?(job_posting, candidacy)
-    actions << "match" if candidacy&.can_match_by_company?
+    return actions if candidacy.nil?
+
+    actions << "match" if candidacy.can_match_by_company?
+    actions << "decline" if candidacy.can_decline?
+    actions << "undo_decline" if candidacy.can_undo_decline?
+    actions << "pass" if candidacy.can_mark_passed?
+    actions << "fail" if candidacy.can_mark_failed?
     actions
   end
 
@@ -206,6 +215,61 @@ class Candidacy < ApplicationRecord
     end
     # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
+  end
+
+  # ㉗〜㉚ 見送り・見送りの取り消し・合格・不合格（API設計.md の 16-3-6、権限_バリデーション.md の 17-2-1。順11）。
+  # 企業が一覧を整理するための操作で、発生元と募集の状態は問わない（終了した募集でもできる）。
+  # どれも状態を1つ書き換えるだけで、ほかの表は触らないので、トランザクションで囲まない。
+  # できない状態なら ConflictError を投げる（窓口では 409）。押せるボタンの判定と同じ can_〜? で確かめる
+
+  # 見送れるか（㉗）。状態が未マッチなら true（応募・スカウトとも）
+  def can_decline?
+    unmatched?
+  end
+
+  # 見送りを取り消せるか（㉘）。状態が見送りなら true（応募・スカウトとも）
+  def can_undo_decline?
+    declined?
+  end
+
+  # 合格にできるか（㉙）。状態がマッチか不合格なら true（不合格からの付け替えを含む）
+  def can_mark_passed?
+    matched? || failed?
+  end
+
+  # 不合格にできるか（㉚）。状態がマッチか合格なら true（合格からの付け替えを含む）
+  def can_mark_failed?
+    matched? || passed?
+  end
+
+  # ㉗ 見送る。状態を見送りにする
+  def decline
+    raise ConflictError unless can_decline?
+
+    update!(status: :declined)
+  end
+
+  # ㉘ 見送りを取り消す。状態を未マッチに戻す（候補者一覧の既定の表示に戻る）
+  def undo_decline
+    raise ConflictError unless can_undo_decline?
+
+    update!(status: :unmatched)
+  end
+
+  # ㉙ 合格として保存する。マッチした日時はそのまま残す。
+  # 名前を pass・fail にしないのは、Ruby に最初からある fail（raise の別名）を上書きしてしまうため。
+  # 合格も不合格に合わせて mark_ を付ける（PR269）
+  def mark_passed
+    raise ConflictError unless can_mark_passed?
+
+    update!(status: :passed)
+  end
+
+  # ㉚ 不合格として保存する。マッチした日時はそのまま残す
+  def mark_failed
+    raise ConflictError unless can_mark_failed?
+
+    update!(status: :failed)
   end
 
   # このやりとりがマッチ以降（マッチ・合格・不合格）か。

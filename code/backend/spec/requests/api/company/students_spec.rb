@@ -87,7 +87,7 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
       expect(response.parsed_body["job_postings"].sole["available_actions"]).to eq([])
     end
 
-    it "応募のある掲載中の募集は、やりとりの状態・タグ・応募理由と、「マッチする」のボタンを返す" do
+    it "応募のある掲載中の募集は、やりとりの状態・タグ・応募理由と、「マッチする」「見送る」のボタンを返す" do
       posting = create(:job_posting, :published, company_profile: company)
       candidacy = create(:candidacy, job_posting: posting, student_profile: student)
       candidacy.save_reasons!(%w[business culture])
@@ -99,7 +99,7 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
           "id" => candidacy.id, "origin" => "application", "status" => "unmatched",
           "tag" => "pending_application", "reasons" => %w[business culture], "matched_at" => nil
         },
-        "available_actions" => [ "match" ]
+        "available_actions" => %w[match decline]
       )
     end
 

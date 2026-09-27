@@ -171,8 +171,8 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
         expect(response.parsed_body).to include(
           "id" => posting.id, "status" => "published",
           "candidacy" => include("id" => candidacy.id, "status" => "matched", "tag" => "matched"),
-          # マッチしたあとは、押せるボタンがなくなる
-          "available_actions" => []
+          # マッチしたあとは、合格・不合格のボタンに変わる（順11）
+          "available_actions" => %w[pass fail]
         )
         expect(MessageThread.where(company_profile: company, student_profile: student).count).to eq(1)
       end
