@@ -1,6 +1,6 @@
 # 性格・カルチャーの5軸を、ここ1か所にまとめる（design/designs/その他決め事.md の 5-5）。
 # 学生の働き方の好み（student_profiles の personality_。画面での呼び名は PR233）と、募集のカルチャー（job_postings の culture_）で、同じ軸を使う。
-# ⑦ GET /api/options が返す5軸と、順10 の比較も、ここの AXES を使う。
+# ⑦ GET /api/options が返す5軸と、⑲ 募集詳細が返す自分の働き方の好み（順10）も、ここの AXES を使う。
 # Django でいえば、複数のモデルに同じバリデーションを持たせる Mixin にあたる
 module CultureAxes
   extend ActiveSupport::Concern

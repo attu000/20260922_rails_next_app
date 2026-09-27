@@ -154,7 +154,9 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         "main_work_process_ids", "involved_work_process_ids", "technology_ids",
         "industry_ids", "business_type_ids",
         "culture_pace", "culture_novelty", "culture_collaboration", "culture_decision", "culture_atmosphere",
-        "published_at", "my_status", "my_candidacy_id", "has_message_thread"
+        "published_at", "my_status", "my_candidacy_id", "has_message_thread",
+        "my_personality_pace", "my_personality_novelty", "my_personality_collaboration",
+        "my_personality_decision", "my_personality_atmosphere"
       )
       expect(body).to include(
         "id" => posting.id,
@@ -206,6 +208,24 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         "culture_pace" => -2,
         "culture_novelty" => 0,
         "culture_atmosphere" => 1
+      )
+    end
+
+    # 順10 で足した項目（PR258）
+    it "自分の働き方の好みの5つを、my_personality_ の名前で返す（カルチャーグラフに黒丸で重ねる）" do
+      student_user.student_profile.update!(personality_pace: 2, personality_decision: -1)
+      posting = create_posting(culture_pace: -2)
+
+      get "/api/student/job_postings/#{posting.id}"
+
+      expect(response.parsed_body).to include(
+        "my_personality_pace" => 2,
+        "my_personality_novelty" => 0,
+        "my_personality_collaboration" => 0,
+        "my_personality_decision" => -1,
+        "my_personality_atmosphere" => 0,
+        # 募集のカルチャーとは別の値
+        "culture_pace" => -2
       )
     end
 

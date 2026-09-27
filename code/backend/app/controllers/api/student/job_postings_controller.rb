@@ -28,6 +28,8 @@ module Api
         @candidacy = current_student.candidacies.find_by(job_posting: @job_posting)
         # この募集の企業と、自分とのスレッドがあるか
         @has_message_thread = MessageThread.exists_between?(@job_posting.company_profile, current_student)
+        # 自分の働き方の好み。カルチャーグラフに黒丸で重ねる（順10。PR258）
+        @student = current_student
       end
 
       private

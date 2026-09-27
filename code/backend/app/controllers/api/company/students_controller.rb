@@ -5,6 +5,11 @@ module Api
     class StudentsController < BaseController
       # 企業向けの学生の行（形C）を出すときに、まとめて読み込む関連（アイコン、プログラミング歴、興味のある職種）
       ROW_ASSOCIATIONS = [ { icon_attachment: :blob }, :student_skills, :student_interested_job_categories ].freeze
+      # 学生詳細の比較（順10）で使う関連。学生の側と募集の側（app/services/student_job_posting_comparison.rb）
+      COMPARISON_STUDENT_ASSOCIATIONS = %i[
+        student_interested_industries student_interested_job_categories student_skills student_commutable_prefectures
+      ].freeze
+      COMPARISON_JOB_POSTING_ASSOCIATIONS = %i[job_posting_industries job_posting_job_categories job_posting_technologies].freeze
 
       # ㉒ 学生検索。条件で結果を減らさず、合致の群を先に並べて返す（処理設計_類似度.md の 7-3）。
       # 検索の本体は app/services/student_search.rb。
@@ -30,18 +35,22 @@ module Api
         @candidacy_counts = current_company.candidacies.where(student_profile_id: student_ids).group(:student_profile_id).count
       end
 
-      # ㉓ 学生のプロフィールと、自社の全募集ぶんの状態・押せるボタン。
+      # ㉓ 学生のプロフィールと、自社の全募集ぶんの状態・押せるボタン・比較。
       # 返事は app/views/api/company/students/show.json.jbuilder
       def show
         # 企業はすべての学生を見られる（16-1-10）。30日以上活動のない学生も、候補者一覧などから開けるよう、ここでは外さない。
-        # 存在しない番号は 404
-        @student = StudentProfile.find(params[:id])
-        # 自社の全募集（非公開・終了も含む）を、⑪ 募集一覧と同じ順（最終更新の新しい順）に
-        @job_postings = current_company.job_postings.order(updated_at: :desc, id: :desc)
+        # 存在しない番号は 404。
+        # 比較に使う関連は、最初にまとめて読み込む（includes。Django の prefetch_related にあたる）。
+        # 募集が何件あっても、学生の関連を募集ごとに読み直さない（N+1問題を避ける）
+        @student = StudentProfile.includes(*COMPARISON_STUDENT_ASSOCIATIONS).find(params[:id])
+        # 自社の全募集（非公開・終了も含む）を、⑪ 募集一覧と同じ順（最終更新の新しい順）に。比較に使う関連も一緒に読む
+        @job_postings = current_company.job_postings.includes(*COMPARISON_JOB_POSTING_ASSOCIATIONS)
+                                       .order(updated_at: :desc, id: :desc)
         # この学生と自社のやりとりを一度にまとめて取り出し、募集の番号で引けるようにする（募集ごとに探しに行かない。N+1問題を避ける）
-        # 押せるボタンの判定で、やりとりから募集の状態を見るので、募集も一緒に読む
+        # 押せるボタンの判定で、やりとりから募集の状態を見るので、募集も一緒に読む。応募理由（reasons）も一緒に読む
         @candidacies_by_job_posting_id = current_company.candidacies.where(student_profile: @student)
-                                                        .includes(:job_posting).index_by(&:job_posting_id)
+                                                        .includes(:job_posting, :candidacy_reasons)
+                                                        .index_by(&:job_posting_id)
         # 自社と、この学生とのスレッドがあるか（募集ごとではなく、学生ごとの値）
         @has_message_thread = MessageThread.exists_between?(current_company, @student)
       end

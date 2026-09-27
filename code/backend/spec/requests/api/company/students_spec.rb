@@ -71,7 +71,9 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
 
       get "/api/company/students/#{student.id}"
 
-      expect(response.parsed_body["job_postings"].sole).to eq(
+      job_posting = response.parsed_body["job_postings"].sole
+      expect(job_posting.keys).to contain_exactly("id", "title", "status", "candidacy", "available_actions", "comparison")
+      expect(job_posting).to include(
         "id" => posting.id, "title" => posting.title, "status" => "published",
         "candidacy" => nil, "available_actions" => [ "scout" ]
       )
@@ -85,19 +87,84 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
       expect(response.parsed_body["job_postings"].sole["available_actions"]).to eq([])
     end
 
-    it "応募のある掲載中の募集は、やりとりの状態・タグと、「マッチする」のボタンを返す" do
+    it "応募のある掲載中の募集は、やりとりの状態・タグ・応募理由と、「マッチする」のボタンを返す" do
       posting = create(:job_posting, :published, company_profile: company)
       candidacy = create(:candidacy, job_posting: posting, student_profile: student)
+      candidacy.save_reasons!(%w[business culture])
 
       get "/api/company/students/#{student.id}"
 
       expect(response.parsed_body["job_postings"].sole).to include(
         "candidacy" => {
           "id" => candidacy.id, "origin" => "application", "status" => "unmatched",
-          "tag" => "pending_application", "matched_at" => nil
+          "tag" => "pending_application", "reasons" => %w[business culture], "matched_at" => nil
         },
         "available_actions" => [ "match" ]
       )
+    end
+
+    # 順10：比較（16-3 ㉓）。項目ごとの判定は spec/services/student_job_posting_comparison_spec.rb で確かめる
+    describe "比較（comparison）" do
+      it "右の列に出す募集の値を返す。職種はメインとサブを1つにまとめ、カルチャーの5つも入れる" do
+        industry = create(:industry)
+        main_category, related_category = create_list(:job_middle_category, 2)
+        technology = create(:technology)
+        prefecture = create(:prefecture)
+        posting = create(:job_posting, company_profile: company,
+                                       min_work_days_per_week: 2, work_style: :onsite, prefecture: prefecture,
+                                       culture_pace: -2)
+        posting.industries << industry
+        posting.job_posting_job_categories.create!(job_middle_category: main_category, role: :main)
+        posting.job_posting_job_categories.create!(job_middle_category: related_category, role: :related)
+        posting.technologies << technology
+
+        get "/api/company/students/#{student.id}"
+
+        # match は、中に match_array（並びを問わない比べ方）を入れられる eq
+        expect(response.parsed_body["job_postings"].sole["comparison"]["job_posting"]).to match(
+          "industry_ids" => [ industry.id ],
+          "job_middle_category_ids" => match_array([ main_category.id, related_category.id ]),
+          "technology_ids" => [ technology.id ],
+          "min_work_days_per_week" => 2, "min_work_hours_per_day" => nil, "min_duration_months" => nil,
+          "start_month" => nil, "work_style" => "onsite", "prefecture_id" => prefecture.id,
+          "culture_pace" => -2, "culture_novelty" => 0, "culture_collaboration" => 0,
+          "culture_decision" => 0, "culture_atmosphere" => 0
+        )
+      end
+
+      it "一致の結果を返す。重なった番号、どちらかが空なら null、稼働条件の6項目" do
+        industry = create(:industry)
+        student.interested_industries << industry
+        student.update!(work_days_per_week: 1)
+        posting = create(:job_posting, company_profile: company, min_work_days_per_week: 2)
+        posting.industries << industry
+
+        get "/api/company/students/#{student.id}"
+
+        comparison = response.parsed_body["job_postings"].sole["comparison"]
+        expect(comparison.keys).to contain_exactly(
+          "job_posting", "industry_ids", "job_middle_category_ids", "technology_ids", "work_conditions"
+        )
+        expect(comparison["industry_ids"]).to eq("matched" => [ industry.id ])
+        expect(comparison["job_middle_category_ids"]).to be_nil
+        expect(comparison["work_conditions"].first).to eq("item" => "work_days_per_week", "result" => "mismatch")
+        expect(comparison["work_conditions"].size).to eq(6)
+      end
+
+      it "募集ごとに、その募集との比較を返す" do
+        industry = create(:industry)
+        student.interested_industries << industry
+        with_industry = create(:job_posting, company_profile: company)
+        with_industry.industries << industry
+        without_industry = create(:job_posting, company_profile: company)
+        with_industry.update_columns(updated_at: 1.day.ago)
+        without_industry.update_columns(updated_at: 2.days.ago)
+
+        get "/api/company/students/#{student.id}"
+
+        industry_results = response.parsed_body["job_postings"].map { |job_posting| job_posting["comparison"]["industry_ids"] }
+        expect(industry_results).to eq([ { "matched" => [ industry.id ] }, nil ])
+      end
     end
 
     it "ほかの学生とのやりとりは、この学生の状態として出さない" do

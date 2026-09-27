@@ -47,7 +47,8 @@ RSpec.describe "スカウト（/api/company/scouts）", type: :request do
         "id" => posting.id, "title" => posting.title, "status" => "published",
         "candidacy" => {
           "id" => candidacy.id, "origin" => "scout", "status" => "unmatched",
-          "tag" => "scouted", "matched_at" => nil
+          # マッチ理由は学生がマッチしたときに選ぶので、スカウトした直後は空
+          "tag" => "scouted", "reasons" => [], "matched_at" => nil
         },
         # スカウトしたあとは、押せるボタンがなくなる（企業はスカウトにマッチできない）
         "available_actions" => []

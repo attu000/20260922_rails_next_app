@@ -4,7 +4,8 @@
 #   - 自分の状態（my_status、my_candidacy_id）：順5（済み）
 #   - その企業とのスレッドがあるか（has_message_thread）：順6（済み）
 #   - 業界・事業形態・工程、カルチャーの5つ：順9（済み）
-#   - カルチャーと自分の働き方の好みとの比較（culture_comparison）：順10
+#   - 自分の働き方の好みの5つ（my_personality_）：順10（済み）。
+#     一致・ずれの判定（culture_comparison）はやめ、カルチャーグラフに自分の値を黒丸で重ねるだけにした（PR258）
 
 company = @job_posting.company_profile
 
@@ -38,3 +39,8 @@ json.extract! @job_posting,
               # カルチャーの5軸（カルチャーグラフ）。−2〜2 の数値
               :culture_pace, :culture_novelty, :culture_collaboration, :culture_decision, :culture_atmosphere,
               :published_at
+# 自分の働き方の好みの5軸。−2〜2 の数値。カルチャーグラフに黒丸で重ねる（PR258）。
+# 名前に my_ を付けて、募集のカルチャー（culture_）と区別する（my_status と同じ付け方）
+CultureAxes::AXES.each do |axis|
+  json.set! "my_personality_#{axis}", @student.public_send("personality_#{axis}")
+end
