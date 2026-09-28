@@ -136,6 +136,88 @@ RSpec.describe Candidacy, type: :model do
     end
   end
 
+  # 順12：学生が興味を示したあと（応募・スカウトへのマッチ）だけ、推薦の集計を数え直すジョブを積む（処理設計_類似度.md の 7-5）。
+  # テストでは、ジョブは実行されず、積まれたことだけが記録される（config/environments/test.rb の queue_adapter = :test）
+  describe "推薦のジョブ（InterestRecordedJob）を積むか" do
+    let(:posting) { create(:job_posting, :published) }
+    let(:student) { create(:student_user).student_profile }
+
+    describe ".apply（応募）" do
+      it "応募すると、そのやりとりについて、推薦の待ち行列にジョブを1つ積む" do
+        expect { described_class.apply(student, posting, %w[business]) }
+          .to have_enqueued_job(InterestRecordedJob)
+          .on_queue("recommendation")
+          .with(an_object_having_attributes(student_profile_id: student.id, job_posting_id: posting.id))
+      end
+
+      it "応募理由に誤りがあって保存しなかったときは、積まない" do
+        expect { described_class.apply(student, posting, []) }.not_to have_enqueued_job(InterestRecordedJob)
+      end
+
+      it "終了した募集への応募（409）では、積まない" do
+        closed = create(:job_posting, :closed)
+
+        expect {
+          expect { described_class.apply(student, closed, %w[business]) }.to raise_error(ConflictError)
+        }.not_to have_enqueued_job(InterestRecordedJob)
+      end
+
+      it "外側のトランザクションの中では積まず、外側が確定してから積む" do
+        candidacy = nil
+
+        ActiveRecord::Base.transaction do
+          candidacy = described_class.apply(student, posting, %w[business])
+          expect(InterestRecordedJob).not_to have_been_enqueued.with(candidacy)
+        end
+
+        expect(InterestRecordedJob).to have_been_enqueued.with(candidacy)
+      end
+
+      it "外側のトランザクションが取り消されたら、積まない" do
+        expect {
+          ActiveRecord::Base.transaction do
+            described_class.apply(student, posting, %w[business])
+            raise ActiveRecord::Rollback
+          end
+        }.not_to have_enqueued_job(InterestRecordedJob)
+      end
+    end
+
+    describe "#match_by_student（学生がスカウトにマッチ）" do
+      it "マッチすると、そのやりとりについてジョブを積む" do
+        candidacy = create(:candidacy, :scout, student_profile: student, job_posting: posting)
+
+        expect { candidacy.match_by_student(%w[culture]) }
+          .to have_enqueued_job(InterestRecordedJob).on_queue("recommendation").with(candidacy)
+      end
+
+      it "マッチ理由に誤りがあって保存しなかったときは、積まない" do
+        candidacy = create(:candidacy, :scout, student_profile: student, job_posting: posting)
+
+        expect { candidacy.match_by_student([]) }.not_to have_enqueued_job(InterestRecordedJob)
+      end
+
+      it "応募から始まったやりとり（409）では、積まない" do
+        candidacy = create(:candidacy, student_profile: student, job_posting: posting)
+
+        expect {
+          expect { candidacy.match_by_student(%w[culture]) }.to raise_error(ConflictError)
+        }.not_to have_enqueued_job(InterestRecordedJob)
+      end
+    end
+
+    it "企業のマッチ・見送り・スカウトの送信では、積まない（7-5 の「更新しない出来事」）" do
+      application = create(:candidacy, job_posting: posting)
+      declined = create(:candidacy, job_posting: posting)
+
+      expect {
+        application.match
+        declined.decline
+        described_class.send_scout(posting, student, "ぜひお話ししたいです")
+      }.not_to have_enqueued_job(InterestRecordedJob)
+    end
+  end
+
   # 番号は保存されている値そのものなので、並べ替えなどでずれると、既存のデータの意味が変わってしまう（技術構成.md の 9-1）
   describe "enum の番号" do
     it "発生元と状態の番号が、設計書の表と一致する" do

@@ -73,7 +73,9 @@ class Candidacy < ApplicationRecord
       candidacy.save!
       candidacy.save_reasons!(reasons)
     end
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
+    # 推薦の集計を裏側で数え直す（処理設計_類似度.md の 7-5）。
+    # 外側にもトランザクションがあれば、それが確定するまで積まない（ApplicationJob の enqueue_after_transaction_commit）
+    InterestRecordedJob.perform_later(candidacy)
     candidacy
   rescue ActiveRecord::RecordNotUnique
     # 同時に2回押され、データベースの「同じ募集×学生のやりとりは1件だけ」に弾かれた。応募済みと同じ扱いにする
@@ -218,7 +220,8 @@ class Candidacy < ApplicationRecord
       update!(status: :matched, matched_at: Time.current)
       save_reasons!(reasons)
     end
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
+    # 推薦の集計を裏側で数え直す（応募と同じ。処理設計_類似度.md の 7-5）
+    InterestRecordedJob.perform_later(self)
     true
   end
 
