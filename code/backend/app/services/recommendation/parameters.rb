@@ -55,5 +55,10 @@ module Recommendation
 
     # 学生検索の1次検索で、行動の経路から取る学生の数の上限（K_B 件 × L_P 人）
     BEHAVIOR_ROUTE_MAX_STUDENTS = 4000
+
+    # 以下は順14（似たもののポップアップ）で足したもの（7-3・7-4）
+
+    # 似たもののポップアップ（似た学生・似た募集）に出す件数。順15 の通知の上位5社も同じ数を使う（PR318）
+    SIMILAR_LIMIT = 5
   end
 end

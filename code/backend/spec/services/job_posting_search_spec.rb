@@ -243,6 +243,35 @@ RSpec.describe JobPostingSearch do
     end
   end
 
+  # 似た募集のポップアップで、「自分の稼働条件で選ぶ」と同じ条件を作る（PR313）
+  describe ".work_condition_params（学生の稼働条件から条件を作る）" do
+    it "学生の上限・開始可能月・可能な勤務形態・出社できる都道府県を条件にする。空欄の項目は入れない" do
+      prefecture = create(:prefecture)
+      student.update!(work_days_per_week: 3, available_from: Date.new(2026, 11, 1), can_onsite: false,
+                      commutable_prefecture_ids: [ prefecture.id ])
+
+      params = described_class.work_condition_params(student)
+
+      expect(params.except(:work_styles)).to eq(
+        work_days_per_week: 3, available_from: "2026-11-01", prefecture_ids: [ prefecture.id ]
+      )
+      expect(params[:work_styles]).to contain_exactly("full_remote", "partial_remote")
+    end
+
+    it "勤務形態を3つとも可能にしていれば、勤務形態は条件に入れない。何も入力していなければ空" do
+      expect(described_class.work_condition_params(student)).to eq({})
+    end
+
+    it "作った条件で、学生の稼働条件に合う募集が合う" do
+      student.update!(work_days_per_week: 3, can_onsite: false)
+      matched = create_posting(min_work_days_per_week: 3, work_style: :full_remote)
+      create_posting(min_work_days_per_week: 3, work_style: :onsite)
+      create_posting(min_work_days_per_week: 5, work_style: :full_remote)
+
+      expect(matched_ids(described_class.work_condition_params(student))).to eq([ matched.id ])
+    end
+  end
+
   describe "③ 稼働条件（PR200）" do
     # 学生が「3まで」を選ぶと、募集の下限が3以下なら合う。空欄は合わない。
     # 募集の値は、それぞれの選択肢の中から、3より小さい・3・3より大きいものを使う（継続期間の選択肢に2はない）

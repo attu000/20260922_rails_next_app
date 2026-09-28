@@ -29,6 +29,26 @@ class JobPostingSearch
     duration_months: :min_duration_months
   }.freeze
 
+  # 学生の稼働条件を、この検索の条件（params）の形にして返す（PR313）。
+  # 募集一覧の「自分の稼働条件で選ぶ」ボタン（画面側）で入る中身と同じにし、
+  # 似た募集のポップアップ（SimilarJobPostings）の「稼働条件に合う」を、検索と同じ意味にする。
+  #   勤務形態は、学生が「可能」にした形。3つとも可能なら、どれでもよいので条件にしない
+  #   勤務地は、学生の出社できる都道府県
+  #   土日OK は、学生の側に項目がないので入れない
+  # 学生が空欄の項目は入れない（条件にしない）
+  def self.work_condition_params(student)
+    work_styles = JobPosting.work_styles.keys.select { |style| student.public_send("can_#{style}") }
+    work_styles = [] if work_styles.size == JobPosting.work_styles.size
+    {
+      work_days_per_week: student.work_days_per_week,
+      work_hours_per_day: student.work_hours_per_day,
+      duration_months: student.duration_months,
+      available_from: student.available_from&.iso8601,
+      work_styles: work_styles,
+      prefecture_ids: student.commutable_prefecture_ids
+    }.compact_blank
+  end
+
   # student：検索している学生（おすすめの点数に使う）。
   # params：画面から送られた条件（q、prefecture_ids、job_major_category_ids、job_middle_category_ids、technology_ids、
   #   work_days_per_week、work_hours_per_day、duration_months、available_from、work_styles、weekend_ok、work_process_ids、
@@ -56,6 +76,12 @@ class JobPostingSearch
     matched_scope.where(id: ids).pluck(:id)
   end
 
+  # 指定した条件を全部満たす募集を、渡した候補（募集の問い合わせ）の中から選ぶ。
+  # 検索の対象（base）とは除外が違う場面（似た募集のポップアップ）で、条件の当て方だけを使い回すため（PR313）
+  def matched_within(scope)
+    conditions.reduce(scope) { |narrowed, condition| narrowed.and(condition) }
+  end
+
   private
 
   # 対象は掲載中の募集のうち、自分の募集管理に載っている募集（応募した募集と、マッチした募集）を除いたもの（PR253）。
@@ -71,7 +97,7 @@ class JobPostingSearch
   # 指定した条件を全部満たす募集。条件が1つもなければ base と同じ（全件が合致）。
   # and は「両方の where を AND でつなぐ」（Django の filter(条件1).filter(条件2) にあたる）
   def matched_scope
-    @matched_scope ||= conditions.reduce(base) { |scope, condition| scope.and(condition) }
+    @matched_scope ||= matched_within(base)
   end
 
   # 指定された条件だけを集める。指定がないもの（nil）は入れない

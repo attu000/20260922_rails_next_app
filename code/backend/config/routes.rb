@@ -61,6 +61,9 @@ Rails.application.routes.draw do
         resource :message_thread, only: :show do
           resources :messages, only: :create
         end
+        # ㉕ GET /api/company/students/:student_id/similar_students（この学生に似た学生。順14）。
+        # 学生の下にある別の一覧として、コントローラーを分ける（チャットと同じ形）
+        resources :similar_students, only: :index
       end
       # ㉔ POST /api/company/scouts（スカウト）
       resources :scouts, only: :create
@@ -79,7 +82,10 @@ Rails.application.routes.draw do
       end
 
       # ⑱ GET /api/student/job_postings（募集検索）、⑲ GET /api/student/job_postings/:id（募集詳細）
-      resources :job_postings, only: %i[index show]
+      resources :job_postings, only: %i[index show] do
+        # ㉝ GET /api/student/job_postings/:job_posting_id/similar_job_postings（この募集に似た募集。順14）
+        resources :similar_job_postings, only: :index
+      end
       # ⑳ GET /api/student/companies/:id（企業詳細）
       resources :companies, only: :show do
         # ㊵ GET /api/student/companies/:company_id/message_thread（その企業とのチャット）、

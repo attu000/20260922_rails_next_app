@@ -282,6 +282,28 @@ RSpec.describe StudentSearch do
     end
   end
 
+  # 似た学生のポップアップで、「この募集の稼働条件で選ぶ」と同じ条件を作る（PR313）
+  describe ".work_condition_params（募集の稼働条件から条件を作る）" do
+    it "募集の下限・開始月・勤務形態・都道府県を条件にする。空欄の項目は入れない" do
+      prefecture = create(:prefecture)
+      job_posting = create(:job_posting, min_work_days_per_week: 3, min_duration_months: 6,
+                                         work_style: :onsite, prefecture: prefecture)
+
+      expect(described_class.work_condition_params(job_posting)).to eq(
+        work_days_per_week: 3, duration_months: 6, work_style: "onsite", prefecture_id: prefecture.id
+      )
+    end
+
+    it "作った条件で、募集の稼働条件に合う学生が合う" do
+      job_posting = create(:job_posting, min_work_days_per_week: 3, start_month: Time.zone.today.next_month.beginning_of_month)
+      matched = create_student(work_days_per_week: 3, available_from: Time.zone.today.beginning_of_month)
+      create_student(work_days_per_week: 3, available_from: Time.zone.today.next_month(2).beginning_of_month)
+      create_student(work_days_per_week: 2)
+
+      expect(matched_ids(described_class.work_condition_params(job_posting))).to eq([ matched.id ])
+    end
+  end
+
   describe "使用技術とレベル" do
     let(:ruby) { create(:technology) }
     let(:go) { create(:technology) }

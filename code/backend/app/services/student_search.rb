@@ -26,6 +26,21 @@ class StudentSearch
     "onsite" => :can_onsite
   }.freeze
 
+  # 募集の稼働条件を、この検索の条件（params）の形にして返す（PR313）。
+  # 学生検索の「この募集の稼働条件で選ぶ」ボタン（画面側）で入る中身と同じにし、
+  # 似た学生のポップアップ（SimilarStudents）の「稼働条件に合う」を、検索と同じ意味にする。
+  # 募集が空欄の項目は入れない（条件にしない）。勤務地は、フルリモートなら下の prefecture_condition が使わない
+  def self.work_condition_params(job_posting)
+    {
+      work_days_per_week: job_posting.min_work_days_per_week,
+      work_hours_per_day: job_posting.min_work_hours_per_day,
+      duration_months: job_posting.min_duration_months,
+      start_month: job_posting.start_month&.iso8601,
+      work_style: job_posting.work_style,
+      prefecture_id: job_posting.prefecture_id
+    }.compact
+  end
+
   # company：検索している会社（募集を選んでいないときの除外に使う）。
   # job_posting：選んだ自社の募集（除外とおすすめの点数に使う）。選んでいなければ nil。
   # params：画面から送られた条件（q、work_days_per_week、work_hours_per_day、duration_months、start_month、work_style、
@@ -52,6 +67,12 @@ class StudentSearch
   # 渡した番号のうち、合致する学生の番号（1ページ分の行に matched を付けるため）
   def matched_ids_in(ids)
     matched_scope.where(id: ids).pluck(:id)
+  end
+
+  # 指定した条件を全部満たす学生を、渡した候補（学生の問い合わせ）の中から選ぶ。
+  # 検索の対象（base）とは除外が違う場面（似た学生のポップアップ）で、条件の当て方だけを使い回すため（PR313）
+  def matched_within(scope)
+    conditions.reduce(scope) { |narrowed, condition| narrowed.and(condition) }
   end
 
   private
@@ -99,7 +120,7 @@ class StudentSearch
   # 指定した条件を全部満たす学生。条件が1つもなければ base と同じ（全員が合致）。
   # and は「両方の where を AND でつなぐ」（Django の filter(条件1).filter(条件2) にあたる）
   def matched_scope
-    @matched_scope ||= conditions.reduce(base) { |scope, condition| scope.and(condition) }
+    @matched_scope ||= matched_within(base)
   end
 
   # 指定された条件だけを集める。指定がないもの（nil）は入れない
