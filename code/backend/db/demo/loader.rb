@@ -89,6 +89,9 @@ class DemoLoader
                              .or(ActiveStorage::Attachment.where(record_type: "StudentProfile", record_id: student_ids))
                              .find_each(&:purge)
 
+    # 仮のアカウント宛ての通知と、仮の学生についての通知（順15。PR327）。
+    # 試しのアカウント宛てでも、相手が仮の学生なら消す（押した先の学生がいなくなるため）
+    Notification.where(user_id: user_ids).or(Notification.where(student_profile_id: student_ids)).delete_all
     Session.where(user_id: user_ids).delete_all
     CompanyProfile.where(id: company_ids).delete_all
     StudentProfile.where(id: student_ids).delete_all

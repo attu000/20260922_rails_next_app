@@ -131,6 +131,9 @@ class BenchLoader
                              .or(ActiveStorage::Attachment.where(record_type: "StudentProfile", record_id: student_ids))
                              .find_each(&:purge)
 
+    # 測定用のアカウント宛ての通知と、測定用の学生についての通知（順15。PR327）。
+    # 応募のジョブが作るので、測定用のデータで画面から応募したときなどにできる
+    Notification.where(user_id: user_ids).or(Notification.where(student_profile_id: student_ids)).delete_all
     Session.where(user_id: user_ids).delete_all
     CompanyProfile.where(id: company_ids).delete_all
     StudentProfile.where(id: student_ids).delete_all

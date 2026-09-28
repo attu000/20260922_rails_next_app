@@ -7,7 +7,8 @@
 #     合致の印 → 合致の件数）。JSON を作る部分は含めない。条件なし（群が1つ）と条件あり（群が2つ）の両方
 #   - 似た学生のポップアップ（スカウト後）、似た募集のポップアップ（応募完了）：窓口がする部分（5件を選ぶ → 行と関連の読み込み。順14）。
 #     近さの部品の印を通らない1本の問い合わせなので、工程の内訳は出ない
-#   - 応募・マッチのときのジョブ（InterestRecordedJob）、全体の作り直し（RecommendationStatsRebuildJob）
+#   - 応募・マッチのときのジョブ（InterestRecordedJob。集計の数え直しと通知。1回ごとに取り消す。PR328）、
+#     全体の作り直し（RecommendationStatsRebuildJob）
 #
 # 工程ごとの内訳は、推薦の部品が付けた印（*.recommendation。PR307）を受け取って足し合わせる。
 #   ① content（内容の近さの SQL）② first_pass（行動の近さと 1次検索の点 F1）③ rerank（上位 R 件の f(P, S)）
@@ -106,8 +107,14 @@ class BenchMeasurer
 
   def measure_jobs(students)
     candidacies = Candidacy.interests.where(student_profile_id: students.map(&:id)).order(:id).to_a.sample(TARGETS, random: @random)
-    report("応募・マッチのときのジョブ：集計の数え直し（やりとり#{candidacies.size}件 × #{RUNS}回）", candidacies) do |candidacy|
-      InterestRecordedJob.perform_now(candidacy)
+    # 1回ごとに取り消す（PR328）。取り消さないと、2回目からは「同じ会社には二度届けない」（PR322）で次の会社を探し、
+    # 回ごとに仕事の量が変わるうえ、通知がたまるため。集計は元データから数え直す値なので、取り消しても元の値と同じ。
+    # 取り消しの分だけ、わずかに時間が足される。Django の transaction.atomic() の中で set_rollback(True) を呼ぶのにあたる
+    report("応募・マッチのときのジョブ：集計の数え直しと通知（やりとり#{candidacies.size}件 × #{RUNS}回）", candidacies) do |candidacy|
+      ActiveRecord::Base.transaction do
+        InterestRecordedJob.perform_now(candidacy)
+        raise ActiveRecord::Rollback
+      end
     end
     # 全体の作り直しは重いので、準備運動なしで1回だけ
     report("全体の作り直し（1回）", [ nil ], runs: 1, warm_up: false) { RecommendationStatsRebuildJob.perform_now }
