@@ -1,6 +1,6 @@
 # 一覧のページ分けを、ここ1か所にまとめる（design/designs/API設計.md の 16-1-11・16-1-14）。
-# 部品は Pagy。データベースの結果（SQL で並べたもの）も、Ruby の配列（おすすめ順で点数を付けて並べたもの）も、
-# 同じ paginate で分けられる（技術構成.md の 9-1-1 の2）。
+# 部品は Pagy。データベースの結果（SQL で並べたもの）を分ける。おすすめ順も、上位の並びを SQL の並べ替えに入れて
+# データベースで並べるので、同じ通り道になる（技術構成.md の 9-1-1 の2。PR295）。Pagy は Ruby の配列も分けられる。
 # Django の Paginator(queryset, 20).get_page(request.GET.get("page")) にあたる
 module Pagination
   extend ActiveSupport::Concern
@@ -18,8 +18,7 @@ module Pagination
   end
 
   # 分けたページの行に、関連するデータ（会社、アイコンなど）をまとめて読み込み、配列で返す。
-  # 1行ごとに問い合わせが増える N+1問題を避けるため。
-  # データベースの結果でも配列でも使えるよう、取り出したあとの行にかける。
+  # 1行ごとに問い合わせが増える N+1問題を避けるため。取り出したあとの行にかける。
   # Django の prefetch_related_objects(行の一覧, *関連) にあたる
   def preload_records(records, associations)
     records = records.to_a

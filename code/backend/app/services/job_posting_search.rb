@@ -44,9 +44,8 @@ class JobPostingSearch
     matched_scope.count
   end
 
-  # 並べた一覧（ページ分けの前）。
-  # 新着順はデータベースの結果（SQL で並べる）、おすすめ順は Ruby の配列（点数を付けて並べる）を返す。
-  # どちらも concerns/pagination.rb の paginate でページに分けられる（技術構成.md の 9-1-1 の2）
+  # 並べた一覧（ページ分けの前）。新着順もおすすめ順も、データベースの結果（SQL で並べる）を返す。
+  # concerns/pagination.rb の paginate でページに分ける（技術構成.md の 9-1-1 の2。PR295）
   def ordered
     @sort == "newest" ? ordered_by_newest : ordered_by_recommendation
   end
@@ -94,21 +93,23 @@ class JobPostingSearch
     )
   end
 
-  # おすすめ順：合致なら0・合致外なら1 → 点数の高い順 → 同点なら新着順（16-3 ⑱）。
-  # 点数は JobPostingRecommender が付ける（今は仮の全件0点なので、並びは新着順と同じ）
+  # おすすめ順：合致なら0・合致外なら1 → 群ごとの上位 R 件（f の高い順）→ 残りは新着順（16-3 ⑱。PR280）。
+  # 上位の並びは JobPostingRecommender が計算し、番号の並びだけを返す。並べ替えとページ分けはデータベースで行う（PR295）。
+  # 上位の並びにない募集（上位 R 件に入らなかったもの）は、array_position が空（NULL）になり、NULLS LAST で同じ群の上位より後ろに回る。
+  # Django の order_by(F("rank").asc(nulls_last=True)) にあたる
   def ordered_by_recommendation
-    job_postings = base.to_a
-    scores = JobPostingRecommender.scores(@student, job_postings)
-    matched_ids = matched_scope.pluck(:id).to_set
+    matched_sql = matched_scope.select(:id).to_sql
+    # 合わない群は「base のうち、合う群以外」。条件を反対にして作ると、未入力の扱いなどの決まりを2か所に書くことになるため
+    unmatched_scope = base.where.not(id: matched_scope.select(:id))
+    ranked_ids = JobPostingRecommender.ranked_ids(@student, [ matched_scope, unmatched_scope ])
 
-    job_postings.sort_by do |job_posting|
-      [
-        matched_ids.include?(job_posting.id) ? 0 : 1,
-        -scores.fetch(job_posting.id),
-        -job_posting.published_at.to_f,
-        -job_posting.id
-      ]
-    end
+    base.order(
+      Arel.sql("CASE WHEN job_postings.id IN (#{matched_sql}) THEN 0 ELSE 1 END"),
+      # 番号は Rails の中で計算した整数だけなので、SQL に直接書いてよい
+      Arel.sql("array_position(ARRAY[#{ranked_ids.map(&:to_i).join(',')}]::bigint[], job_postings.id) NULLS LAST"),
+      published_at: :desc,
+      id: :desc
+    )
   end
 
   # ① フリーワード：空白（全角の空白も）で区切ったすべての語が、次のどこかに含まれる募集（PR198）。

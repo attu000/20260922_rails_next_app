@@ -43,9 +43,8 @@ class StudentSearch
     matched_scope.count
   end
 
-  # 並べた一覧（ページ分けの前）。
-  # 最終活動の順はデータベースの結果（SQL で並べる）、おすすめ順は Ruby の配列（点数を付けて並べる）を返す。
-  # どちらも concerns/pagination.rb の paginate でページに分けられる（技術構成.md の 9-1-1 の2）
+  # 並べた一覧（ページ分けの前）。最終活動の順もおすすめ順も、データベースの結果（SQL で並べる）を返す。
+  # concerns/pagination.rb の paginate でページに分ける（技術構成.md の 9-1-1 の2。PR295）
   def ordered
     @sort == "recommended" ? ordered_by_recommendation : ordered_by_last_active
   end
@@ -123,22 +122,22 @@ class StudentSearch
     )
   end
 
-  # おすすめ順：合致なら0・合致外なら1 → 点数の高い順 → 同点なら最終活動の順（16-3 ㉒）。
-  # 点数は StudentRecommender が付ける（今は仮の全員0点なので、並びは最終活動の順と同じ。PR214）
+  # おすすめ順：合致なら0・合致外なら1 → 群ごとの上位 R 人（f の高い順）→ 残りは最終活動の新しい順（16-3 ㉒。PR280）。
+  # 上位の並びは StudentRecommender が計算し、番号の並びだけを返す。並べ替えとページ分けはデータベースで行う（PR295）。
+  # 上位の並びにない学生は、array_position が空（NULL）になり、NULLS LAST で同じ群の上位より後ろに回る（募集検索と同じ形）
   def ordered_by_recommendation
-    students = base.includes(:user).to_a
-    scores = StudentRecommender.scores(@job_posting, students)
-    matched_ids = matched_scope.pluck(:id).to_set
+    matched_sql = matched_scope.select(:id).to_sql
+    # 合わない群は「base のうち、合う群以外」（募集検索と同じ考え方）
+    unmatched_scope = base.where.not(id: matched_scope.select(:id))
+    ranked_ids = StudentRecommender.ranked_ids(@job_posting, [ matched_scope, unmatched_scope ])
 
-    students.sort_by do |student|
-      [
-        matched_ids.include?(student.id) ? 0 : 1,
-        -scores.fetch(student.id),
-        # 日付を「紀元前からの日数」（jd）にして、新しい日ほど小さくなるよう符号を反転する
-        -student.user.last_active_on.jd,
-        -student.id
-      ]
-    end
+    base.joins(:user).order(
+      Arel.sql("CASE WHEN student_profiles.id IN (#{matched_sql}) THEN 0 ELSE 1 END"),
+      # 番号は Rails の中で計算した整数だけなので、SQL に直接書いてよい
+      Arel.sql("array_position(ARRAY[#{ranked_ids.map(&:to_i).join(',')}]::bigint[], student_profiles.id) NULLS LAST"),
+      Arel.sql("users.last_active_on DESC"),
+      id: :desc
+    )
   end
 
   # フリーワード：空白（全角の空白も）で区切ったすべての語が、次のどこかに含まれる学生（16-3 ㉒）。

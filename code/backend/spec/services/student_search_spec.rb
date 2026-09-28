@@ -147,21 +147,51 @@ RSpec.describe StudentSearch do
       expect(search({ grades: [ "undergrad_3" ] }).ordered.map(&:id)).to eq(expected_order)
     end
 
-    it "募集を選べば、おすすめ順が既定になる。今は全員0点なので、並びは最終活動の順と同じ（PR214）" do
+    it "募集を選べば、おすすめ順が既定になる。推薦の集計の行がない学生は上位の並びに入らないので、最終活動の順と同じ並び" do
       job_posting = create(:job_posting, :published, company_profile: company)
+      expect(StudentRecommender).to receive(:ranked_ids).and_call_original
 
-      result = search({ grades: [ "undergrad_3" ] }, job_posting: job_posting)
+      # ordered は呼ぶたびに上位の並びを計算し直すので、1回だけ呼ぶ
+      ordered = search({ grades: [ "undergrad_3" ] }, job_posting: job_posting).ordered
 
-      # おすすめ順は点数を付けて Ruby で並べるので、配列が返る
-      expect(result.ordered).to be_an(Array)
-      expect(result.ordered.map(&:id)).to eq(expected_order)
+      # おすすめ順も SQL で並べる（PR295）
+      expect(ordered).to be_a(ActiveRecord::Relation)
+      expect(ordered.map(&:id)).to eq(expected_order)
     end
 
-    it "募集を選ばなければ、おすすめ順を指定しても最終活動の順になる（窓口では 422 にしてある）" do
+    it "募集を選ばなければ、おすすめ順を指定しても最終活動の順になり、上位の並びを計算しない（窓口では 422 にしてある）" do
+      expect(StudentRecommender).not_to receive(:ranked_ids)
+
       result = search({ grades: [ "undergrad_3" ], sort: "recommended" })
 
-      expect(result.ordered).not_to be_an(Array)
       expect(result.ordered.map(&:id)).to eq(expected_order)
+    end
+  end
+
+  # 順13：おすすめ順は、群ごとの上位 R 人を f の高い順に並べ、残りを最終活動の新しい順に続ける（処理設計_類似度.md の 7-3・7-5。PR280）
+  describe "おすすめ順の、上位と残りの並び" do
+    let(:ruby) { create(:technology) }
+    # 募集は Ruby を使う。Ruby を持つ学生は内容の近さ 0.40、ほかは 0.10
+    let(:job_posting) do
+      create(:job_posting, :published, company_profile: company).tap { |posting| posting.save_posting(technology_ids: [ ruby.id ]) }
+    end
+
+    it "R = 1 なら、合う群の上位1人（最終活動は古いが点が最も高い）→ 合う群の残り（最終活動の新しい順）→ 合わない群も同じ形" do
+      stub_const("Recommendation::Parameters::RERANK_SIZE", 1)
+      matched_best = create_student(grade: :undergrad_3, last_active_on: Time.zone.today - 5).tap { |student| add_skill(student, ruby, :v1) }
+      matched_middle = create_student(grade: :undergrad_3, last_active_on: Time.zone.today - 3)
+      matched_new = create_student(grade: :undergrad_3, last_active_on: Time.zone.today - 1)
+      unmatched_best = create_student(grade: :master_1, last_active_on: Time.zone.today - 10).tap { |student| add_skill(student, ruby, :v1) }
+      unmatched_new = create_student(grade: :master_1, last_active_on: Time.zone.today - 2)
+      job_posting
+      RecommendationStatsRebuildJob.perform_now
+
+      ordered = search({ grades: [ "undergrad_3" ] }, job_posting: job_posting).ordered
+
+      expect(ordered.map(&:id)).to eq([
+        matched_best.id, matched_new.id, matched_middle.id,
+        unmatched_best.id, unmatched_new.id
+      ])
     end
   end
 

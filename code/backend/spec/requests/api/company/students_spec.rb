@@ -285,15 +285,20 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         expect(response.parsed_body["errors"].keys).to eq([ "job_posting_id" ])
       end
 
-      it "自社の募集を選べば、おすすめ順で並べられる（今は仮の全員0点なので、最終活動の新しい順。PR214）" do
+      it "自社の募集を選べば、おすすめ順で並べられる。最終活動の順より、おすすめの点が優先される（順13）" do
+        ruby = create(:technology)
         job_posting = create(:job_posting, company_profile: company)
+        job_posting.save_posting(technology_ids: [ ruby.id ])
+        # older は最終活動が古いが、募集の技術（Ruby）を持っている
         older = create(:student_user, last_active_on: Time.zone.today - 3).student_profile
+        older.save_profile(skills: [ { technology_id: ruby.id, level: "v1" } ])
         newer = create(:student_user, last_active_on: Time.zone.today - 1).student_profile
+        RecommendationStatsRebuildJob.perform_now
 
         get "/api/company/students", params: { job_posting_id: job_posting.id, sort: "recommended" }
 
         expect(response).to have_http_status(:ok)
-        expect(response.parsed_body["items"].map { |item| item["id"] }).to eq([ newer.id, older.id ])
+        expect(response.parsed_body["items"].map { |item| item["id"] }).to eq([ older.id, newer.id ])
       end
 
       # 行のタグ（PR219）。スカウト済み・見送り・マッチ以降の学生は検索の本体が除く（PR220）ので、残るのは未対応応募だけ

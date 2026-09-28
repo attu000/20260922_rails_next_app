@@ -49,7 +49,6 @@ class CompanyProfile < ApplicationRecord
 
     # まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
     transaction { write_profile! }
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
   end
 

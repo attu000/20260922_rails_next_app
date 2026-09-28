@@ -303,16 +303,54 @@ RSpec.describe JobPostingSearch do
       expect(ordered.map(&:id)).to eq(expected_ids)
     end
 
-    it "おすすめ順：仮の点数は全件0点なので、新着順と同じ並び。Ruby の配列で並べる" do
+    it "おすすめ順：推薦の集計の行がない募集は上位の並びに入らないので、新着順と同じ並び。これも SQL で並べる（PR295）" do
       ordered = search(q: "ruby", sort: "recommended").ordered
 
-      expect(ordered).to be_a(Array)
+      expect(ordered).to be_a(ActiveRecord::Relation)
       expect(ordered.map(&:id)).to eq(expected_ids)
     end
 
-    it "並び順を省いたときと、知らない値のときは、おすすめ順" do
-      expect(search(q: "ruby").ordered).to be_a(Array)
-      expect(search(q: "ruby", sort: "unknown").ordered).to be_a(Array)
+    it "並び順を省いたときと、知らない値のときは、おすすめ順（上位の並びを計算する）" do
+      expect(JobPostingRecommender).to receive(:ranked_ids).twice.and_call_original
+
+      search(q: "ruby").ordered
+      search(q: "ruby", sort: "unknown").ordered
+    end
+
+    it "新着順では、上位の並びを計算しない" do
+      expect(JobPostingRecommender).not_to receive(:ranked_ids)
+
+      search(q: "ruby", sort: "newest").ordered.to_a
+    end
+  end
+
+  # 順13：おすすめ順は、群ごとの上位 R 件を f の高い順に並べ、残りを新着順に続ける（処理設計_類似度.md の 7-3・7-5。PR280）
+  describe "おすすめ順の、上位と残りの並び" do
+    let(:ruby) { create(:technology) }
+
+    # 学生は Ruby を持っている。Ruby を使う募集は内容の近さ 0.40、ほかは 0.10
+    def create_ranked_posting(title:, published_at:, uses_ruby: false)
+      create_posting(title: title, published_at: published_at).tap do |posting|
+        posting.save_posting(technology_ids: uses_ruby ? [ ruby.id ] : [])
+      end
+    end
+
+    it "R = 1 なら、合う群の上位1件（いちばん古いが点が最も高い）→ 合う群の残り（新着順）→ 合わない群も同じ形" do
+      stub_const("Recommendation::Parameters::RERANK_SIZE", 1)
+      student.save_profile(skills: [ { technology_id: ruby.id, level: "v1" } ])
+      matched_best = create_ranked_posting(title: "Ruby いちばん古い", published_at: 3.days.ago, uses_ruby: true)
+      matched_middle = create_ranked_posting(title: "Ruby 中くらい", published_at: 2.days.ago)
+      matched_new = create_ranked_posting(title: "Ruby 新しい", published_at: 1.day.ago)
+      unmatched_best = create_ranked_posting(title: "Go 古い", published_at: 5.days.ago, uses_ruby: true)
+      unmatched_new = create_ranked_posting(title: "Go 新しい", published_at: 4.days.ago)
+      RecommendationStatsRebuildJob.perform_now
+
+      ordered = search(q: "ruby", sort: "recommended").ordered
+
+      expect(ordered.map(&:id)).to eq([
+        matched_best.id, matched_new.id, matched_middle.id,
+        unmatched_best.id, unmatched_new.id
+      ])
     end
   end
 end
