@@ -4,7 +4,8 @@
 //
 // 条件・並び順・ページは、すべて URL の ? の後ろに持つ（URL が正。16-1-13）。
 // 画面の URL の ? の後ろを、そのまま ⑱ GET /api/student/job_postings に渡す（形が同じなので変換しない）。
-// - 条件欄は [勤務地][職種][技術][工程][稼働条件](フリーワード)[検索する] の横並び。各ボタンはポップアップを開く（PR201）
+// - 条件欄は [勤務地][業界・事業形態][職種][技術][工程][稼働条件](フリーワード)[検索する] の横並び。
+//   各ボタンはポップアップを開く（PR201）
 // - 条件欄を触っても、画面の中の下書きが変わるだけ。「検索する」を押したときに URL に書き込む（PR192）
 // - 並び順は、選んだらすぐ URL に書き込む（PR196）
 // - URL が変わると SWR が Rails に取りに行く。ブラウザの「戻る」で、条件欄も結果も前の URL の内容に戻る
@@ -13,8 +14,7 @@
 // 画面は、合致外に変わるところに「ここから条件に合いません」の区切りを入れるだけ（処理設計_類似度.md の 7-3）。
 // 自分が応募した募集・マッチした募集は、Rails が結果から除いて返す（PR253）。
 // 並び順と条件は切り離す。おすすめ順は並び順だけを変え、条件は画面で選んだものだけを使う。
-// 自分の稼働条件は、稼働条件のポップアップの「自分の稼働条件で選ぶ」を押したときだけ下書きに入る（PR302）。
-// 業界・事業形態の条件は、順13 の最後（PR299）で足す
+// 自分の稼働条件は、稼働条件のポップアップの「自分の稼働条件で選ぶ」を押したときだけ下書きに入る（PR302）
 
 import { Fragment, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -35,6 +35,7 @@ import {
 import { StudentJobPostingRow } from "@/components/student-job-posting-row";
 import { TechnologyPicker } from "@/components/technology-picker";
 import { Button } from "@/components/ui/button";
+import { FieldGroup } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { useApi } from "@/lib/api";
@@ -199,7 +200,7 @@ function SearchForm({ initial, options, profile, onSearch }: SearchFormProps) {
     onSearch({ ...draft, job_major_category_ids: majorOnlyIds, ...fromWorkConditionsDraft(workConditions) });
   }
 
-  // [勤務地][職種][技術][稼働条件](フリーワード)[検索する] を横に並べる。狭い画面では折り返す。
+  // [勤務地][業界・事業形態][職種][技術][工程][稼働条件](フリーワード)[検索する] を横に並べる。狭い画面では折り返す。
   // 各ボタンを押すとポップアップが開き、中で選んだものはその場で下書きに入る（PR201）
   return (
     <div className="space-y-2">
@@ -221,6 +222,32 @@ function SearchForm({ initial, options, profile, onSearch }: SearchFormProps) {
             onChange={(ids) => updateDraft("prefecture_ids", ids)}
             columnsClassName="grid-cols-2 sm:grid-cols-4 md:grid-cols-6"
           />
+        </SearchConditionDialog>
+
+        {/* ④ 業界・事業形態（PR299）：1つのボタンにまとめ、中で上下に並べる（PR311。学生検索の学年・卒業年度・活動状況と同じ形）。
+            募集の値だけで判定する（会社情報の値では補わない。行に出している値と同じ） */}
+        <SearchConditionDialog
+          label="業界・事業形態"
+          count={draft.industry_ids.length + draft.business_type_ids.length}
+          onClear={() => setDraft({ ...draft, industry_ids: [], business_type_ids: [] })}
+          description="それぞれ、選んだもののどれか1つに当てはまる募集が、条件に合います"
+        >
+          <FieldGroup>
+            <MasterCheckboxGroup
+              name="search-industry"
+              legend="業界"
+              rows={options.masters.industries}
+              selectedIds={draft.industry_ids}
+              onChange={(ids) => updateDraft("industry_ids", ids)}
+            />
+            <MasterCheckboxGroup
+              name="search-business-type"
+              legend="事業形態"
+              rows={options.masters.business_types}
+              selectedIds={draft.business_type_ids}
+              onChange={(ids) => updateDraft("business_type_ids", ids)}
+            />
+          </FieldGroup>
         </SearchConditionDialog>
 
         {/* ④ 職種：大分類 → 中分類。大分類だけ選ぶと、その大分類の職種すべてで探す。

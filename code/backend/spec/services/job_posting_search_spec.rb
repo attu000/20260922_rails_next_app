@@ -207,6 +207,42 @@ RSpec.describe JobPostingSearch do
     end
   end
 
+  # 順13 で足した条件（PR299）。どちらも募集の値だけで判定する（その他決め事.md の 5-8）
+  describe "④ 業界・事業形態" do
+    it "選んだ業界のどれか1つを持つ募集が合う。ほかの業界だけの募集・業界なしの募集は合わない" do
+      education = create(:industry)
+      game = create(:industry)
+      finance = create(:industry)
+      in_education = create_posting.tap { |p| p.industries << education }
+      in_both = create_posting.tap { |p| p.industries << [ education, game ] }
+      create_posting.tap { |p| p.industries << finance }
+      create_posting
+
+      expect(matched_ids(industry_ids: [ education.id, game.id ])).to contain_exactly(in_education.id, in_both.id)
+    end
+
+    it "選んだ事業形態のどれか1つを持つ募集が合う。ほかの事業形態だけの募集・事業形態なしの募集は合わない" do
+      saas = create(:business_type)
+      contract = create(:business_type)
+      in_saas = create_posting.tap { |p| p.business_types << saas }
+      create_posting.tap { |p| p.business_types << contract }
+      create_posting
+
+      expect(matched_ids(business_type_ids: [ saas.id ])).to eq([ in_saas.id ])
+    end
+
+    it "企業プロフィールの業界・事業形態は使わない（会社の値があっても、募集が空なら合わない）" do
+      education = create(:industry)
+      saas = create(:business_type)
+      company.industries << education
+      company.business_types << saas
+      create_posting
+
+      expect(matched_ids(industry_ids: [ education.id ])).to eq([])
+      expect(matched_ids(business_type_ids: [ saas.id ])).to eq([])
+    end
+  end
+
   describe "③ 稼働条件（PR200）" do
     # 学生が「3まで」を選ぶと、募集の下限が3以下なら合う。空欄は合わない。
     # 募集の値は、それぞれの選択肢の中から、3より小さい・3・3より大きいものを使う（継続期間の選択肢に2はない）

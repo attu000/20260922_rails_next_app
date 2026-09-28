@@ -31,7 +31,8 @@ class JobPostingSearch
 
   # student：検索している学生（おすすめの点数に使う）。
   # params：画面から送られた条件（q、prefecture_ids、job_major_category_ids、job_middle_category_ids、technology_ids、
-  #   work_days_per_week、work_hours_per_day、duration_months、available_from、work_styles、weekend_ok、work_process_ids、sort）。
+  #   work_days_per_week、work_hours_per_day、duration_months、available_from、work_styles、weekend_ok、work_process_ids、
+  #   industry_ids、business_type_ids、sort）。
   #   数でない・日付でない・知らない名前などの値は、その条件を「指定なし」として扱う（並び順・ページ番号と同じゆるさ。PR200）
   def initialize(student:, params:)
     @student = student
@@ -76,7 +77,8 @@ class JobPostingSearch
   # 指定された条件だけを集める。指定がないもの（nil）は入れない
   def conditions
     [
-      keyword_condition, prefecture_condition, job_category_condition, technology_condition, work_process_condition,
+      keyword_condition, prefecture_condition, industry_condition, business_type_condition,
+      job_category_condition, technology_condition, work_process_condition,
       *work_condition_conditions, start_month_condition, work_style_condition, weekend_condition
     ].compact
   end
@@ -185,6 +187,24 @@ class JobPostingSearch
     return nil if prefecture_ids.empty?
 
     JobPosting.where(work_style: :full_remote).or(JobPosting.where(prefecture_id: prefecture_ids))
+  end
+
+  # ④ 業界（順13。PR299）：選んだ業界のどれか1つを持つ募集が合う。
+  #   募集の業界だけで判定し、企業プロフィールの値では補わない（募集の行に出している値と同じ。その他決め事.md の 5-8）。
+  #   業界が空の募集は合わない（未入力は合致外。5-10）。使用技術と同じく、結合せず「番号がこの一覧に入っているか」で探す
+  def industry_condition
+    industry_ids = array_param(:industry_ids)
+    return nil if industry_ids.empty?
+
+    JobPosting.where(id: JobPostingIndustry.where(industry_id: industry_ids).select(:job_posting_id))
+  end
+
+  # ④ 事業形態（順13。PR299）：業界と同じ形。選んだ事業形態のどれか1つを持つ募集が合う
+  def business_type_condition
+    business_type_ids = array_param(:business_type_ids)
+    return nil if business_type_ids.empty?
+
+    JobPosting.where(id: JobPostingBusinessType.where(business_type_id: business_type_ids).select(:job_posting_id))
   end
 
   # ④ 職種：主・関連のどれか1つが一致する募集。

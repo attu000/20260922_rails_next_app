@@ -112,6 +112,26 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
       expect(items.first["involved_work_process_ids"]).to eq([ process.id ])
     end
 
+    # 順13 で足した条件（PR299）。窓口が2つの値を受け取って、検索の本体に渡すことを確かめる
+    it "業界・事業形態を送ると、両方を持つ募集が合致の群に入り、条件に合う件数に数えられる" do
+      industry = create(:industry)
+      business_type = create(:business_type)
+      both = create_posting(published_at: 3.hours.ago).tap do |posting|
+        posting.industries << industry
+        posting.business_types << business_type
+      end
+      only_industry = create_posting(published_at: 2.hours.ago).tap { |posting| posting.industries << industry }
+      neither = create_posting(published_at: 1.hour.ago)
+
+      get "/api/student/job_postings",
+          params: { industry_ids: [ industry.id ], business_type_ids: [ business_type.id ], sort: "newest" }
+
+      items = response.parsed_body["items"]
+      expect(items.map { |item| item["id"] }).to eq([ both.id, neither.id, only_industry.id ])
+      expect(items.map { |item| item["matched"] }).to eq([ true, false, false ])
+      expect(response.parsed_body["pagination"]["matched_count"]).to eq(1)
+    end
+
     it "ページ番号が数でなければ、1ページ目を返す" do
       create_posting
 

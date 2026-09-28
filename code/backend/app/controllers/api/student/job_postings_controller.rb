@@ -48,7 +48,9 @@ module Api
                       :work_days_per_week, :work_hours_per_day, :duration_months, :available_from, :weekend_ok,
                       prefecture_ids: [], job_major_category_ids: [], job_middle_category_ids: [],
                       # 工程（順9。PR251）
-                      technology_ids: [], work_process_ids: [], work_styles: [])
+                      technology_ids: [], work_process_ids: [], work_styles: [],
+                      # 業界・事業形態（順13。PR299）
+                      industry_ids: [], business_type_ids: [])
       end
     end
   end

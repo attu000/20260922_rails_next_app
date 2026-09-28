@@ -57,6 +57,9 @@ export type JobPostingSearchResult = {
 export type SearchConditions = {
   q: string;
   prefecture_ids: number[];
+  // 業界・事業形態（順13。PR299）。選んだもののどれか1つを持つ募集が合う。募集の値だけで判定する
+  industry_ids: number[];
+  business_type_ids: number[];
   // 中分類を1つも選んでいない大分類（大分類だけで探す）
   job_major_category_ids: number[];
   job_middle_category_ids: number[];
@@ -84,6 +87,8 @@ export function conditionsFromQuery(params: QueryReader): SearchConditions {
   return {
     q: params.get("q") ?? "",
     prefecture_ids: idsFromQuery(params, "prefecture_ids"),
+    industry_ids: idsFromQuery(params, "industry_ids"),
+    business_type_ids: idsFromQuery(params, "business_type_ids"),
     job_major_category_ids: idsFromQuery(params, "job_major_category_ids"),
     job_middle_category_ids: idsFromQuery(params, "job_middle_category_ids"),
     technology_ids: idsFromQuery(params, "technology_ids"),
@@ -109,6 +114,8 @@ export function buildSearchQuery(conditions: SearchConditions, sort: SearchSort,
   const q = conditions.q.trim();
   if (q !== "") params.set("q", q);
   conditions.prefecture_ids.forEach((id) => params.append("prefecture_ids[]", String(id)));
+  conditions.industry_ids.forEach((id) => params.append("industry_ids[]", String(id)));
+  conditions.business_type_ids.forEach((id) => params.append("business_type_ids[]", String(id)));
   conditions.job_major_category_ids.forEach((id) => params.append("job_major_category_ids[]", String(id)));
   conditions.job_middle_category_ids.forEach((id) => params.append("job_middle_category_ids[]", String(id)));
   conditions.technology_ids.forEach((id) => params.append("technology_ids[]", String(id)));

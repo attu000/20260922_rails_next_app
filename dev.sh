@@ -25,6 +25,8 @@ usage() {
   demo    仮のデータ（企業5社・募集20件・学生20人など）を入れる。何度実行してもよい
   rebuild 推薦の集計の全体の作り直しを待ち行列に積む（実行係の jobs が処理する）。不具合からの復旧などに使う
   logs    ログを出し続ける（例：bash dev.sh logs backend、ジョブは bash dev.sh logs jobs）。Ctrl+C で止める
+  bench-load     速さの実測に使う測定用のデータを入れる（例：bash dev.sh bench-load small。small か medium）
+  bench-measure  おすすめ順などの処理時間を測る（先に bench-load を実行しておく）
   help    この説明を出す
 EOF
 }
@@ -86,7 +88,9 @@ cmd_test() {
 }
 
 cmd_lint() {
-  docker compose run --rm -T frontend npx tsc --noEmit
+  # 開発用サーバーが作る型のファイル（.next/dev/types）は、起動直後に2か所から同時に書かれて壊れることがある（PR305）。
+  # それを消し、next typegen で型のファイルを別の場所（.next/types）に1回だけ作り直してから確かめる
+  docker compose run --rm -T frontend sh -c "rm -rf .next/dev/types && npx next typegen && npx tsc --noEmit"
   docker compose run --rm -T frontend npm run lint
   echo "型のチェックと、コードの点検が通りました。"
 }
@@ -107,6 +111,17 @@ cmd_logs() {
   docker compose logs -f "$@"
 }
 
+cmd_bench_load() {
+  # 速さの実測に使う、測定用のデータを入れる（code/backend/lib/tasks/bench.rake）。段階は small か medium（省略すると small）。
+  # 前回の測定用のデータは消して作り直す。仮のデータ（demo）と試しのアカウントは消さない
+  docker compose run --rm -T backend bin/rails "bench:load[${1:-small}]"
+}
+
+cmd_bench_measure() {
+  # おすすめ順・応募のジョブ・全体の作り直しの処理時間を測る（技術構成.md の 9-4-1）
+  docker compose run --rm -T backend bin/rails bench:measure
+}
+
 command="${1:-help}"
 shift || true
 
@@ -120,6 +135,8 @@ case "$command" in
   demo) cmd_demo ;;
   rebuild) cmd_rebuild ;;
   logs) cmd_logs "$@" ;;
+  bench-load) cmd_bench_load "$@" ;;
+  bench-measure) cmd_bench_measure ;;
   help | -h | --help) usage ;;
   *)
     echo "知らないコマンドです：$command"
