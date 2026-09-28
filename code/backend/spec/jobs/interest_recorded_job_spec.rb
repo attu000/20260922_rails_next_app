@@ -65,6 +65,17 @@ RSpec.describe InterestRecordedJob, type: :job do
     expect(p3.reload.recommendation_stat).to be_nil
   end
 
+  it "数え直しのあとに、似た募集を持つ他社へ通知を作る。応募・マッチした募集の会社と、やりとりがある募集の会社には送らない" do
+    # 近さの計算に使う集計の行（項目数）を、全募集・全学生について作っておく
+    RecommendationStatsRebuildJob.perform_now
+    sato_scout.match_by_student(%w[technologies])
+
+    described_class.perform_now(sato_scout)
+
+    # 佐藤は P1 に応募、P2 にマッチしたので、残る P3 の会社にだけ届く
+    expect(Notification.pluck(:user_id, :student_profile_id)).to eq([ [ p3.company_profile.user_id, sato.id ] ])
+  end
+
   it "2回実行しても、同じ値になる" do
     sato_scout.match_by_student(%w[technologies])
 
