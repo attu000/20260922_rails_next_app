@@ -79,4 +79,21 @@ RSpec.describe Recommendation::Similarity do
       expect(f).to be_within(1e-9).of((1 - weight) * content + weight * cf)
     end
   end
+
+  describe ".student_student_sql（f を出す SQL を部品として使う。PR316）" do
+    it "別の問い合わせの中に入れて f の高い順の上位1件を取ると、student_student の一番上と同じになる" do
+      others = [ sato.id, suzuki.id, takahashi.id ]
+      sql = <<~SQL
+        SELECT pairs.right_id, pairs.f
+        FROM (#{described_class.student_student_sql([ tanaka.id ], others)}) pairs
+        ORDER BY pairs.f DESC, pairs.right_id DESC
+        LIMIT 1
+      SQL
+      right_id, f = ActiveRecord::Base.connection.select_rows(sql).sole
+      best = described_class.student_student([ tanaka.id ], others).max_by { |row| [ row.f, row.right_id ] }
+
+      expect(right_id.to_i).to eq(best.right_id)
+      expect(f.to_f).to be_within(1e-9).of(best.f)
+    end
+  end
 end

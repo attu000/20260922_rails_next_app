@@ -19,11 +19,20 @@ module Recommendation
     # reason_mask の桁数（応募理由の番号の最大 + 1。今は12個で12桁）
     REASON_BITS = CandidacyReason.reasons.values.max + 1
 
-    # 募集どうし：左の募集 → 興味を示した学生（L_P 人まで）→ その学生が興味を示した募集（L_S 件まで）のうち右の集まりのもの
     def self.posting_posting(job_postings, other_job_postings)
+      rows(posting_posting_sql(job_postings, other_job_postings))
+    end
+
+    def self.student_student(students, other_students)
+      rows(student_student_sql(students, other_students))
+    end
+
+    # 募集どうし：左の募集 → 興味を示した学生（L_P 人まで）→ その学生が興味を示した募集（L_S 件まで）のうち右の集まりのもの。
+    # 実行せずに SQL の文字列で返す（列は left_id・right_id・co・cf）。内容の近さと混ぜて f まで SQL で出すときの部品（PR316）
+    def self.posting_posting_sql(job_postings, other_job_postings)
       lefts = ids_sql(JobPosting, job_postings)
       rights = ids_sql(JobPosting, other_job_postings)
-      rows(<<~SQL)
+      <<~SQL
         WITH
           left_interests AS (#{Interests.of_postings_sql(lefts)}),
           bridge_interests AS (#{Interests.of_students_sql('SELECT DISTINCT student_profile_id FROM left_interests')}),
@@ -43,11 +52,12 @@ module Recommendation
       SQL
     end
 
-    # 学生どうし：左の学生 → 興味を示した募集（L_S 件まで）→ その募集に興味を示した学生（L_P 人まで）のうち右の集まりのもの
-    def self.student_student(students, other_students)
+    # 学生どうし：左の学生 → 興味を示した募集（L_S 件まで）→ その募集に興味を示した学生（L_P 人まで）のうち右の集まりのもの。
+    # 実行せずに SQL の文字列で返す（募集どうしと同じ形）
+    def self.student_student_sql(students, other_students)
       lefts = ids_sql(StudentProfile, students)
       rights = ids_sql(StudentProfile, other_students)
-      rows(<<~SQL)
+      <<~SQL
         WITH
           left_interests AS (#{Interests.of_students_sql(lefts)}),
           bridge_interests AS (#{Interests.of_postings_sql('SELECT DISTINCT job_posting_id FROM left_interests')}),

@@ -59,6 +59,17 @@ module Recommendation
       new(:posting_posting, POSTING, POSTING, job_postings, other_job_postings).rows(top: top)
     end
 
+    # 学生どうし・募集どうしの近さを出す SQL を、実行せずに文字列で返す（列は left_id・right_id・content）。
+    # 行動の近さと混ぜて f まで SQL で出すときに、部品として組み込む（Recommendation::Similarity。PR316）。
+    # Django でいえば、QuerySet を評価せずに Subquery として別の問い合わせに入れるのにあたる
+    def self.student_student_sql(students, other_students)
+      new(:student_student, STUDENT, STUDENT, students, other_students).to_sql
+    end
+
+    def self.posting_posting_sql(job_postings, other_job_postings)
+      new(:posting_posting, POSTING, POSTING, job_postings, other_job_postings).to_sql
+    end
+
     def initialize(pair, left, right, left_set, right_set)
       @pair = pair
       @left = left
@@ -72,6 +83,11 @@ module Recommendation
     def rows(top: nil)
       result = ActiveRecord::Base.connection.select_all(sql(top), "Recommendation::Content")
       result.rows.map { |left_id, right_id, content| Row.new(left_id.to_i, right_id.to_i, content.to_f) }
+    end
+
+    # 計算する SQL の文字列（並べ替え・件数の絞り込みなし）
+    def to_sql
+      sql(nil)
     end
 
     private
