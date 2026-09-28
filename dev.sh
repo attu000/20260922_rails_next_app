@@ -27,6 +27,7 @@ usage() {
   logs    ログを出し続ける（例：bash dev.sh logs backend、ジョブは bash dev.sh logs jobs）。Ctrl+C で止める
   bench-load     速さの実測に使う測定用のデータを入れる（例：bash dev.sh bench-load small。small か medium）
   bench-measure  おすすめ順などの処理時間を測る（先に bench-load を実行しておく）
+  bench-diagnose 近さの部品ごとに、相手の数を増やしたときの時間の増え方を測る（結果は code/backend/tmp/bench_diagnose.txt にも書く）
   help    この説明を出す
 EOF
 }
@@ -122,6 +123,11 @@ cmd_bench_measure() {
   docker compose run --rm -T backend bin/rails bench:measure
 }
 
+cmd_bench_diagnose() {
+  # 近さの部品ごとに、相手の数を増やしたときの時間の増え方と実行計画を出す（code/backend/db/bench/diagnoser.rb）
+  docker compose run --rm -T backend bin/rails bench:diagnose
+}
+
 command="${1:-help}"
 shift || true
 
@@ -137,6 +143,7 @@ case "$command" in
   logs) cmd_logs "$@" ;;
   bench-load) cmd_bench_load "$@" ;;
   bench-measure) cmd_bench_measure ;;
+  bench-diagnose) cmd_bench_diagnose ;;
   help | -h | --help) usage ;;
   *)
     echo "知らないコマンドです：$command"

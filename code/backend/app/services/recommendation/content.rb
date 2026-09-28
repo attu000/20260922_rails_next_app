@@ -98,11 +98,17 @@ module Recommendation
       relation.reselect(:id).to_sql
     end
 
+    # 本体の FROM は、左と右の番号の一覧（lefts・rights）から結合を始める（PR330）。
+    # 結合する表が多い（10を超える）ので、PostgreSQL は結合の順番を並べ替えず、書いた順に近い形で実行する。
+    # 表どうしを先に CROSS JOIN して最後に番号で絞ると、渡した人数に関係なく「表全体 × 表全体」の組を作ってしまう
+    # （中の段階の学生どうしで 5,022人 × 5,022人 ＝ 約2,500万組。速さの診断 bench:diagnose で見つかった）。
+    # 番号の一覧から始めれば、書いた順のままでも「渡した左 × 右」の組だけになる。
+    # 番号の一覧は重複を除く（前の IN と同じく、同じ番号を2回渡しても1組として扱うため）
     def sql(top)
       <<~SQL
         WITH
-          lefts AS (#{@left_ids_sql}),
-          rights AS (#{@right_ids_sql}),
+          lefts AS (SELECT DISTINCT id FROM (#{@left_ids_sql}) AS left_set),
+          rights AS (SELECT DISTINCT id FROM (#{@right_ids_sql}) AS right_set),
           #{common_sql("middle_common", :job_categories, "job_middle_category_id")},
           #{majors_sql("left_majors", @left, "lefts")},
           #{majors_sql("right_majors", @right, "rights")},
@@ -116,16 +122,17 @@ module Recommendation
           #{common_sql("industry_common", :industries, "industry_id")}
           #{", #{common_sql("work_process_common", :work_processes, "work_process_id")}" if work_process?}
         SELECT lt.id AS left_id, rt.id AS right_id, (#{score_sql}) AS content
-        FROM #{@left[:table]} lt
+        FROM lefts
+        JOIN #{@left[:table]} lt ON lt.id = lefts.id
         JOIN #{@left[:stats_table]} ls ON ls.#{@left[:key]} = lt.id
-        CROSS JOIN #{@right[:table]} rt
+        CROSS JOIN rights
+        JOIN #{@right[:table]} rt ON rt.id = rights.id
         JOIN #{@right[:stats_table]} rs ON rs.#{@right[:key]} = rt.id
         LEFT JOIN middle_common mc ON mc.left_id = lt.id AND mc.right_id = rt.id
         LEFT JOIN major_common jc ON jc.left_id = lt.id AND jc.right_id = rt.id
         LEFT JOIN technology_common tc ON tc.left_id = lt.id AND tc.right_id = rt.id
         LEFT JOIN industry_common ic ON ic.left_id = lt.id AND ic.right_id = rt.id
         #{'LEFT JOIN work_process_common pc ON pc.left_id = lt.id AND pc.right_id = rt.id' if work_process?}
-        WHERE lt.id IN (SELECT id FROM lefts) AND rt.id IN (SELECT id FROM rights)
         #{"ORDER BY content DESC, left_id, right_id LIMIT #{Integer(top)}" if top}
       SQL
     end

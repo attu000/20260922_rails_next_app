@@ -1,7 +1,8 @@
 # 速さの実測（design/designs/技術構成.md の 9-4-1）のコマンド。Django の manage.py に自作のコマンドを足すのにあたる。
 #   bin/rails "bench:load[small]"  … 測定用のデータを入れる（small か medium。省略すると small）。bash dev.sh bench-load small からも呼べる
 #   bin/rails bench:measure        … 場面ごとの処理時間を測って出す。bash dev.sh bench-measure からも呼べる
-# データを作る処理は db/bench/loader.rb、測る処理は db/bench/measurer.rb
+#   bin/rails bench:diagnose       … 部品ごとに、相手の数を増やしたときの時間の増え方を測る。bash dev.sh bench-diagnose からも呼べる
+# データを作る処理は db/bench/loader.rb、測る処理は db/bench/measurer.rb、診断は db/bench/diagnoser.rb
 namespace :bench do
   desc "測定用のデータ（small：学生100人・募集100件、medium：学生5,000人・募集1,000件）を入れる（開発用のデータベースだけ。何度実行してもよい）"
   task :load, [ :size ] => :environment do |_task, args|
@@ -35,6 +36,20 @@ namespace :bench do
     begin
       BenchMeasurer.measure
     rescue BenchMeasurer::Error => e
+      abort e.message
+    end
+  end
+
+  desc "内容の近さ・行動の近さ・近さ f の部品ごとに、相手の数を増やしたときの時間の増え方と実行計画を出す（先に bench:load で測定用のデータを入れておく）"
+  task diagnose: :environment do
+    abort "診断は、開発用のデータベースでだけ行えます（今は #{Rails.env}）" unless Rails.env.development?
+
+    require Rails.root.join("db/bench/loader").to_s
+    require Rails.root.join("db/bench/diagnoser").to_s
+
+    begin
+      BenchDiagnoser.diagnose
+    rescue BenchDiagnoser::Error => e
       abort e.message
     end
   end

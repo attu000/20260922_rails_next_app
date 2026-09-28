@@ -34,6 +34,7 @@ module Recommendation
       rights = ids_sql(JobPosting, other_job_postings)
       <<~SQL
         WITH
+          #{rights_cte_sql(rights)},
           left_interests AS (#{Interests.of_postings_sql(lefts)}),
           bridge_interests AS (#{Interests.of_students_sql('SELECT DISTINCT student_profile_id FROM left_interests')}),
           co AS (
@@ -42,7 +43,7 @@ module Recommendation
             FROM left_interests li
             JOIN bridge_interests bi ON bi.student_profile_id = li.student_profile_id
             JOIN student_recommendation_stats ss ON ss.student_profile_id = li.student_profile_id
-            WHERE bi.job_posting_id IN (#{rights})
+            WHERE bi.job_posting_id IN (SELECT id FROM rights)
             GROUP BY li.job_posting_id, bi.job_posting_id
           )
         SELECT co.left_id, co.right_id, co.co, #{cf_sql} AS cf
@@ -59,6 +60,7 @@ module Recommendation
       rights = ids_sql(StudentProfile, other_students)
       <<~SQL
         WITH
+          #{rights_cte_sql(rights)},
           left_interests AS (#{Interests.of_students_sql(lefts)}),
           bridge_interests AS (#{Interests.of_postings_sql('SELECT DISTINCT job_posting_id FROM left_interests')}),
           co AS (
@@ -67,7 +69,7 @@ module Recommendation
             FROM left_interests li
             JOIN bridge_interests bi ON bi.job_posting_id = li.job_posting_id
             JOIN job_posting_recommendation_stats ps ON ps.job_posting_id = li.job_posting_id
-            WHERE bi.student_profile_id IN (#{rights})
+            WHERE bi.student_profile_id IN (SELECT id FROM rights)
             GROUP BY li.student_profile_id, bi.student_profile_id
           )
         SELECT co.left_id, co.right_id, co.co, #{cf_sql} AS cf
@@ -75,6 +77,16 @@ module Recommendation
         JOIN student_recommendation_stats ls ON ls.student_profile_id = co.left_id
         JOIN student_recommendation_stats rs ON rs.student_profile_id = co.right_id
       SQL
+    end
+
+    # 右の集まりを、先に1回だけ表の形にする下ごしらえ（PR332）。
+    # 右を番号の配列で渡すと「id IN (…数千個…)」になり、そのまま IN に入れると、PostgreSQL は候補の1行ごとに
+    # その一覧を端から照らし合わせる（候補の数 × 一覧の長さで重くなる。速さの診断 bench:diagnose で見つかった）。
+    # MATERIALIZED は「先に1回だけ作っておく」指定。1回しか使わない下ごしらえは、書かないと本体に埋め込まれて元の形に戻るので付ける。
+    # 1回作った表なら、ハッシュ（早見表）で照らし合わせられる（Recommendation::Content の rights と同じ扱い）。
+    # 番号の重複は除く（前の IN と同じく、同じ番号を2回渡しても1人・1件として扱うため）
+    def self.rights_cte_sql(rights)
+      "rights AS MATERIALIZED (SELECT DISTINCT id FROM (#{rights}) AS right_set)"
     end
 
     # 割り引きの重み u = 1 / log(1 + 件数)。stats はその人・募集の推薦の集計の表の別名。
@@ -109,6 +121,6 @@ module Recommendation
       relation.reselect(:id).to_sql
     end
 
-    private_class_method :discount_sql, :reason_similarity_sql, :cf_sql, :rows, :ids_sql
+    private_class_method :rights_cte_sql, :discount_sql, :reason_similarity_sql, :cf_sql, :rows, :ids_sql
   end
 end
