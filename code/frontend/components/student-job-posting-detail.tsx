@@ -128,6 +128,7 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
         status={{ my_status: data.my_status, my_candidacy_id: data.my_candidacy_id }}
         reasonOptions={options.enums.candidacy_reason}
         statusOptions={options.enums.my_status}
+        options={options}
         // 応募・マッチができたら、返ってきた状態で書き換える（取り直しはしない）
         onStatusChanged={(status) => mutate({ ...data, ...status }, { revalidate: false })}
         // 応募・マッチができなかったら（409 など）、取り直して最新の状態にする

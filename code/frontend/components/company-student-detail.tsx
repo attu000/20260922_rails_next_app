@@ -8,9 +8,8 @@
 // ボタンは Rails が返す available_actions だけに従う。画面側では状態から組み立てない（16-1-9）。
 // やりとりを変えるボタン（マッチする・見送る・見送りを取り消す・合格・不合格）は、すべて確認のポップアップを挟む（順11）。
 // 「この学生とのメッセージ」は、募集の選択欄の外（名前の横）に、Rails の has_message_thread が true のときだけ出す（PR213）。
-// 次のものは、それを作る順で足す
-//   - 送信後の「この学生に似た学生」のポップアップ：順14
-//   - 最終活動の目安：【仕上げ】
+// スカウトを送ったら、「この学生に似た学生」のポップアップを開く（components/similar-students-dialog.tsx。順14）。
+// 最終活動の目安は【仕上げ】で足す
 
 import { useState } from "react";
 import { cn } from "cn";
@@ -21,6 +20,7 @@ import { useRedirectIfUnauthorized } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
 import { ScoutDialog } from "@/components/scout-dialog";
+import { SimilarStudentsDialog } from "@/components/similar-students-dialog";
 import { StatusBadge } from "@/components/status-badge";
 import { StudentProfileView } from "@/components/student-profile-view";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -208,6 +208,8 @@ type JobPostingPanelProps = {
 // その学生とのやりとりの状態と、押せるボタン。
 // 募集名と募集の状態は、すぐ上の選択欄に出ているので、ここでは繰り返さない（PR268）
 function JobPostingPanel({ state, studentId, studentName, options, onStateChanged, onFailed }: JobPostingPanelProps) {
+  // スカウト送信後の「この学生に似た学生」のポップアップが開いているか（順14）
+  const [similarOpen, setSimilarOpen] = useState(false);
   const { candidacy } = state;
   // やりとりを変えるボタンのうち、Rails が「今押せる」と返したもの（やりとりがあるときだけ）
   const candidacyActions =
@@ -237,7 +239,11 @@ function JobPostingPanel({ state, studentId, studentName, options, onStateChange
               jobPostingTitle={state.title}
               studentId={studentId}
               studentName={studentName}
-              onScouted={onStateChanged}
+              // 送れたら、表示を「スカウト済み」に書き換えてから、似た学生のポップアップを開く
+              onScouted={(scoutedState) => {
+                onStateChanged(scoutedState);
+                setSimilarOpen(true);
+              }}
               onFailed={onFailed}
             />
           )}
@@ -255,6 +261,15 @@ function JobPostingPanel({ state, studentId, studentName, options, onStateChange
             ))}
         </div>
       )}
+
+      {/* スカウトのポップアップの外に置く。送ったあとは「スカウトをする」のボタンごと消えるため */}
+      <SimilarStudentsDialog
+        open={similarOpen}
+        onOpenChange={setSimilarOpen}
+        studentId={studentId}
+        jobPostingId={state.id}
+        options={options}
+      />
     </div>
   );
 }

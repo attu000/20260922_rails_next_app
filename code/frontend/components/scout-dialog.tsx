@@ -5,7 +5,8 @@
 // ボタンを出すかどうかは、学生詳細の側で Rails の available_actions（"scout"）に従って決める。
 // 守りは Rails にある（やりとりがもうある・募集が掲載中でないなら 409、スカウト文が空・長すぎるなら 422）。
 // 画面側の確かめは、送る手間を省くためだけ。
-// 送信後の「この学生に似た学生」のポップアップは、順14 でここにつなげる
+// 送信後の「この学生に似た学生」のポップアップは、学生詳細の側が onScouted を受けて開く
+// （このポップアップは送ったあとボタンごと消えるので、外に置く。順14）
 
 import { useState, type FormEvent } from "react";
 import { LongTextField } from "@/components/form-fields";

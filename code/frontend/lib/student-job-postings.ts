@@ -35,6 +35,12 @@ export type StudentJobPostingRow = {
   published_at: string;
 };
 
+// ㉝ この募集に似た募集の返事（募集詳細の応募完了のポップアップ。順14）。
+// 最大5件の形B。稼働条件に合う募集が先、その中は近さの高い順（Rails が並べる）。ページ分けしない
+export type SimilarJobPostingsResult = {
+  items: StudentJobPostingRow[];
+};
+
 // ⑱ 募集検索の返事。行は形B に matched（指定した条件を全部満たすか。Rails が判定する）を足したもの。
 // 並び順は、matched が true の行がすべて先（16-1-11）
 export type JobPostingSearchResult = {

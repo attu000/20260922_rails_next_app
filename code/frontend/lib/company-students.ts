@@ -107,6 +107,12 @@ export type CompanyStudentRow = {
   duration_months: number | null;
 };
 
+// ㉕ この学生に似た学生の返事（学生詳細のスカウト送信後のポップアップ。順14）。
+// 最大5人の形C。稼働条件に合う学生が先、その中は近さの高い順（Rails が並べる）。ページ分けしない
+export type SimilarStudentsResult = {
+  items: CompanyStudentRow[];
+};
+
 // ㉒ 学生検索の返事。行は形C に、次の3つを足したもの。並び順は、matched が true の行がすべて先（16-1-11）。
 // もうスカウトした・見送った・マッチした学生は、Rails が除いて返す（PR220）
 export type CompanyStudentSearchResult = {

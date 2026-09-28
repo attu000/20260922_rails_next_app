@@ -18,7 +18,6 @@
 // 最終活動の目安、フリーワードの資格名は【仕上げ】で足す
 
 import { Fragment, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CompanySearchWorkConditions,
@@ -30,13 +29,12 @@ import {
   toCompanyWorkConditionsDraft,
 } from "@/components/company-search-work-conditions";
 import { ChoiceButtons } from "@/components/choice-buttons";
+import { CompanyStudentRow } from "@/components/company-student-row";
 import { JobCategoryPicker } from "@/components/job-category-picker";
 import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { PageNav } from "@/components/page-nav";
 import { PageTitle } from "@/components/page-title";
-import { ProfileIcon } from "@/components/profile-icon";
 import { SearchConditionDialog } from "@/components/search-condition-dialog";
-import { StatusBadge } from "@/components/status-badge";
 import { TechnologyPicker } from "@/components/technology-picker";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,7 +44,6 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { useApi } from "@/lib/api";
 import {
   buildStudentSearchQuery,
-  type CompanyStudentRow,
   type CompanyStudentSearchResult,
   type StudentSearchConditions,
   type StudentSearchSort,
@@ -55,7 +52,7 @@ import {
 } from "@/lib/company-students";
 import { currentYearInTokyo, isHalfSelectedMonth } from "@/lib/form-values";
 import type { JobPosting, JobPostingRow } from "@/lib/job-postings";
-import { type EnumOption, jobMiddleCategoryNames, labelOf, nameOf, type Options, useOptions } from "@/lib/options";
+import { type EnumOption, labelOf, type Options, useOptions } from "@/lib/options";
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
@@ -533,7 +530,7 @@ function SearchResults({ result, options, jobPostingId, hrefFor }: SearchResults
                   <span className="h-px flex-1 bg-border" />
                 </li>
               )}
-              <StudentRow
+              <CompanyStudentRow
                 student={item}
                 options={options}
                 jobPostingId={jobPostingId}
@@ -549,7 +546,7 @@ function SearchResults({ result, options, jobPostingId, hrefFor }: SearchResults
   );
 }
 
-// ── 学生1人の行 ──
+// ── 学生1人の行（見た目は components/company-student-row.tsx。ポップアップと使い回す。PR319） ──
 
 // 行の名前の横に出す札（PR219）。出さないなら null。
 // タグは Rails が計算したものを日本語にするだけ（画面側では組み立てない。16-1-9）。
@@ -563,64 +560,4 @@ function tagOf(
   // 募集を選んでいないとき：自社のどれかの募集とやりとりがあれば「やりとりあり」（ページ設計.md の 6-5 C5）
   if (jobPostingId === null && item.candidacy_count > 0) return "やりとりあり";
   return null;
-}
-
-type StudentRowProps = {
-  student: CompanyStudentRow;
-  options: Options;
-  jobPostingId: string | null;
-  // 名前の横に出す札。null なら出さない
-  tag: string | null;
-};
-
-// 名前（と札）、学年・卒業年度・活動状況、興味のある職種、プログラミング歴、稼働条件と、「詳細を見る」
-function StudentRow({ student, options, jobPostingId, tag }: StudentRowProps) {
-  // 学生詳細。募集を選んでいれば、その募集のタブを選んだ状態で開く
-  const detailHref = `/company/students/${student.id}${
-    jobPostingId === null ? "" : `?job_posting_id=${encodeURIComponent(jobPostingId)}`
-  }`;
-  // 学年・卒業年度・活動状況。空欄の項目は飛ばす
-  const profileParts = [
-    labelOf(options.enums.grade, student.grade),
-    student.graduation_year === null ? null : `${student.graduation_year}年卒`,
-    labelOf(options.enums.activity_status, student.activity_status),
-  ].filter((part) => part !== null);
-  const jobCategoryNames = jobMiddleCategoryNames(
-    options.masters.job_major_categories,
-    student.interested_job_middle_category_ids,
-  );
-  // プログラミング歴。「Ruby（v3）」のように、技術の名前（なければ「その他」の名前）とレベル
-  const skillNames = student.skills.map(
-    (skill) => `${nameOf(options.masters.technologies, skill.technology_id) ?? skill.other_name ?? ""}（${skill.level}）`,
-  );
-  // 稼働条件。学生が入れているのは上限なので「まで」「以上続けられる」を付ける（学生詳細と同じ書き方）。空欄は飛ばす
-  const workConditionParts = [
-    student.work_days_per_week === null ? null : `週${student.work_days_per_week}日まで`,
-    student.work_hours_per_day === null ? null : `1日${student.work_hours_per_day}時間まで`,
-    student.duration_months === null ? null : `${student.duration_months}ヶ月以上`,
-  ].filter((part) => part !== null);
-
-  return (
-    <li className="space-y-3 rounded-lg border p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <ProfileIcon src={student.icon_url} name={student.name} size="sm" />
-        <Link href={detailHref} className="font-bold hover:underline">
-          {student.name}
-        </Link>
-        {/* 見た目は、候補者一覧の行のタグとそろえる（同じ部品） */}
-        {tag && <StatusBadge size="sm">{tag}</StatusBadge>}
-      </div>
-
-      <div className="space-y-1 text-sm">
-        {profileParts.length > 0 && <p className="text-muted-foreground">{profileParts.join(" ・ ")}</p>}
-        {jobCategoryNames.length > 0 && <p>興味のある職種：{jobCategoryNames.join("・")}</p>}
-        {skillNames.length > 0 && <p>プログラミング歴：{skillNames.join("・")}</p>}
-        {workConditionParts.length > 0 && <p>稼働条件：{workConditionParts.join("・")}</p>}
-      </div>
-
-      <Link href={detailHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
-        詳細を見る
-      </Link>
-    </li>
-  );
 }

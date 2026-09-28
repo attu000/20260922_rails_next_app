@@ -6,11 +6,13 @@
 // 守りは Rails にある（応募済み・募集終了・応募由来へのマッチなら 409、理由が0個なら 422）。
 // 画面側のボタンの出し分けと確かめは、見た目と送る手間を省くためだけ。
 // マッチ理由は、応募理由と同じ項目・同じ文言で選ぶ（PR218）。
-// 応募完了のポップアップ（この募集に似た募集）は順14 で足す
+// 応募できたら、応募完了のポップアップ（この募集に似た募集。components/similar-job-postings-dialog.tsx。順14）を開く。
+// スカウトへのマッチでは開かない（ページ設計.md の 6-6 S6）
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { toFieldErrorItems } from "@/components/form-fields";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
+import { SimilarJobPostingsDialog } from "@/components/similar-job-postings-dialog";
 import { StatusBadge } from "@/components/status-badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -26,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { ApiError, apiFetch } from "@/lib/api";
-import { labelOf, type EnumOption } from "@/lib/options";
+import { labelOf, type EnumOption, type Options } from "@/lib/options";
 import type { MyCandidacyStatus } from "@/lib/student-job-postings";
 
 // 応募理由を1つも選ばずに押したときの文言。Rails の 422 と同じ（権限_バリデーション.md の 17-3-6）
@@ -43,6 +45,8 @@ type StudentCandidacyActionsProps = {
   // ⑦ の enums.candidacy_reason と enums.my_status
   reasonOptions: EnumOption[];
   statusOptions: EnumOption[];
+  // ⑦ 全体。応募完了のポップアップの募集の行（業界・職種などの名前）に使う
+  options: Options;
   // 応募・マッチができたとき。返ってきた状態で、画面の募集詳細を書き換える（読み直しはしない）
   onStatusChanged: (status: MyCandidacyStatus) => void;
   // 応募・マッチができなかったとき（409 など）。募集詳細を取り直して、最新の状態にする
@@ -55,11 +59,14 @@ export function StudentCandidacyActions({
   status,
   reasonOptions,
   statusOptions,
+  options,
   onStatusChanged,
   onFailed,
 }: StudentCandidacyActionsProps) {
   // 応募・マッチができなかったときの一言（「この操作は今はできません…」など）。取り直して状態が変わっても出したままにする
   const [message, setMessage] = useState<string | null>(null);
+  // 応募完了のポップアップ（この募集に似た募集）が開いているか（順14）
+  const [similarOpen, setSimilarOpen] = useState(false);
 
   // 理由を選ぶポップアップに共通で渡すもの
   const dialogProps = {
@@ -80,6 +87,11 @@ export function StudentCandidacyActions({
     content = isOpen ? (
       <ReasonsDialog
         {...dialogProps}
+        // 応募できたら、状態を書き換えてから、応募完了のポップアップを開く
+        onDone={(result) => {
+          dialogProps.onDone(result);
+          setSimilarOpen(true);
+        }}
         triggerLabel="応募する"
         // ㉛ 応募する。返事は自分の状態（形E）
         submit={(reasons) =>
@@ -116,12 +128,19 @@ export function StudentCandidacyActions({
       );
   }
 
-  if (content === null && message === null) return null;
+  if (content === null && message === null && !similarOpen) return null;
 
   return (
     <div className="space-y-2">
       {content}
       {message && <p className="text-sm text-destructive">{message}</p>}
+      {/* 応募のポップアップの外に置く。応募したあとは「応募する」のボタンごと消えるため */}
+      <SimilarJobPostingsDialog
+        open={similarOpen}
+        onOpenChange={setSimilarOpen}
+        jobPostingId={jobPostingId}
+        options={options}
+      />
     </div>
   );
 }
