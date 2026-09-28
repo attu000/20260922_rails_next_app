@@ -16,4 +16,16 @@ class Notification < ApplicationRecord
   scope :latest_first, -> { order(created_at: :desc, id: :desc) }
 
   validates :body, presence: true
+
+  # 渡した一覧（user.notifications など）の未読を、まとめて既読にする（㊹）。
+  # 1本の UPDATE 文で済ませる（検証やコールバックは通らない）。Django の qs.filter(read_at__isnull=True).update(read_at=now) にあたる
+  def self.mark_all_read!
+    now = Time.current
+    unread.update_all(read_at: now, updated_at: now)
+  end
+
+  # 既読にする（㊸）。すでに既読なら何もしない（何度押しても同じ結果にし、最初に読んだ日時を残す）
+  def mark_read!
+    update!(read_at: Time.current) if read_at.nil?
+  end
 end

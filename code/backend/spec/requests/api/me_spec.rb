@@ -22,8 +22,21 @@ RSpec.describe "ログイン中の人（GET /api/me）", type: :request do
       "role" => "company",
       "name" => "株式会社テスト",
       "icon_url" => nil,
-      "unread_notifications_count" => nil
+      "unread_notifications_count" => 0
     )
+  end
+
+  it "企業なら、自社宛ての未読の通知だけを数える" do
+    user = create(:company_user)
+    create_list(:notification, 2, user: user)
+    create(:notification, user: user, read_at: Time.current)
+    # 他社宛て
+    create(:notification)
+    log_in_as(user)
+
+    get "/api/me"
+
+    expect(response.parsed_body["unread_notifications_count"]).to eq(2)
   end
 
   it "企業にアイコンがあれば、icon_url にその URL が入る" do
@@ -47,6 +60,8 @@ RSpec.describe "ログイン中の人（GET /api/me）", type: :request do
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body["role"]).to eq("student")
     expect(response.parsed_body["name"]).to eq("テスト 太郎")
+    # 学生には通知がない
+    expect(response.parsed_body["unread_notifications_count"]).to be_nil
   end
 
   it "呼ぶと最終活動日が今日になる" do

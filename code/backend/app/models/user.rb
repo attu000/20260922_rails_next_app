@@ -21,4 +21,9 @@ class User < ApplicationRecord
   validates :email, presence: true, length: { maximum: 255 },
                     format: { with: URI::MailTo::EMAIL_REGEXP }, uniqueness: true
   validates :password, length: { minimum: 8 }, allow_nil: true
+
+  # ヘッダーに出す未読の通知の件数（API設計.md の 16-3 ③）。学生には通知がないので nil
+  def unread_notifications_count
+    company? ? notifications.unread.count : nil
+  end
 end

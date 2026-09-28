@@ -69,6 +69,13 @@ Rails.application.routes.draw do
       resources :scouts, only: :create
       # ㊱ GET /api/company/message_threads（スレッド一覧）
       resources :message_threads, only: :index
+      # ㊷ GET /api/company/notifications（通知の一覧）、㊸ POST /api/company/notifications/:id/read（1件を既読にする）、
+      # ㊹ POST /api/company/notifications/read_all（すべて既読にする）。順15。
+      # 1件ごとの操作は member、全体への操作は collection に置く（16-1-4）
+      resources :notifications, only: :index do
+        post :read, on: :member
+        post :read_all, on: :collection
+      end
     end
 
     # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、

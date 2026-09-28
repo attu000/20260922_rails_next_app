@@ -33,7 +33,7 @@ RSpec.describe "新規登録（/api/company_registrations・/api/student_registr
       user = User.sole
       expect(response.parsed_body).to eq(
         "id" => user.id, "role" => "company", "name" => "株式会社サンプル",
-        "icon_url" => nil, "unread_notifications_count" => nil
+        "icon_url" => nil, "unread_notifications_count" => 0
       )
 
       get "/api/me"
