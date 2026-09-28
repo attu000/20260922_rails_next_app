@@ -53,6 +53,16 @@ Rails.application.configure do
   # Highlight code that enqueued background job in logs.
   config.active_job.verbose_enqueue_logs = true
 
+  # ジョブは Solid Queue の待ち行列（database.yml の queue）に積み、実行係のコンテナ（docker-compose.yml の jobs）が取り出して動かす。
+  # 本番用（production.rb）と同じ設定（PR291。処理設計_類似度.md の 7-5）
+  config.active_job.queue_adapter = :solid_queue
+  config.solid_queue.connects_to = { database: { writing: :queue } }
+
+  # 環境変数 RAILS_LOG_TO_STDOUT があれば、記録（ログ）を log/development.log ではなく画面（標準出力）に書く。
+  # 実行係のコンテナ（docker-compose.yml の jobs）で使い、bash dev.sh logs jobs で見られるようにする（PR293）。
+  # rails server（backend）は、起動するときに自分で画面にも書くので、この変数は要らない
+  config.logger = ActiveSupport::TaggedLogging.logger(STDOUT) if ENV["RAILS_LOG_TO_STDOUT"].present?
+
   # Highlight code that triggered redirect in logs.
   config.action_dispatch.verbose_redirect_logs = true
 

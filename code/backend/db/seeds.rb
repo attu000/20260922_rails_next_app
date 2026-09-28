@@ -214,3 +214,9 @@ student_profile = student_user.student_profile ||
                   student_user.create_student_profile!(name: "山田 花子", activity_status: :skill_up)
 # 活動状況は必須（その他決め事.md の 5-9）。順3 より前に作った試しの学生は空なので、空なら入れる
 student_profile.update!(activity_status: :skill_up) if student_profile.activity_status.nil?
+
+# ── 推薦の集計 ──
+
+# 試しのアカウントは新規登録の処理を通らずに作るので、推薦の集計の行ができない。
+# 全体の作り直しをその場で実行して作る（処理設計_類似度.md の 7-5。順12）。何度実行しても同じ結果になる
+RecommendationStatsRebuildJob.perform_now

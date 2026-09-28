@@ -38,6 +38,18 @@ RSpec.describe DemoLoader do
     expect(thread_message_counts).to all(be_between(2, 4))
   end
 
+  # 順12：入れ終わった時点で、推薦の集計が数え終わっている（最後に全体の作り直しを実行する）
+  it "推薦の集計の件数の合計が、応募理由・マッチ理由の付いたやりとりの数と一致する" do
+    described_class.load!
+
+    student_ids = StudentProfile.where(user_id: described_class.demo_users.select(:id)).ids
+    interests = Candidacy.interests.where(student_profile_id: student_ids).count
+    expect(interests).to be_positive
+    expect(StudentRecommendationStat.where(student_profile_id: student_ids).sum(:interest_count)).to eq(interests)
+    expect(JobPostingRecommendationStat.where(job_posting_id: Candidacy.interests.where(student_profile_id: student_ids).select(:job_posting_id))
+                                       .sum(:interest_count)).to eq(interests)
+  end
+
   it "2回続けて入れても数は増えず、仮のデータでないアカウントは消えない" do
     other_student = create(:student_user).student_profile
 

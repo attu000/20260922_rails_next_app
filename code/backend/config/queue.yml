@@ -1,9 +1,19 @@
+# Solid Queue の実行係（bin/jobs）の割り当て。開発（docker-compose.yml の jobs）と本番で同じ設定を使う
 default: &default
   dispatchers:
     - polling_interval: 1
       batch_size: 500
   workers:
-    - queues: "*"
+    # 推薦用（InterestRecordedJob・RecommendationStatsRebuildJob）。同時に動かすのは1つだけにし、積まれた順に1つずつ実行する。
+    # 同じ行を同時に書き換えることがなくなるので、細かいロックの設計が要らない（処理設計_類似度.md の 7-5 の基本方針）
+    - queues: recommendation
+      threads: 1
+      processes: 1
+      polling_interval: 1
+    # それ以外（アイコンの画像の解析・削除など、Rails が裏側で動かすジョブ）。
+    # "*"（すべて）にすると recommendation も取り出してしまい、推薦のジョブが同時に動くので、待ち行列の名前を並べる。
+    # 新しい待ち行列の名前を使うジョブを作ったら、ここに足す
+    - queues: default
       threads: 3
       processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
       polling_interval: 1

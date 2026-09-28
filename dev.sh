@@ -23,7 +23,8 @@ usage() {
   test    Rails のテストを実行する
   lint    画面側（Next.js）の型のチェックと、コードの点検をする
   demo    仮のデータ（企業5社・募集20件・学生20人など）を入れる。何度実行してもよい
-  logs    ログを出し続ける（例：bash dev.sh logs backend）。Ctrl+C で止める
+  rebuild 推薦の集計の全体の作り直しを待ち行列に積む（実行係の jobs が処理する）。不具合からの復旧などに使う
+  logs    ログを出し続ける（例：bash dev.sh logs backend、ジョブは bash dev.sh logs jobs）。Ctrl+C で止める
   help    この説明を出す
 EOF
 }
@@ -39,8 +40,10 @@ cmd_setup() {
   docker compose build
 
   # 3. データベースを作り、テーブルを作り、試しのアカウントを入れる。
-  #    Django の「データベースを作る → migrate → loaddata」と同じ。すでにあるものは作り直さない
-  docker compose run --rm backend bin/rails db:create db:migrate db:seed
+  #    Django の「データベースを作る → migrate → loaddata」と同じ。すでにあるものは作り直さない。
+  #    db:prepare は、データベースがなければ作って設計図（schema.rb・queue_schema.rb）から表を作り、あれば未実行のマイグレーションを流す。
+  #    ジョブの待ち行列のデータベースはマイグレーションのファイルを持たず設計図だけなので、db:migrate では表ができない（PR291）
+  docker compose run --rm backend bin/rails db:prepare db:seed
 
   # 4. 起動する
   docker compose up -d
@@ -94,6 +97,12 @@ cmd_demo() {
   docker compose run --rm -T backend bin/rails demo:load
 }
 
+cmd_rebuild() {
+  # 推薦の集計の全体の作り直し（code/backend/lib/tasks/recommendation.rake）。
+  # その場では数え直さず、応募のジョブと同じ待ち行列に積む。実行係（jobs のコンテナ）が順番に処理する
+  docker compose run --rm -T backend bin/rails recommendation:rebuild
+}
+
 cmd_logs() {
   docker compose logs -f "$@"
 }
@@ -109,6 +118,7 @@ case "$command" in
   test) cmd_test ;;
   lint) cmd_lint ;;
   demo) cmd_demo ;;
+  rebuild) cmd_rebuild ;;
   logs) cmd_logs "$@" ;;
   help | -h | --help) usage ;;
   *)

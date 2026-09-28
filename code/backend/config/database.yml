@@ -23,9 +23,17 @@ default: &default
   username: <%= ENV["DB_USERNAME"] %>
   password: <%= ENV["DB_PASSWORD"] %>
 
+# 開発用は、アプリのデータ（primary）と、ジョブの待ち行列（queue。Solid Queue が使う）の2つ。
+# 同じ PostgreSQL の中に、データベースを2つ作る（PR291。本番用の production と同じ形）。
+# 待ち行列の表の設計図は db/queue_schema.rb。bin/rails db:prepare で、なければ作られる
 development:
-  <<: *default
-  database: backend_development
+  primary: &primary_development
+    <<: *default
+    database: backend_development
+  queue:
+    <<: *primary_development
+    database: backend_development_queue
+    migrations_paths: db/queue_migrate
 
   # The specified database role being used to connect to PostgreSQL.
   # To create additional roles in PostgreSQL see `$ createuser --help`.

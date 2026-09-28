@@ -52,6 +52,33 @@ services:
       db:
         condition: service_healthy
 
+  # ジョブの実行係（Solid Queue）。Rails と同じコードを、画面用のサーバーではなく実行係として起動する。
+  # 待ち行列（backend_development_queue）からジョブを取り出し、アプリのデータベースを読み書きする。
+  # Django＋Celery で、web とは別に celery worker のコンテナを動かすのと同じ（PR291。処理設計_類似度.md の 7-5）。
+  # ポートは開けない（外からつなぐものではないため）
+  jobs:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    # backend の server.pid と同じく、前回の終わり方が悪いと残る「起動中」の印を消してから起動する。
+    # 残っていると、Solid Queue が「もう起動している」と判断して止まることがあるため
+    command: bash -c "rm -f tmp/pids/solid_queue_supervisor.pid && bin/jobs"
+    volumes:
+      # backend と同じもの。コードの変更は、ジョブを実行するたびに読み込み直される
+      - ./backend:/app
+      - bundle_data:/usr/local/bundle
+      # アイコンの画像の解析・削除のジョブが、アップロードされたファイルを読むため
+      - storage_data:/app/storage
+    environment:
+      DB_HOST: db
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      # 記録を画面に書き、bash dev.sh logs jobs で見られるようにする（config/environments/development.rb。PR293）
+      RAILS_LOG_TO_STDOUT: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+
   # Next.js（画面）。ブラウザはここ（3000番）だけを開き、/api/… は Rails へ転送される
   frontend:
     build:

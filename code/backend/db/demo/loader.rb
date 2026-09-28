@@ -39,6 +39,9 @@ class DemoLoader
       create_applications!
       create_scouts!
       create_messages!
+      # 推薦の集計を、その場で全体の作り直しをする（順12）。応募・マッチのジョブ（InterestRecordedJob）も積まれるが、
+      # それがいつ動くかに関係なく、入れ終わった時点で集計がそろうようにするため
+      RecommendationStatsRebuildJob.perform_now
     end
     { companies: @companies.size, job_postings: @postings.size, students: @students.size,
       candidacies: DemoContent::APPLICATIONS.size + DemoContent::SCOUTS.size }
