@@ -11,8 +11,7 @@ import { loginPathFor, type Role } from "@/lib/auth";
 import { useMe } from "@/components/member-only";
 import { ProfileIcon } from "@/components/profile-icon";
 
-// タブ。行き先の画面はすべてある（メッセージは順7 で作った。未決内容.md の 11-2）。
-// 通知（企業だけ）の行き先は、それを作る順15 で作る。それまでは押すと「見つかりません」になる
+// タブ。行き先の画面はすべてある（メッセージは順7、通知は順15 で作った。未決内容.md の 11-2）
 const TABS: Record<Role, { label: string; href: string }[]> = {
   company: [
     { label: "会社情報", href: "/company/profile" },
@@ -29,6 +28,12 @@ const TABS: Record<Role, { label: string; href: string }[]> = {
     { label: "メッセージ", href: "/student/messages" },
   ],
 };
+
+// 未読件数の表示。1〜9 はそのまま、10以上は「9+」。0 と null（学生）は何も付けない
+function formatUnreadCount(count: number | null): string {
+  if (!count) return "";
+  return `（${count > 9 ? "9+" : count}）`;
+}
 
 export function AppHeader() {
   const me = useMe();
@@ -52,10 +57,10 @@ export function AppHeader() {
             </Link>
           ))}
           {/* 通知は企業だけ。ベルの絵ではなく文字にしている（見た目は最小限）。
-              未読の件数は、通知の機能を作る Phase 6 までは null なので出ない */}
+              未読があれば件数を付ける（10件以上は「9+」。ページ設計.md の 6-5 C10）。件数は画面を移るたびに取り直す */}
           {me.role === "company" && (
             <Link href="/company/notifications" className="hover:underline">
-              通知{me.unread_notifications_count ? `（${me.unread_notifications_count}）` : ""}
+              通知{formatUnreadCount(me.unread_notifications_count)}
             </Link>
           )}
         </nav>

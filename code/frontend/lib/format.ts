@@ -21,6 +21,16 @@ const DATE_TIME_FORMAT = new Intl.DateTimeFormat("ja-JP", {
   minute: "2-digit",
 });
 
+// 「9月20日」「2025年9月20日」と、年だけ（今年かを比べる）の書式。日本時間で数える
+const MONTH_DAY_FORMAT = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", month: "long", day: "numeric" });
+const YEAR_MONTH_DAY_FORMAT = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+const YEAR_FORMAT = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric" });
+
 // 日時（"2026-09-25T10:00:00.000+09:00"）を「2026/09/25」にする
 export function formatDate(isoString: string): string {
   return DATE_FORMAT.format(new Date(isoString));
@@ -29,6 +39,23 @@ export function formatDate(isoString: string): string {
 // 日時（"2026-09-25T10:00:00.000+09:00"）を「2026/09/25 10:00」にする。メッセージの日時に使う
 export function formatDateTime(isoString: string): string {
   return DATE_TIME_FORMAT.format(new Date(isoString));
+}
+
+// 日時を、経った時間で書き分ける。通知の日時に使う（ページ設計.md の 6-5 C10。PR325）。
+//   1分未満「たった今」、1時間未満「12分前」、24時間未満「3時間前」、
+//   それより前は今年なら「9月20日」、去年以前なら「2025年9月20日」（年は日本時間で比べる）。
+// 開いた時点の表示のままで、開いている間には変わらない（未読件数をリアルタイムで更新しないのと同じ割り切り）
+export function formatRelativeTime(isoString: string, now: Date = new Date()): string {
+  const date = new Date(isoString);
+  // 端末の時計が遅れていて、未来の日時に見えるときも「たった今」にする
+  const minutes = Math.floor((now.getTime() - date.getTime()) / 60_000);
+  if (minutes < 1) return "たった今";
+  if (minutes < 60) return `${minutes}分前`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}時間前`;
+  return YEAR_FORMAT.format(date) === YEAR_FORMAT.format(now)
+    ? MONTH_DAY_FORMAT.format(date)
+    : YEAR_MONTH_DAY_FORMAT.format(date);
 }
 
 // 稼働条件の1行表示に使う、募集の項目

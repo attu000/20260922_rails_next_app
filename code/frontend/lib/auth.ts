@@ -54,14 +54,17 @@ export function loginUrlWithReturnTo(role: Role, currentPath: string): string {
   return `${loginPathFor(role)}?return_to=${encodeURIComponent(currentPath)}`;
 }
 
-// ログインした後の行き先。
-// return_to は利用者が自由に書き換えられるので、ログインした人の種別と先頭が合っているときだけ使う。
-// 「/company/ か /student/ で始まるか」の確認で、「/ で始まるアプリ内のパスだけ」の決まりも同時に満たす
-// （「//別のサイト」のような書き方は、どちらでも始まらないので捨てられる）。
+// その種別の画面のパス（/company/… か /student/…）か。
+// 利用者やデータが決めたパスへ移る前に確かめる（ログインした後の return_to、通知のリンク先。PR326）。
+// 先頭が種別と合っているかの確認で、「/ で始まるアプリ内のパスだけ」の決まりも同時に満たす
+// （「//別のサイト」のような書き方は、ブラウザが外のサイトへ移ってしまうが、どちらでも始まらないので捨てられる）。
 // これは見た目のための処理で、書き換えられても他人のデータは見えない（Rails が断る）
+export function isAppPathFor(role: Role, path: string | null): path is string {
+  return path !== null && path.startsWith(PATH_PREFIXES[role]);
+}
+
+// ログインした後の行き先。
+// return_to は利用者が自由に書き換えられるので、ログインした人の種別の画面のパスのときだけ使う
 export function destinationAfterLogin(role: Role, returnTo: string | null): string {
-  if (returnTo && returnTo.startsWith(PATH_PREFIXES[role])) {
-    return returnTo;
-  }
-  return homePathFor(role);
+  return isAppPathFor(role, returnTo) ? returnTo : homePathFor(role);
 }
