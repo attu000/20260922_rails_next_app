@@ -1,7 +1,7 @@
 // 学生検索（C5）の [稼働条件] のポップアップの中身。
 // 企業側の言い方（募集で求める下限：週◯日以上など）で並べる。学生の上限がこの値以上なら合う（その他決め事.md の 5-6）。
 // 「合うかどうか」の判定は Rails が行う（API設計.md の 16-3 ㉒）。ここは選ぶだけ。
-// 募集を選ぶと、その募集の稼働条件で自動で選ぶ仕組みは後で足す（PR214）
+// 「この募集の稼働条件で選ぶ」ボタン（推薦検索）は、募集を選んだだけでは動かず、押したときだけ下書きを埋める（PR302）
 
 import { ChoiceButtons } from "@/components/choice-buttons";
 import { MonthField } from "@/components/form-fields";
@@ -9,6 +9,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import type { StudentSearchConditions } from "@/lib/company-students";
 import { currentYearInTokyo, joinMonthDate, splitMonthDate, yearChoices } from "@/lib/form-values";
+import type { JobPosting } from "@/lib/job-postings";
 import type { Options } from "@/lib/options";
 
 // ポップアップの中で持つ下書き。開始時期は、年と月の片方だけ選んだ状態も持てるよう、2つの文字で持つ
@@ -45,6 +46,22 @@ export function fromCompanyWorkConditionsDraft(draft: CompanyWorkConditionsDraft
     start_month: joinMonthDate(draft.start_year, draft.start_month),
     work_style: draft.work_style,
     prefecture_id: draft.prefecture_id,
+  };
+}
+
+// 募集の稼働条件 → 下書き（「この募集の稼働条件で選ぶ」。推薦検索。PR302）。
+// 入力済みの項目だけを選び、未入力の項目はオフにする（その他決め事.md の 5-10）。
+// 募集の開始時期が今月より前でも、そのまま選ぶ（条件として使わないかどうかは Rails が決める）
+export function companyWorkConditionsDraftFromJobPosting(jobPosting: JobPosting): CompanyWorkConditionsDraft {
+  const { year, month } = splitMonthDate(jobPosting.start_month);
+  return {
+    work_days_per_week: jobPosting.min_work_days_per_week,
+    work_hours_per_day: jobPosting.min_work_hours_per_day,
+    duration_months: jobPosting.min_duration_months,
+    start_year: year,
+    start_month: month,
+    work_style: jobPosting.work_style,
+    prefecture_id: jobPosting.prefecture_id,
   };
 }
 

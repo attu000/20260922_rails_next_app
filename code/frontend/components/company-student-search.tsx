@@ -13,15 +13,16 @@
 // 画面は、合致外に変わるところに「ここから条件に合いません」の区切りを入れるだけ（処理設計_類似度.md の 7-3）。
 // 30日以上活動のない学生と、もうスカウトした・見送った・マッチした学生は、Rails が外して返す（PR216・PR220）。
 // 行には、その募集とのやりとり（未対応応募）か、自社とのやりとりがあることを札で出す（PR219）。
-// 次のものは、それを作る順で足す
-//   - 募集を選ぶと、その募集の稼働条件で条件欄が自動で入る仕組み：後で（PR214）
-//   - 最終活動の目安、フリーワードの資格名：【仕上げ】
+// 並び順と条件は切り離す。募集を選ぶと並び順（おすすめ順）が変わるだけで、条件は変わらない。
+// 募集の稼働条件は、稼働条件のポップアップの「この募集の稼働条件で選ぶ」を押したときだけ下書きに入る（推薦検索。PR302）。
+// 最終活動の目安、フリーワードの資格名は【仕上げ】で足す
 
 import { Fragment, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CompanySearchWorkConditions,
+  companyWorkConditionsDraftFromJobPosting,
   type CompanyWorkConditionsDraft,
   countCompanyWorkConditions,
   EMPTY_COMPANY_WORK_CONDITIONS,
@@ -53,7 +54,7 @@ import {
   studentSearchStateFromQuery,
 } from "@/lib/company-students";
 import { currentYearInTokyo, isHalfSelectedMonth } from "@/lib/form-values";
-import type { JobPostingRow } from "@/lib/job-postings";
+import type { JobPosting, JobPostingRow } from "@/lib/job-postings";
 import { type EnumOption, jobMiddleCategoryNames, labelOf, nameOf, type Options, useOptions } from "@/lib/options";
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
@@ -78,6 +79,11 @@ export function CompanyStudentSearch() {
   const { options, failed: optionsFailed } = useOptions();
   // 募集を選ぶ欄に出す自社の募集（⑪ 自社の全募集。候補者一覧のタブと同じ取り方）
   const { data: jobPostings } = useApi<{ items: JobPostingRow[] }>("/api/company/job_postings");
+  // 選んでいる募集1件（⑫。「この募集の稼働条件で選ぶ」に使う）。選んでいなければ取りに行かない。
+  // 届くまで・取れなかったとき（他社の募集の番号など）は、そのボタンを押せない
+  const { data: selectedJobPosting } = useApi<JobPosting>(
+    state.jobPostingId === null ? null : `/api/company/job_postings/${encodeURIComponent(state.jobPostingId)}`,
+  );
   // 401 は共通の枠（member-only.tsx）がログイン画面へ移す。
   // keepPreviousData：次の結果が届くまで前の結果を出したままにする（ページ送りで画面がちらつかないように）
   const { data, error } = useApi<CompanyStudentSearchResult>(`/api/company/students${query === "" ? "" : `?${query}`}`, {
@@ -135,7 +141,13 @@ export function CompanyStudentSearch() {
       </div>
 
       {/* key に URL を渡す：URL が変わったら条件欄を作り直し、下書きを URL の内容に戻す（「戻る」のため） */}
-      <SearchForm key={query} initial={state.conditions} options={options} onSearch={search} />
+      <SearchForm
+        key={query}
+        initial={state.conditions}
+        options={options}
+        jobPosting={selectedJobPosting}
+        onSearch={search}
+      />
 
       <SortTabs state={state} selectedTitle={selectedTitle} onChange={changeSort} />
 
@@ -164,13 +176,15 @@ type SearchFormProps = {
   // URL から読んだ条件（下書きの最初の値）
   initial: StudentSearchConditions;
   options: Options;
+  // 選んでいる募集1件。選んでいない・まだ届いていなければ undefined
+  jobPosting: JobPosting | undefined;
   onSearch: (conditions: StudentSearchConditions) => void;
 };
 
 // 未入力の学生の扱い（各ポップアップに添える。その他決め事.md の 5-10）
 const BLANK_NOTE = "学生が未入力の項目は、条件に合わない側に入ります";
 
-function SearchForm({ initial, options, onSearch }: SearchFormProps) {
+function SearchForm({ initial, options, jobPosting, onSearch }: SearchFormProps) {
   const majors = options.masters.job_major_categories;
   // 画面上で保持する条件（下書き）。「検索する」を押すまで Rails には送らない（PR192）
   const [draft, setDraft] = useState<StudentSearchConditions>(initial);
@@ -218,6 +232,14 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
     setJobCategoryResetKey(jobCategoryResetKey + 1);
   }
 
+  // 「この募集の稼働条件で選ぶ」（推薦検索。PR302）：稼働条件のポップアップの中身を、募集の入力済みの値に置き換える。
+  // 下書きが変わるだけで、「検索する」を押すまで結果は変わらない。ほかの条件（技術・職種など）はそのまま
+  function fillFromJobPosting() {
+    if (!jobPosting) return;
+    setWorkConditions(companyWorkConditionsDraftFromJobPosting(jobPosting));
+    setStartMonthErrors(undefined);
+  }
+
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     // 開始時期は、年と月の両方を選ぶか、両方空欄にする（画面側だけの確認。募集一覧と同じ文言）
@@ -247,12 +269,18 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
           }}
           description={`学生が無理なく出せる量（上限）が、選んだ値以上なら条件に合います。${BLANK_NOTE}`}
         >
-          <CompanySearchWorkConditions
-            options={options}
-            draft={workConditions}
-            onChange={setWorkConditions}
-            startMonthErrors={startMonthErrors}
-          />
+          <div className="space-y-6">
+            {/* 募集を選んでいないときは押せない */}
+            <Button type="button" variant="outline" size="sm" disabled={!jobPosting} onClick={fillFromJobPosting}>
+              この募集の稼働条件で選ぶ
+            </Button>
+            <CompanySearchWorkConditions
+              options={options}
+              draft={workConditions}
+              onChange={setWorkConditions}
+              startMonthErrors={startMonthErrors}
+            />
+          </div>
         </SearchConditionDialog>
 
         {/* 使用技術とレベル：選んだ技術をすべて持っている学生が合う（募集一覧の「どれか1つ」とは違う。16-3 ㉒） */}
@@ -428,7 +456,7 @@ type SortTabsProps = {
 };
 
 // [「○○」におすすめ順] [最終活動が新しい順]。
-// おすすめ順は、選んだ募集を元に並べるので、募集を選んでいないときは押せない（PR214。今は仮の全員0点）
+// おすすめ順は、選んだ募集を元に並べるので、募集を選んでいないときは押せない（PR214）
 function SortTabs({ state, selectedTitle, onChange }: SortTabsProps) {
   const canRecommend = state.jobPostingId !== null;
   const tabs: { sort: StudentSearchSort; label: string; disabled: boolean }[] = [

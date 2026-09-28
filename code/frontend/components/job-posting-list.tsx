@@ -2,7 +2,7 @@
 
 // 募集一覧（C2。企業のホーム）の中身。詳しくは design/designs/ページ設計.md の 6-5 C2、API設計.md の 16-3 ⑪。
 // 開いたら ⑪ 自社の募集の一覧と ⑦ 選択肢（状態の表示名）を取り、行を並べる。並び順は Rails が決める（最終更新の新しい順）。
-// 「この募集でスカウト先を探す」は【強み】、未対応の応募の件数は【仕上げ】で足す
+// 未対応の応募の件数は【仕上げ】で足す
 
 import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
@@ -73,6 +73,14 @@ export function JobPostingList() {
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   この募集の候補者を見る
+                </Link>
+                {/* 学生検索（C5）を、この募集を選んだ状態（「○○」におすすめ順）で開く。
+                    条件は入れない。稼働条件は、学生検索のポップアップのボタンで入れる（PR302・PR303） */}
+                <Link
+                  href={`/company/students?job_posting_id=${jobPosting.id}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  この募集でスカウト先を探す
                 </Link>
               </div>
             </li>

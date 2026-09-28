@@ -12,7 +12,9 @@
 // 結果は条件で減らさず、合致の群を先に、合致外の群をあとに並べて返ってくる（Rails が並べる）。
 // 画面は、合致外に変わるところに「ここから条件に合いません」の区切りを入れるだけ（処理設計_類似度.md の 7-3）。
 // 自分が応募した募集・マッチした募集は、Rails が結果から除いて返す（PR253）。
-// おすすめ順のときの稼働条件のボタンの自動選択は順13、業界・事業形態の条件は【仕上げ】で足す
+// 並び順と条件は切り離す。おすすめ順は並び順だけを変え、条件は画面で選んだものだけを使う。
+// 自分の稼働条件は、稼働条件のポップアップの「自分の稼働条件で選ぶ」を押したときだけ下書きに入る（PR302）。
+// 業界・事業形態の条件は、順13 の最後（PR299）で足す
 
 import { Fragment, useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -28,6 +30,7 @@ import {
   SearchWorkConditions,
   toWorkConditionsDraft,
   type WorkConditionsDraft,
+  workConditionsDraftFromProfile,
 } from "@/components/search-work-conditions";
 import { StudentJobPostingRow } from "@/components/student-job-posting-row";
 import { TechnologyPicker } from "@/components/technology-picker";
@@ -45,6 +48,7 @@ import {
   type SearchSort,
   sortFromQuery,
 } from "@/lib/student-job-postings";
+import type { StudentProfile } from "@/lib/student-profile";
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
@@ -72,6 +76,8 @@ export function StudentJobPostingSearch() {
   const { data, error } = useApi<JobPostingSearchResult>(`/api/student/job_postings${query === "" ? "" : `?${query}`}`, {
     keepPreviousData: true,
   });
+  // 自分のプロフィール（⑮。「自分の稼働条件で選ぶ」に使う）。届くまでは、そのボタンを押せない
+  const { data: profile } = useApi<StudentProfile>("/api/student/profile");
 
   // 今の URL の条件と並び順（下書きではなく、実際に検索している内容）
   const currentConditions = conditionsFromQuery(searchParams);
@@ -100,7 +106,7 @@ export function StudentJobPostingSearch() {
       <PageTitle>募集一覧</PageTitle>
 
       {/* key に URL を渡す：URL が変わったら条件欄を作り直し、下書きを URL の内容に戻す（「戻る」のため） */}
-      <SearchForm key={query} initial={currentConditions} options={options} onSearch={search} />
+      <SearchForm key={query} initial={currentConditions} options={options} profile={profile} onSearch={search} />
 
       {!data && error && error.status !== 401 ? (
         <p className="text-sm text-destructive">{error.message}</p>
@@ -127,10 +133,12 @@ type SearchFormProps = {
   // URL から読んだ条件（下書きの最初の値）
   initial: SearchConditions;
   options: Options;
+  // 自分のプロフィール。まだ届いていなければ undefined
+  profile: StudentProfile | undefined;
   onSearch: (conditions: SearchConditions) => void;
 };
 
-function SearchForm({ initial, options, onSearch }: SearchFormProps) {
+function SearchForm({ initial, options, profile, onSearch }: SearchFormProps) {
   const majors = options.masters.job_major_categories;
   // 画面上で保持する条件（下書き）。「検索する」を押すまで Rails には送らない（PR192）
   const [draft, setDraft] = useState<SearchConditions>(initial);
@@ -168,6 +176,16 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
     setDraft({ ...draft, job_middle_category_ids: [] });
     setCheckedMajorIds([]);
     setJobCategoryResetKey(jobCategoryResetKey + 1);
+  }
+
+  // 「自分の稼働条件で選ぶ」（PR302）：稼働条件のポップアップの中身を、プロフィールの入力済みの値に置き換える。
+  // 出社できる都道府県も稼働条件の一部なので、勤務地のポップアップも一緒に置き換える（PR304）。
+  // 下書きが変わるだけで、「検索する」を押すまで結果は変わらない
+  function fillFromProfile() {
+    if (!profile) return;
+    setWorkConditions(workConditionsDraftFromProfile(profile, workConditions));
+    setDraft({ ...draft, prefecture_ids: profile.commutable_prefecture_ids });
+    setStartMonthErrors(undefined);
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -269,12 +287,24 @@ function SearchForm({ initial, options, onSearch }: SearchFormProps) {
           }}
           description="無理なく続けられる範囲で選んでください。募集の条件が未入力の項目は、条件に合わない側に入ります"
         >
-          <SearchWorkConditions
-            options={options}
-            draft={workConditions}
-            onChange={setWorkConditions}
-            startMonthErrors={startMonthErrors}
-          />
+          <div className="space-y-6">
+            {/* 勤務地（出社できる都道府県）も一緒に選ぶ（PR304） */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={!profile}
+              onClick={fillFromProfile}
+            >
+              自分の稼働条件で選ぶ
+            </Button>
+            <SearchWorkConditions
+              options={options}
+              draft={workConditions}
+              onChange={setWorkConditions}
+              startMonthErrors={startMonthErrors}
+            />
+          </div>
         </SearchConditionDialog>
 
         {/* ① フリーワード。画面に出る文章と、会社名・職種・技術の名前が対象（PR198） */}

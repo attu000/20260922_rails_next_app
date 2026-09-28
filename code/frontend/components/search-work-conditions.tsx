@@ -1,7 +1,7 @@
 // 募集一覧（学生のホーム）の [稼働条件] のポップアップの中身（PR200）。
 // 学生側の言い方（無理なく続けられる範囲の上限）で並べる（design/designs/その他決め事.md の 5-6）。
 // 「合うかどうか」の判定は Rails が行う（API設計.md の 16-3 ⑱）。ここは選ぶだけ。
-// おすすめ順のときに自分のプロフィールから自動で選ぶのは、順13（【強み】）で足す
+// 「自分の稼働条件で選ぶ」ボタンは、並び順とは関係なく、押したときだけ下書きを埋める（PR302）
 
 import { ChoiceButtons } from "@/components/choice-buttons";
 import { MonthField } from "@/components/form-fields";
@@ -10,6 +10,7 @@ import { Field, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/componen
 import { currentYearInTokyo, joinMonthDate, splitMonthDate, yearChoices } from "@/lib/form-values";
 import type { Options } from "@/lib/options";
 import type { SearchConditions } from "@/lib/student-job-postings";
+import type { StudentProfile } from "@/lib/student-profile";
 
 // ポップアップの中で持つ下書き。開始時期は、年と月の片方だけ選んだ状態も持てるよう、2つの文字で持つ
 export type WorkConditionsDraft = {
@@ -45,6 +46,31 @@ export function fromWorkConditionsDraft(draft: WorkConditionsDraft) {
     available_from: joinMonthDate(draft.start_year, draft.start_month),
     work_styles: draft.work_styles,
     weekend_ok: draft.weekend_ok,
+  };
+}
+
+// プロフィールの稼働条件 → 下書き（「自分の稼働条件で選ぶ」。PR302）。
+// 入力済みの項目だけを選び、未入力の項目はオフにする（その他決め事.md の 5-10）。
+// 勤務形態は、3つとも可能なら選ばない（「未入力」と「すべて可能」は区別しない。5-6）。
+// 土日OK はプロフィールにない項目なので、今の選択のまま
+export function workConditionsDraftFromProfile(
+  profile: StudentProfile,
+  current: WorkConditionsDraft,
+): WorkConditionsDraft {
+  const { year, month } = splitMonthDate(profile.available_from);
+  const possibleStyles = [
+    profile.can_full_remote ? "full_remote" : null,
+    profile.can_partial_remote ? "partial_remote" : null,
+    profile.can_onsite ? "onsite" : null,
+  ].filter((style) => style !== null);
+  return {
+    work_days_per_week: profile.work_days_per_week,
+    work_hours_per_day: profile.work_hours_per_day,
+    duration_months: profile.duration_months,
+    start_year: year,
+    start_month: month,
+    work_styles: possibleStyles.length === 3 ? [] : possibleStyles,
+    weekend_ok: current.weekend_ok,
   };
 }
 
