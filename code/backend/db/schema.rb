@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_27_140001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -185,6 +185,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_140001) do
     t.index ["job_middle_category_id"], name: "index_job_posting_job_categories_on_job_middle_category_id"
     t.index ["job_posting_id", "job_middle_category_id"], name: "idx_on_job_posting_id_job_middle_category_id_ff30f932c4", unique: true
     t.index ["job_posting_id"], name: "index_job_posting_job_categories_on_job_posting_id"
+  end
+
+  create_table "job_posting_recommendation_stats", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "industry_count", default: 0, null: false
+    t.integer "interest_count", default: 0, null: false
+    t.integer "job_major_category_count", default: 0, null: false
+    t.integer "job_middle_category_count", default: 0, null: false
+    t.bigint "job_posting_id", null: false
+    t.float "self_weight", default: 0.0, null: false
+    t.integer "technology_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.integer "work_process_count", default: 0, null: false
+    t.index ["job_posting_id"], name: "index_job_posting_recommendation_stats_on_job_posting_id", unique: true
   end
 
   create_table "job_posting_technologies", force: :cascade do |t|
@@ -367,6 +381,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_140001) do
     t.check_constraint "university_id IS NULL OR university_other_name IS NULL", name: "student_profiles_university_or_other_name"
   end
 
+  create_table "student_recommendation_stats", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "industry_count", default: 0, null: false
+    t.integer "interest_count", default: 0, null: false
+    t.integer "job_major_category_count", default: 0, null: false
+    t.integer "job_middle_category_count", default: 0, null: false
+    t.float "self_weight", default: 0.0, null: false
+    t.bigint "student_profile_id", null: false
+    t.integer "technology_count", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["student_profile_id"], name: "index_student_recommendation_stats_on_student_profile_id", unique: true
+  end
+
   create_table "student_skills", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.integer "level", null: false
@@ -434,6 +461,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_140001) do
   add_foreign_key "job_posting_industries", "job_postings"
   add_foreign_key "job_posting_job_categories", "job_middle_categories"
   add_foreign_key "job_posting_job_categories", "job_postings"
+  add_foreign_key "job_posting_recommendation_stats", "job_postings"
   add_foreign_key "job_posting_technologies", "job_postings"
   add_foreign_key "job_posting_technologies", "technologies"
   add_foreign_key "job_posting_work_processes", "job_postings"
@@ -458,6 +486,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_27_140001) do
   add_foreign_key "student_profiles", "prefectures"
   add_foreign_key "student_profiles", "universities"
   add_foreign_key "student_profiles", "users"
+  add_foreign_key "student_recommendation_stats", "student_profiles"
   add_foreign_key "student_skills", "student_profiles"
   add_foreign_key "student_skills", "technologies"
 end

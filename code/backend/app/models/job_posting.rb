@@ -31,6 +31,8 @@ class JobPosting < ApplicationRecord
   has_many :business_types, through: :job_posting_business_types
   # この募集とのやりとり（応募・スカウト）
   has_many :candidacies
+  # 推薦の集計の行（1募集1行）。job_posting.recommendation_stat で取り出す
+  has_one :recommendation_stat, class_name: "JobPostingRecommendationStat"
 
   # 状態と勤務形態。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。範囲外の値は検証エラーにする
   enum :status, {
