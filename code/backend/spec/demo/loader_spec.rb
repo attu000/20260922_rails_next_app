@@ -19,7 +19,10 @@ RSpec.describe DemoLoader do
       published: JobPosting.where(id: posting_ids).published.count,
       students: student_ids.size,
       candidacies: Candidacy.where(job_posting_id: posting_ids).count,
-      matched: Candidacy.where(job_posting_id: posting_ids).after_match.count
+      matched: Candidacy.where(job_posting_id: posting_ids).after_match.count,
+      # 推薦の集計の行（順12）。募集・学生ごとに1行ずつできる
+      posting_stats: JobPostingRecommendationStat.where(job_posting_id: posting_ids).count,
+      student_stats: StudentRecommendationStat.where(student_profile_id: student_ids).count
     }
   end
 
@@ -27,7 +30,8 @@ RSpec.describe DemoLoader do
     result = described_class.load!
 
     expect(result).to eq(companies: 5, job_postings: 20, students: 20, candidacies: 18)
-    expect(demo_counts).to eq(companies: 5, job_postings: 20, published: 16, students: 20, candidacies: 18, matched: 7)
+    expect(demo_counts).to eq(companies: 5, job_postings: 20, published: 16, students: 20, candidacies: 18, matched: 7,
+                              posting_stats: 20, student_stats: 20)
     # マッチした組（企業×学生）ごとに2〜4通。スカウト文もメッセージとしてスレッドに入るので、それは除いて数える
     thread_message_counts = Message.where.not(id: ScoutMessage.select(:message_id)).group(:message_thread_id).count.values
     expect(thread_message_counts.size).to eq(7)
@@ -40,7 +44,8 @@ RSpec.describe DemoLoader do
     described_class.load!
     described_class.load!
 
-    expect(demo_counts).to eq(companies: 5, job_postings: 20, published: 16, students: 20, candidacies: 18, matched: 7)
+    expect(demo_counts).to eq(companies: 5, job_postings: 20, published: 16, students: 20, candidacies: 18, matched: 7,
+                              posting_stats: 20, student_stats: 20)
     expect(StudentProfile.exists?(other_student.id)).to be(true)
     # db/seeds.rb の試しのアカウントも残る
     expect(User.exists?(email: "company@example.com")).to be(true)

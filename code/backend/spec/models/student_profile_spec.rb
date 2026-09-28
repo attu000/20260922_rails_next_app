@@ -86,4 +86,36 @@ RSpec.describe StudentProfile, type: :model do
       expect(profile.reload.interested_industry_ids).to eq([])
     end
   end
+
+  # 順12：推薦の集計の項目数は、付属テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5）
+  describe "#save_profile（推薦の集計の項目数）" do
+    let(:middles) { create_list(:job_middle_category, 2) }
+    let(:industry) { create(:industry) }
+
+    it "保存すると、集計の行ができ、項目数が入力どおりになる。変えて保存し直すと、項目数も変わる" do
+      profile.save_profile(interested_job_middle_category_ids: middles.map(&:id), interested_industry_ids: [ industry.id ])
+      expect(profile.reload.recommendation_stat).to have_attributes(job_middle_category_count: 2, industry_count: 1)
+
+      profile.save_profile(interested_job_middle_category_ids: [ middles.first.id ], interested_industry_ids: [])
+
+      expect(profile.reload.recommendation_stat).to have_attributes(job_middle_category_count: 1, industry_count: 0)
+    end
+
+    it "項目に関係のない保存（氏名だけ）でも、項目数は正しいまま" do
+      profile.save_profile(interested_job_middle_category_ids: middles.map(&:id))
+
+      profile.save_profile(name: "新しい名前")
+
+      expect(profile.reload.recommendation_stat.job_middle_category_count).to eq(2)
+    end
+
+    it "入力に誤りがあって保存できなかったときは、項目数も変わらない" do
+      profile.save_profile(interested_industry_ids: [ industry.id ])
+
+      result = profile.save_profile(interested_job_middle_category_ids: middles.map(&:id), interested_industry_ids: [ 0 ])
+
+      expect(result).to be(false)
+      expect(profile.reload.recommendation_stat).to have_attributes(job_middle_category_count: 0, industry_count: 1)
+    end
+  end
 end

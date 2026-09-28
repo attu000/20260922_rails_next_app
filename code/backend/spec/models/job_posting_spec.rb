@@ -96,4 +96,56 @@ RSpec.describe JobPosting, type: :model do
       expect(job_posting.involved_work_process_ids).to eq([ processes[1].id ])
     end
   end
+
+  # 順12：推薦の集計の項目数は、中間テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5）
+  describe "#save_posting（推薦の集計の項目数）" do
+    let(:company) { create(:company_user).company_profile }
+    let(:technologies) { create_list(:technology, 2) }
+    let(:industry) { create(:industry) }
+
+    it "新しく作ると集計の行ができ、件数と self_weight は0、項目数は入力どおりになる" do
+      # 窓口（⑬）と同じく、まだ保存していない募集に save_posting を呼んで作る
+      job_posting = JobPosting.new(company_profile: company)
+
+      result = job_posting.save_posting(title: "新しい募集", status: "unpublished",
+                                        technology_ids: technologies.map(&:id), industry_ids: [ industry.id ])
+
+      expect(result).to be(true)
+      expect(job_posting.reload.recommendation_stat).to have_attributes(
+        interest_count: 0,
+        self_weight: 0,
+        technology_count: 2,
+        industry_count: 1,
+        job_middle_category_count: 0
+      )
+    end
+
+    it "編集すると、項目数も変わる" do
+      job_posting = create(:job_posting)
+      job_posting.save_posting(technology_ids: technologies.map(&:id))
+
+      job_posting.save_posting(technology_ids: [ technologies.first.id ], industry_ids: [ industry.id ])
+
+      expect(job_posting.reload.recommendation_stat).to have_attributes(technology_count: 1, industry_count: 1)
+    end
+
+    it "状態だけを変えても、項目数は正しいまま" do
+      job_posting = create(:job_posting)
+      job_posting.save_posting(technology_ids: technologies.map(&:id))
+
+      expect(job_posting.save_posting(status: "published")).to be(true)
+
+      expect(job_posting.reload.recommendation_stat.technology_count).to eq(2)
+    end
+
+    it "入力に誤りがあって保存できなかったときは、項目数も変わらない" do
+      job_posting = create(:job_posting)
+      job_posting.save_posting(technology_ids: technologies.map(&:id))
+
+      result = job_posting.save_posting(technology_ids: [ technologies.first.id ], industry_ids: [ 0 ])
+
+      expect(result).to be(false)
+      expect(job_posting.reload.recommendation_stat).to have_attributes(technology_count: 2, industry_count: 0)
+    end
+  end
 end

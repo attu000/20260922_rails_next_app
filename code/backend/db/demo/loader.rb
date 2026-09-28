@@ -71,10 +71,13 @@ class DemoLoader
     [ JobPostingJobCategory, JobPostingTechnology, JobPostingWorkProcess, JobPostingIndustry, JobPostingBusinessType ].each do |model|
       model.where(job_posting_id: posting_ids).delete_all
     end
+    # 推薦の集計の行（順12。募集の保存・新規登録で自動でできる）
+    JobPostingRecommendationStat.where(job_posting_id: posting_ids).delete_all
     JobPosting.where(id: posting_ids).delete_all
 
     [ CompanyIndustry, CompanyBusinessType ].each { |model| model.where(company_profile_id: company_ids).delete_all }
-    [ StudentSkill, StudentInterestedJobCategory, StudentInterestedIndustry, StudentCommutablePrefecture ].each do |model|
+    [ StudentSkill, StudentInterestedJobCategory, StudentInterestedIndustry, StudentCommutablePrefecture,
+      StudentRecommendationStat ].each do |model|
       model.where(student_profile_id: student_ids).delete_all
     end
 

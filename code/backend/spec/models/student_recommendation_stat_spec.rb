@@ -148,7 +148,8 @@ RSpec.describe StudentRecommendationStat, type: :model do
     end
 
     it "件数と self_weight の列は書き換えない" do
-      described_class.create!(student_profile: student, interest_count: 2, self_weight: 1.5)
+      # 行は、上の save_profile で自動でできている（順12 の 12-2）。件数と self_weight に、わざと値を入れておく
+      student.recommendation_stat.update!(interest_count: 2, self_weight: 1.5)
 
       described_class.refresh_item_counts!([ student.id ])
 

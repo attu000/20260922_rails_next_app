@@ -122,7 +122,6 @@ class StudentProfile < ApplicationRecord
 
     # まとめて書き込む。途中で失敗したら、すべて取り消す（Django の transaction.atomic() にあたる）
     transaction { write_profile! }
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
   end
 
@@ -147,7 +146,8 @@ class StudentProfile < ApplicationRecord
     errors.empty?
   end
 
-  # assign_profile で確かめた内容を書き込む。トランザクションの中で呼ぶ
+  # assign_profile で確かめた内容を書き込む。トランザクションの中で呼ぶ。
+  # マイページの保存（save_profile）と新規登録（StudentRegistration）の両方がここを通る
   def write_profile!
     save!
     # 中間テーブルを、送られた一覧でまるごと置き換える（16-3 ⑯）。送られなかった項目は変えない
@@ -155,6 +155,10 @@ class StudentProfile < ApplicationRecord
     self.interested_industry_ids = @pending_industry_ids unless @pending_industry_ids.nil?
     self.commutable_prefecture_ids = @pending_commutable_prefecture_ids unless @pending_commutable_prefecture_ids.nil?
     replace_skills(@pending_skills) unless @pending_skills.nil?
+    # 推薦の集計の項目数を、付属テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5。PR286）。
+    # 項目と数が同じ時点で変わらないと、Content の分母がずれるため。新規登録のときは、ここで集計の行ができる（件数と self_weight は0）。
+    # どの項目が変わったかは見ずに、毎回数え直す（自分の1行だけなので軽い）
+    StudentRecommendationStat.refresh_item_counts!([ id ])
   end
 
   # エラーの文を作るとき、Rails は項目の今の値を読みに行く（文の中に %{value} で差し込めるようにするため）。

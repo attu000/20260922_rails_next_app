@@ -162,8 +162,11 @@ class JobPosting < ApplicationRecord
       # Rails は本体の列が変わったときだけ updated_at を変えるので、職種や技術だけを直したときなど、
       # 本体が変わらなかった場合は touch（updated_at だけを今にする）で更新する
       touch unless saved_changes?
+      # 推薦の集計の項目数を、中間テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5。PR286）。
+      # 新しく作ったときは、ここで集計の行ができる（件数と self_weight は0）。
+      # 状態だけの変更などでも、どの項目が変わったかは見ずに毎回数え直す（自分の1行だけなので軽い）
+      JobPostingRecommendationStat.refresh_item_counts!([ id ])
     end
-    # 【強み】の順12 で、ここに「トランザクションが確定したら推薦のジョブを呼ぶ」処理を足す（技術構成.md の 9-1-1 の4）
     true
   end
 

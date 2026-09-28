@@ -129,7 +129,8 @@ RSpec.describe JobPostingRecommendationStat, type: :model do
     end
 
     it "件数と self_weight の列は書き換えない" do
-      described_class.create!(job_posting: posting, interest_count: 7, self_weight: 2.5)
+      # 行は、上の save_posting で自動でできている（順12 の 12-2）。件数と self_weight に、わざと値を入れておく
+      posting.recommendation_stat.update!(interest_count: 7, self_weight: 2.5)
 
       described_class.refresh_item_counts!([ posting.id ])
 

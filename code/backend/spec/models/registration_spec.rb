@@ -133,6 +133,43 @@ RSpec.describe Registration, type: :model do
       expect([ User.count, StudentSkill.count ]).to eq([ 0, 0 ])
     end
 
+    # 順12：推薦の集計の行は、書き込み（write_profile!）と同じトランザクションで作る（処理設計_類似度.md の 7-5）
+    it "推薦の集計の行を、件数と self_weight は0、項目数は入力どおりで作る" do
+      registration = described_class.new(
+        account.merge(
+          name: "山田 太郎", activity_status: "job_hunting",
+          interested_job_middle_category_ids: [ create(:job_middle_category).id ],
+          interested_industry_ids: [ create(:industry).id ],
+          skills: [
+            { technology_id: create(:technology).id, level: "v2" },
+            { other_name: "Elm", level: "v1" }
+          ]
+        )
+      )
+
+      expect(registration.save).to be(true)
+      expect(registration.profile.recommendation_stat).to have_attributes(
+        interest_count: 0,
+        self_weight: 0,
+        job_middle_category_count: 1,
+        job_major_category_count: 1,
+        technology_count: 1,
+        industry_count: 1
+      )
+    end
+
+    it "誤りがあって登録できなかったときは、推薦の集計の行を作らない" do
+      expect(described_class.new(account.merge(name: "山田 太郎")).save).to be(false)
+      expect(StudentRecommendationStat.count).to eq(0)
+    end
+
+    it "書き込みの途中で失敗したら、推薦の集計の行も一緒に取り消される" do
+      registration = described_class.new(account.merge(name: "山田 太郎", activity_status: "job_hunting"))
+
+      expect { registration.save { raise ActiveRecord::RecordInvalid } }.to raise_error(ActiveRecord::RecordInvalid)
+      expect([ User.count, StudentProfile.count, StudentRecommendationStat.count ]).to eq([ 0, 0, 0 ])
+    end
+
     it "学生の名前の項目名は「氏名」（企業の「会社名」とは別）" do
       registration = described_class.new(account.merge(name: "", activity_status: "job_hunting"))
 
