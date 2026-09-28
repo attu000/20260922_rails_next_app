@@ -387,8 +387,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 開いたとき | ⑦ GET /api/options | 表示名、5軸の説明 |
 | | 開いたとき | ㉓ GET /api/company/students/:id | 学生のプロフィールと、自社の全募集ぶんの状態・比較 |
 | | スカウトをする（文面を入力して送信） | ㉔ POST /api/company/scouts | スカウトを送る |
-| | スカウトの送信後 | ㉕ GET /api/company/students/:id/similar_students | 「この学生に似た学生」のポップアップ |
-| | ポップアップの学生 | `/company/students/[その学生id]?job_posting_id=[募集id]` | 画面の移動だけ |
+| | スカウトの送信後 | ㉕ GET /api/company/students/:id/similar_students | 「スカウトを送りました」のポップアップの「この学生に似た学生」（PR320）。ポップアップを開いているときだけ取る |
+| | ポップアップの学生 | `/company/students/[その学生id]?job_posting_id=[スカウトに使った募集id]` | 画面の移動だけ。スカウトに使った募集を選んだ状態で開く（PR315）。移る前にポップアップを閉じる |
 | | マッチする | ㉖ POST /api/company/candidacies/:id/match | 応募にマッチする |
 | | 見送る | ㉗ POST /api/company/candidacies/:id/decline | 見送る |
 | | 見送りを取り消す | ㉘ POST /api/company/candidacies/:id/undo_decline | 見送りを未マッチに戻す（応募由来・スカウト由来とも） |
@@ -447,8 +447,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 開いたとき | ⑦ GET /api/options | 表示名、応募理由の選択肢、5軸の説明 |
 | | 開いたとき | ⑲ GET /api/student/job_postings/:id | 募集の中身、自分の状態、自分の働き方の好み（カルチャーグラフに重ねる） |
 | | 応募する（応募理由を選ぶ） | ㉛ POST /api/student/candidacies | 応募する |
-| | 応募の完了後 | ㉝ GET /api/student/job_postings/:id/similar_job_postings | 「この募集に似た募集」のポップアップ |
-| | ポップアップの募集 | `/student/job_postings/[その募集id]` | 画面の移動だけ |
+| | 応募の完了後 | ㉝ GET /api/student/job_postings/:id/similar_job_postings | 「応募が完了しました」のポップアップの「この募集に似た募集」。ポップアップを開いているときだけ取る。スカウトへのマッチでは開かない |
+| | ポップアップの募集 | `/student/job_postings/[その募集id]` | 画面の移動だけ。移る前にポップアップを閉じる |
 | | マッチする（マッチ理由を選ぶ） | ㉜ POST /api/student/candidacies/:id/match | スカウトにマッチする |
 | | この企業とのメッセージ（⑲ の has_message_thread が true のとき） | `/student/messages?company_id=[id]` | 画面の移動だけ |
 | | 会社名 | `/student/companies/[id]` | 画面の移動だけ |
@@ -1373,27 +1373,35 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 - 画面・操作：C6 のスカウト送信後のポップアップ
 - 送るもの：job_posting_id（必須。スカウトに使った募集）。なければ 422（16-1-10）
-- 返すもの：200。最大5人の形C（items で包む。ページ分けしない）
+- 返すもの：200。最大5人の形C（items で包む。ページ分けしない）。matched は付けない（ポップアップに合う・合わないの区切りを出さないため）。似た学生がいなければ空の items
+- 確かめる順：job_posting_id がない（422）→ 他社の募集の番号（404）→ 存在しない学生の番号（404）。学生はすべての学生の中から探す（C6 と同じ。30日以上活動のない学生でも開ける）
 - 選び方（本書7-3・7-5）
   1. 学生すべてについて、その学生との近さ f(学生, 学生) をその場で計算する
-  2. 次の学生を**外す**：30日以上活動のない学生／その募集とやりとりがある学生
-  3. 残りのうち、その募集の稼働条件（入力済みの項目）に**合う学生から f の高い順に取る**
+  2. 次の学生を**外す**：30日以上活動のない学生／その募集とやりとりがある学生／その学生本人
+  3. 残りのうち、その募集の稼働条件（入力済みの項目）に**合う学生から f の高い順に取る**。「合う」は、C5 の「この募集の稼働条件で選ぶ」と同じ条件で判定する（PR313）
   4. 5人に満たなければ、**合わない学生からも f の高い順に補充して**5人にする
   5. それでも足りなければ、ある分だけ
+  - f が同じなら、最終活動が新しい順 → 番号の大きい順（PR317）
 - 稼働条件で絞り切らないのは、学生が稼働条件を埋めていないことが多く、絞ると毎回同じ少数の相手しか出てこなくなるため（本書7-3）
+- Rails では、選び方を `SimilarStudents.ids`（`app/services/similar_students.rb`）にまとめ、窓口は番号を確かめて呼ぶだけ。窓口は学生の下の別の一覧として、コントローラーを分ける（`Api::Company::SimilarStudentsController#index`。ルーティングは `resources :students` の中の `resources :similar_students, only: :index` で、パスの番号の名前は `:student_id`）。返ってきた番号の順（`in_order_of`）に、形C の関連（`StudentsController::ROW_ASSOCIATIONS`）もまとめて読む
 - 段階タグ：【強み】
+- 作る順：順14
 
 **㉝ GET /api/student/job_postings/:id/similar_job_postings（この募集に似た募集）**
 
 - 画面・操作：S6 の応募完了のポップアップ
-- 返すもの：200。最大5件の形B（items で包む。ページ分けしない）
+- 返すもの：200。最大5件の形B（items で包む。ページ分けしない）。matched は付けない。似た募集がなければ空の items
+- 番号は、学生から見てよい募集（⑲ と同じ。掲載中と、自分とやりとりがある募集）の中から探す。範囲外は 404。応募の直後なら、その間に募集が終了しても開ける
 - 選び方（㉕ と同じ形）
   1. 募集すべてについて、その募集との近さ f(募集, 募集) をその場で計算する
-  2. 次の募集を**外す**：掲載中以外の募集／自分とやりとりがある募集
-  3. 残りのうち、学生の入力済みの稼働条件に**合う募集から f の高い順に取る**
+  2. 次の募集を**外す**：掲載中以外の募集／自分とやりとりがある募集／その募集自身
+  3. 残りのうち、学生の入力済みの稼働条件に**合う募集から f の高い順に取る**。「合う」は、S2 の「自分の稼働条件で選ぶ」と同じ条件で判定する（PR313）
   4. 5件に満たなければ、**合わない募集からも f の高い順に補充して**5件にする
   5. それでも足りなければ、ある分だけ
+  - f が同じなら、新着順 → 番号の大きい順（PR317）
+- Rails では、選び方を `SimilarJobPostings.ids`（`app/services/similar_job_postings.rb`）にまとめる。窓口は `Api::Student::SimilarJobPostingsController#index`（`resources :job_postings` の中の `resources :similar_job_postings, only: :index`。パスの番号の名前は `:job_posting_id`）。行は形B の部品と `JobPostingsController::ROW_ASSOCIATIONS` を使い回す
 - 段階タグ：【強み】
+- 作る順：順14
 
 **㉞ GET /api/student/candidacies（募集管理）**
 

@@ -25,7 +25,7 @@ namespace :bench do
     puts "ログイン（パスワードはどれも #{BenchLoader::PASSWORD}）：#{BenchLoader::EMAIL_PREFIX}student1#{BenchLoader::EMAIL_DOMAIN} など"
   end
 
-  desc "おすすめ順・応募のジョブ・全体の作り直しの処理時間を測る（先に bench:load で測定用のデータを入れておく）"
+  desc "おすすめ順・似たもののポップアップ・応募のジョブ・全体の作り直しの処理時間を測る（先に bench:load で測定用のデータを入れておく）"
   task measure: :environment do
     abort "測定は、開発用のデータベースでだけ行えます（今は #{Rails.env}）" unless Rails.env.development?
 

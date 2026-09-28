@@ -2,9 +2,11 @@
 # 入口はコマンド bin/rails bench:measure（lib/tasks/bench.rake。bash dev.sh bench-measure からも呼べる）。
 # 測る前に、測定用のデータ（db/bench/loader.rb）を入れておく。
 #
-# 測る場面（スカウト後・応募完了のポップアップは、作る順で足す）
+# 測る場面
 #   - 募集一覧（学生）のおすすめ順、学生検索のおすすめ順：窓口がする検索の本体の部分（並べる → 件数 → 1ページ目の20件と関連の読み込み →
 #     合致の印 → 合致の件数）。JSON を作る部分は含めない。条件なし（群が1つ）と条件あり（群が2つ）の両方
+#   - 似た学生のポップアップ（スカウト後）、似た募集のポップアップ（応募完了）：窓口がする部分（5件を選ぶ → 行と関連の読み込み。順14）。
+#     近さの部品の印を通らない1本の問い合わせなので、工程の内訳は出ない
 #   - 応募・マッチのときのジョブ（InterestRecordedJob）、全体の作り直し（RecommendationStatsRebuildJob）
 #
 # 工程ごとの内訳は、推薦の部品が付けた印（*.recommendation。PR307）を受け取って足し合わせる。
@@ -50,7 +52,10 @@ class BenchMeasurer
     @out.puts
 
     without_sql_log do
-      measure_searches(sample_students(students), sample_postings(postings))
+      sampled_students = sample_students(students)
+      sampled_postings = sample_postings(postings)
+      measure_searches(sampled_students, sampled_postings)
+      measure_popups(sampled_students, sampled_postings)
       measure_jobs(students)
     end
   end
@@ -88,6 +93,17 @@ class BenchMeasurer
     end
   end
 
+  # 学生と募集を1組ずつ組にして測る（学生1人 × その募集。スカウトした・応募した場面に見立てる）
+  def measure_popups(students, postings)
+    pairs = students.zip(postings)
+    report("似た学生のポップアップ（#{pairs.size}組 × #{RUNS}回）", pairs) do |student, posting|
+      similar_students(student, posting)
+    end
+    report("似た募集のポップアップ（#{pairs.size}組 × #{RUNS}回）", pairs) do |student, posting|
+      similar_job_postings(posting, student)
+    end
+  end
+
   def measure_jobs(students)
     candidacies = Candidacy.interests.where(student_profile_id: students.map(&:id)).order(:id).to_a.sample(TARGETS, random: @random)
     report("応募・マッチのときのジョブ：集計の数え直し（やりとり#{candidacies.size}件 × #{RUNS}回）", candidacies) do |candidacy|
@@ -110,6 +126,18 @@ class BenchMeasurer
     ids = first_page(search, Api::Company::StudentsController::ROW_ASSOCIATIONS)
     posting.candidacies.where(student_profile_id: ids).to_a
     company.candidacies.where(student_profile_id: ids).group(:student_profile_id).count
+  end
+
+  # 窓口（Api::Company::SimilarStudentsController#index）と同じ順で、5人を選び、その順に行と関連を読む
+  def similar_students(student, posting)
+    ids = SimilarStudents.ids(student, posting)
+    StudentProfile.includes(*Api::Company::StudentsController::ROW_ASSOCIATIONS).in_order_of(:id, ids).to_a
+  end
+
+  # 窓口（Api::Student::SimilarJobPostingsController#index）と同じ順で、5件を選び、その順に行と関連を読む
+  def similar_job_postings(posting, student)
+    ids = SimilarJobPostings.ids(posting, student)
+    JobPosting.includes(*Api::Student::JobPostingsController::ROW_ASSOCIATIONS).in_order_of(:id, ids).to_a
   end
 
   # 並べる → 件数（Pagy と同じ count(:all)）→ 1ページ目の行と関連 → 合致の印 → 合致の件数。1ページ目の番号を返す
