@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_28_130001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -285,6 +285,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_120001) do
     t.index ["sender_user_id"], name: "index_messages_on_sender_user_id"
   end
 
+  create_table "notifications", force: :cascade do |t|
+    t.text "body", null: false
+    t.datetime "created_at", null: false
+    t.integer "kind", null: false
+    t.string "link_path"
+    t.datetime "read_at"
+    t.bigint "student_profile_id"
+    t.datetime "updated_at", null: false
+    t.bigint "user_id", null: false
+    t.index ["student_profile_id"], name: "index_notifications_on_student_profile_id"
+    t.index ["user_id", "created_at"], name: "index_notifications_on_user_id_and_created_at"
+    t.index ["user_id", "read_at"], name: "index_notifications_on_user_id_and_read_at"
+  end
+
   create_table "prefectures", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "name", null: false
@@ -472,6 +486,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_120001) do
   add_foreign_key "message_threads", "student_profiles"
   add_foreign_key "messages", "message_threads"
   add_foreign_key "messages", "users", column: "sender_user_id"
+  add_foreign_key "notifications", "student_profiles"
+  add_foreign_key "notifications", "users"
   add_foreign_key "scout_messages", "candidacies"
   add_foreign_key "scout_messages", "messages"
   add_foreign_key "sessions", "users"

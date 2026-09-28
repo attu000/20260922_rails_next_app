@@ -8,6 +8,8 @@ class User < ApplicationRecord
   has_many :sessions, dependent: :destroy
   has_one :company_profile
   has_one :student_profile
+  # 自分宛ての通知（今は企業だけ。user.notifications.unread.count で未読件数を数える）
+  has_many :notifications
 
   # 種別。番号を明示し、新しい値は末尾に足す（技術構成.md の 9-1）。範囲外の値は検証エラーにする
   enum :role, { student: 0, company: 1 }, validate: true
