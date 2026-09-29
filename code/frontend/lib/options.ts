@@ -31,6 +31,13 @@ export type WorkProcess = { id: number; name: string };
 // 学部。中に学科を持つ（学科は学部の中での表示順）
 export type Faculty = { id: number; name: string; departments: MasterRow[] };
 
+// プチ職業体験の自己分析の、伸ばしたい理由の種類（順18）。
+// detail_question は、その理由を選んだときの 2-3 の深掘りの問い（PR397）
+export type GrowthReasonOption = EnumOption & { detail_question: string };
+
+// プチ職業体験の講座（講座の表示順。順18）
+export type JobTrialMaster = { id: number; title: string; job_middle_category_id: number };
+
 // 性格・カルチャーの5軸の1つ（その他決め事.md の 5-5）。
 // 例：{ key: "pace", name: "進め方", left_label: "スピード", left_description: "まず動くものを作って見せ、…", right_label: "緻密さ", … }
 export type CultureAxis = {
@@ -59,6 +66,8 @@ export type Options = {
     candidacy_tag: EnumOption[];
     // 企業に見せる学生の最終活動の目安（3日以内・7日以内・30日以内・30日より前。【仕上げ】順16）
     last_active_range: EnumOption[];
+    // プチ職業体験の自己分析の、伸ばしたい理由の種類（順18）
+    growth_reason: GrowthReasonOption[];
   };
   // 稼働条件の数値の選択肢（その他決め事.md の 5-6）
   work_conditions: {
@@ -79,6 +88,8 @@ export type Options = {
     // 大学（学校コードの順）と学部（順3）
     universities: MasterRow[];
     faculties: Faculty[];
+    // プチ職業体験の講座（順18）
+    job_trials: JobTrialMaster[];
   };
 };
 

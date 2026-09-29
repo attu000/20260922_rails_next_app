@@ -34,7 +34,8 @@ function readCsrfToken(): string | null {
 }
 
 type ApiFetchOptions = {
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  // PUT は、作る・上書きを1つの窓口で行うときに使う（プチ職業体験の自己分析の保存。16-3 ㊽）
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   // 送る中身。FormData（画像などのファイル）ならそのまま、それ以外は JSON に直して送る
   body?: unknown;
 };

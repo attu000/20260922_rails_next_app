@@ -58,10 +58,12 @@ json.enums do
     json.value value
     json.label t("enums.student_profile.last_active_range.#{value}")
   end
-  # プチ職業体験の自己分析の、伸ばしたい理由の種類（サービス概要_コンセプト.md の 12-4。順18）
+  # プチ職業体験の自己分析の、伸ばしたい理由の種類（サービス概要_コンセプト.md の 12-4。順18）。
+  # detail_question は、その理由を選んだときの 2-3 の深掘りの問い（PR397）。画面は選んだ理由の問いを出す
   json.growth_reason SelfAnalysis.growth_reasons.keys do |value|
     json.value value
     json.label t("enums.self_analysis.growth_reason.#{value}")
+    json.detail_question t("self_analysis.detail_questions.#{value}")
   end
 end
 

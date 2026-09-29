@@ -1,11 +1,19 @@
-// 入力欄の部品と、開閉するまとまり。募集詳細編集（C3）とマイページ（S1）で使い回す。
+// 入力欄の部品と、開閉するまとまり。募集詳細編集（C3）とマイページ（S1）、プチ職業体験（S12）で使い回す。
 // 見出し・入力欄・文字数・エラーの組み立てを1か所にまとめる。
 // 部品は、フォームの中ではなく、このファイルの一番上の段に置く
 // （フォームの中で定義すると、描き直すたびに入力欄が作り直され、打っている途中でカーソルが外れるため）
 
 import type { ReactNode } from "react";
 import { AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,7 +94,8 @@ export function TextField({ id, value, onChange, errors, label, required }: Inpu
   );
 }
 
-// 文章の入力欄（複数行）。placeholder は、空欄のときに薄く出す文
+// 文章の入力欄（複数行）。placeholder は、空欄のときに薄く出す文。
+// maxLength は文字数の表示に使う上限（Rails と同じ値を渡す。省けば LONG_TEXT_MAX_LENGTH）
 export function LongTextField({
   id,
   value,
@@ -96,7 +105,8 @@ export function LongTextField({
   placeholder,
   description,
   required,
-}: InputProps & { label: string; placeholder?: string; description?: string }) {
+  maxLength = LONG_TEXT_MAX_LENGTH,
+}: InputProps & { label: string; placeholder?: string; description?: string; maxLength?: number }) {
   return (
     <Field data-invalid={errors ? true : undefined}>
       <FieldLabel htmlFor={id}>
@@ -112,10 +122,63 @@ export function LongTextField({
         aria-invalid={errors ? true : undefined}
       />
       <FieldDescription>
-        {value.length}／{LONG_TEXT_MAX_LENGTH}文字
+        {value.length}／{maxLength}文字
       </FieldDescription>
       <FieldError errors={toFieldErrorItems(errors)} />
     </Field>
+  );
+}
+
+// 1つだけ選ぶ丸いボタン（ラジオボタン）の並び。選択肢をすべて見せて選ばせたいときに使う
+// （プチ職業体験の問題と、自己分析のハードル・理由の種類）。
+// name は、同じ並びのボタンをまとめる名前（ページの中で重ならないようにする）
+export function RadioField({
+  name,
+  legend,
+  choices,
+  value,
+  onChange,
+  errors,
+  required,
+}: {
+  name: string;
+  legend: string;
+  choices: { value: string; label: string }[];
+  // 選んでいる値。まだ選んでいなければ空文字
+  value: string;
+  onChange: (value: string) => void;
+  errors: string[] | undefined;
+  required?: boolean;
+}) {
+  return (
+    <FieldSet data-invalid={errors ? true : undefined}>
+      <FieldLegend variant="label">
+        <LabelText label={legend} required={required} />
+      </FieldLegend>
+      <div className="space-y-2">
+        {choices.map((choice) => {
+          const id = `${name}-${choice.value}`;
+          return (
+            <Field key={choice.value} orientation="horizontal" className="items-start">
+              <input
+                id={id}
+                type="radio"
+                name={name}
+                value={choice.value}
+                checked={value === choice.value}
+                onChange={() => onChange(choice.value)}
+                // ラジオボタンには「誤りあり」の印（aria-invalid）を付けられないので、並びの下のエラーの文で伝える
+                className="mt-0.5 size-4 shrink-0 accent-primary"
+              />
+              <FieldLabel htmlFor={id} className="font-normal">
+                {choice.label}
+              </FieldLabel>
+            </Field>
+          );
+        })}
+      </div>
+      <FieldError errors={toFieldErrorItems(errors)} />
+    </FieldSet>
   );
 }
 

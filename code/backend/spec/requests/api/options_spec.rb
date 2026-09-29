@@ -215,12 +215,15 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
 
   # 順18（プチ職業体験）で足した選択肢とマスタ
   describe "プチ職業体験で使う選択肢とマスタ" do
-    it "伸ばしたい理由の種類の5つを、名前と日本語の表示名で返す" do
+    it "伸ばしたい理由の種類の5つを、名前と日本語の表示名、2-3 の深掘りの問いと一緒に返す（PR397）" do
       get "/api/options"
 
       reasons = response.parsed_body["enums"]["growth_reason"]
       expect(reasons.map { |option| option["value"] }).to eq(%w[challenge curiosity importance future other])
-      expect(reasons.last).to eq("value" => "other", "label" => "その他")
+      expect(reasons.last).to eq(
+        "value" => "other", "label" => "その他", "detail_question" => "そう思った理由を書いてください。"
+      )
+      expect(reasons.map { |option| option["detail_question"] }).to all(be_present)
     end
 
     it "講座を表示順で、番号・題名・中分類の番号の3つだけ返す" do

@@ -11,7 +11,8 @@ import { loginPathFor, type Role } from "@/lib/auth";
 import { useMe } from "@/components/member-only";
 import { ProfileIcon } from "@/components/profile-icon";
 
-// タブ。行き先の画面はすべてある（メッセージは順7、通知は順15 で作った。未決内容.md の 11-2）
+// タブ。行き先の画面はすべてある（メッセージは順7、通知は順15、プチ職業体験は順18 で作った。未決内容.md の 11-2）。
+// 学生のプチ職業体験は、「体験してから応募する」使い方が伝わるよう、募集検索の次に置く（ページ設計.md の 6-2。PR385）
 const TABS: Record<Role, { label: string; href: string }[]> = {
   company: [
     { label: "会社情報", href: "/company/profile" },
@@ -23,6 +24,7 @@ const TABS: Record<Role, { label: string; href: string }[]> = {
   student: [
     { label: "マイページ", href: "/student/profile" },
     { label: "募集検索", href: "/student/job_postings" },
+    { label: "プチ職業体験", href: "/student/job_trials" },
     { label: "募集管理", href: "/student/candidacies" },
     { label: "スカウト管理", href: "/student/scouts" },
     { label: "メッセージ", href: "/student/messages" },
