@@ -13,7 +13,7 @@ RSpec.describe JobTrialLoader do
     let(:job_trial) { JobTrial.find_by!(code: "qa-coupon") }
 
     it "テスト設計の講座が、ハードル4つ・工程のタグ2つと一緒に入る" do
-      expect(job_trial).to have_attributes(title: "新しいクーポン機能、どこを確かめる？", position: 1)
+      expect(job_trial).to have_attributes(title: "テスト設計", position: 1)
       expect(job_trial.job_middle_category.code).to eq("4-1")
       expect(job_trial.work_processes.map(&:name)).to contain_exactly("テスト計画・リスク評価", "テスト・評価")
       expect(job_trial.hurdles.map(&:code)).to eq(%w[understand enumerate specify judge])

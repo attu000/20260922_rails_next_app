@@ -56,9 +56,13 @@ module Api
         # 自社と、この学生とのスレッドがあるか（募集ごとではなく、学生ごとの値）
         @has_message_thread = MessageThread.exists_between?(current_company, @student)
         # この学生の自己分析（修了したプチ職業体験）のすべてを、修了した日の新しい順に（順19。PR372）。
-        # 講座とハードルの名前も返すので、まとめて読む（自己分析の数だけ問い合わせを増やさない。Django の select_related にあたる）
-        @self_analyses = @student.self_analyses.includes(:job_trial, :strength_hurdle, :growth_hurdle)
+        # 講座の中身（ハードル・工程）とハードルの名前も返すので、まとめて読む
+        # （自己分析の数だけ問い合わせを増やさない。Django の select_related・prefetch_related にあたる）
+        @self_analyses = @student.self_analyses
+                                 .includes({ job_trial: %i[hurdles work_processes] }, :strength_hurdle, :growth_hurdle)
                                  .order(created_at: :desc, id: :desc)
+        # 企業向けの説明（講座の説明と、ハードルごとの力）。講座のファイルから1回だけ読む（PR407）
+        @job_trial_guides = @self_analyses.any? ? JobTrialGuide.all : {}
       end
 
       private

@@ -10,7 +10,7 @@
 // 「この学生とのメッセージ」は、募集の選択欄の外（名前の横）に、Rails の has_message_thread が true のときだけ出す（PR213）。
 // スカウトを送ったら、「この学生に似た学生」のポップアップを開く（components/similar-students-dialog.tsx。順14）。
 // 最終活動の目安は、名前の下に出す。一度もログインしていない学生（Rails が null を返す）には出さない（PR335）。
-// 修了したプチ職業体験と自己分析のポップアップは、名前の行と募集の選択欄のあいだ（components/company-self-analyses.tsx。順19）
+// 修了したプチ職業体験と自己分析のポップアップは、いちばん下（プロフィールの「稼働条件」の下。components/company-self-analyses.tsx。順19）
 
 import { useState } from "react";
 import { cn } from "cn";
@@ -128,9 +128,6 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
         )}
       </div>
 
-      {/* 修了したプチ職業体験（順19）。学生ごとの情報なので、募集の選択欄の外に置く（PR401）。1つもなければ出さない */}
-      <CompletedJobTrials selfAnalyses={data.self_analyses} options={options} />
-
       {/* 募集の選択欄と、選んだ募集の中身（ページ設計.md の 6-5 C6）。
           中身は、その募集での状態・ボタン、応募理由、募集との比較、学生のプロフィール */}
       <div className="space-y-3">
@@ -197,6 +194,9 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
           <Separator />
 
           <StudentProfileView student={data.student} options={options} />
+
+          {/* 修了したプチ職業体験（順19）。いちばん下、プロフィールの「稼働条件」の下に置く。1つもなければ出さない */}
+          <CompletedJobTrials selfAnalyses={data.self_analyses} studentName={data.student.name} options={options} />
         </section>
       </div>
     </div>

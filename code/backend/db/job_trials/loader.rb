@@ -6,6 +6,7 @@
 # - YAML から消した講座・ハードルは、消さずにそのまま残す（PR383）
 # - 工程のタグは中間テーブルなので、YAML の内容で置き換える
 # - 全体を1つのトランザクションで行い、途中で誤りがあれば何も変えずに止める
+# - 企業向けの説明（guide）は、データベースに入れずに読み飛ばす。Rails がその都度ファイルから読む（app/models/job_trial_guide.rb。PR407）
 class JobTrialLoader
   DIRECTORY = Rails.root.join("db/job_trials")
 

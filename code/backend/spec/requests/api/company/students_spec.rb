@@ -225,8 +225,8 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
           "job_trial", "strength_hurdle", "strength_reason", "growth_hurdle", "growth_reason",
           "growth_detail", "next_step", "same_hurdle", "created_at", "updated_at"
         )
+        expect(self_analyses.first["job_trial"]).to include("id" => newer_trial.id, "title" => newer_trial.title)
         expect(self_analyses.first).to include(
-          "job_trial" => { "id" => newer_trial.id, "title" => newer_trial.title },
           "strength_hurdle" => { "id" => hurdle.id, "name" => hurdle.name },
           "strength_reason" => newer.strength_reason,
           "growth_hurdle" => { "id" => hurdle.id, "name" => hurdle.name },
@@ -235,6 +235,56 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         )
         expect(self_analyses.second["same_hurdle"]).to be(false)
         expect(self_analyses.second["strength_hurdle"]["id"]).to eq(older.strength_hurdle_id)
+      end
+
+      # 講座の中身と、講座のファイルの企業向けの説明（PR403・PR407）
+      describe "講座の中身（job_trial）" do
+        let(:directory) { Pathname.new(Dir.mktmpdir) }
+        let(:job_trial) { create(:job_trial, :with_hurdles, code: "guided") }
+        let(:hurdles) { job_trial.hurdles.to_a }
+
+        before do
+          stub_const("JobTrialGuide::DIRECTORY", directory)
+          job_trial.work_processes << create(:work_process)
+          create(:self_analysis, student_profile: student, job_trial: job_trial)
+        end
+
+        after { FileUtils.remove_entry(directory) }
+
+        it "講座の説明と、ハードルごとの力を、講座の中の順番で返す" do
+          File.write(directory.join("guided.yml"), {
+            "code" => "guided",
+            "guide" => {
+              "summary" => "講座の説明",
+              "hurdles" => {
+                hurdles[0].code => { "skill" => "力1", "skill_description" => "説明1", "skill_point" => "まとめ1" }
+              }
+            }
+          }.to_yaml)
+
+          get "/api/company/students/#{student.id}"
+
+          body = response.parsed_body["self_analyses"].sole["job_trial"]
+          expect(body.keys).to contain_exactly(
+            "id", "title", "job_middle_category_id", "work_process_ids", "summary", "hurdles"
+          )
+          expect(body).to include("summary" => "講座の説明", "work_process_ids" => job_trial.work_process_ids)
+          expect(body["hurdles"].map { |hurdle| hurdle["id"] }).to eq(hurdles.map(&:id))
+          expect(body["hurdles"].first).to eq(
+            "id" => hurdles[0].id, "name" => hurdles[0].name,
+            "skill" => "力1", "skill_description" => "説明1", "skill_point" => "まとめ1"
+          )
+          # 書いていないハードルは null
+          expect(body["hurdles"].second).to include("skill" => nil, "skill_description" => nil, "skill_point" => nil)
+        end
+
+        it "講座のファイルに説明がなければ、説明と力は null（画面はその部分を出さない）" do
+          get "/api/company/students/#{student.id}"
+
+          body = response.parsed_body["self_analyses"].sole["job_trial"]
+          expect(body["summary"]).to be_nil
+          expect(body["hurdles"].map { |hurdle| hurdle["skill"] }).to all(be_nil)
+        end
       end
     end
 

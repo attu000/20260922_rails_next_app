@@ -12,10 +12,21 @@ end
 json.has_message_thread @has_message_thread
 # この学生の自己分析（修了したプチ職業体験）。修了した日の新しい順。なければ空の配列（順19。PR372）。
 # 学生ごとの値なので、job_postings の外に置く。ポップアップを開くたびに取りに行かず、ここに全部入れる（PR386）。
-# 画面は講座の中身を持たないので、講座名とハードルの名前もここに入れる
+# 画面は講座の中身を持たないので、講座の説明とハードルの一覧（企業向けの力の説明つき）もここに入れる（PR403）
 json.self_analyses @self_analyses do |self_analysis|
+  job_trial = self_analysis.job_trial
+  # 企業向けの説明は、講座のファイルの guide から（PR407）。書いていなければ null
+  guide = @job_trial_guides[job_trial.code]
   json.job_trial do
-    json.extract! self_analysis.job_trial, :id, :title
+    json.extract! job_trial, :id, :title, :job_middle_category_id
+    json.work_process_ids job_trial.work_process_ids
+    json.summary guide&.summary
+    # ハードルは講座の中の順番
+    json.hurdles job_trial.hurdles do |hurdle|
+      json.extract! hurdle, :id, :name
+      hurdle_guide = guide ? guide.hurdle(hurdle.code) : {}
+      JobTrialGuide::HURDLE_KEYS.each { |key| json.set! key, hurdle_guide[key] }
+    end
   end
   json.strength_hurdle do
     json.extract! self_analysis.strength_hurdle, :id, :name

@@ -69,9 +69,29 @@ export type CompanyJobTrialChoice = JobTrialChoice & { correct: boolean; explana
 export type CompanyJobTrialHurdle = Omit<JobTrialHurdle, "choices"> & { choices: CompanyJobTrialChoice[] };
 export type CompanyJobTrial = Omit<JobTrialDetail, "hurdles" | "self_analysis"> & { hurdles: CompanyJobTrialHurdle[] };
 
-// 企業の学生詳細（㉓）の自己分析。画面は講座の中身を持たないので、講座名とハードルの名前が入っている
+// 企業の学生詳細（㉓）の自己分析の講座。企業向けの説明（summary と、ハードルごとの skill など）は、
+// 講座のファイルの guide から Rails が入れる。書いていなければ null（PR402・PR403・PR407）
+export type CompanySelfAnalysisJobTrial = {
+  id: number;
+  title: string;
+  job_middle_category_id: number;
+  work_process_ids: number[];
+  // 講座の説明（「テスト設計では、…確かめます。」）
+  summary: string | null;
+  // 講座の中の順番
+  hurdles: {
+    id: number;
+    name: string;
+    // 力（「情報を整理する力」）、その説明、まとめ（「情報を整理し、分からない点を見つける力」）
+    skill: string | null;
+    skill_description: string | null;
+    skill_point: string | null;
+  }[];
+};
+
+// 企業の学生詳細（㉓）の自己分析。画面は講座の中身を持たないので、講座の説明とハードルの一覧が入っている
 export type CompanySelfAnalysis = {
-  job_trial: { id: number; title: string };
+  job_trial: CompanySelfAnalysisJobTrial;
   strength_hurdle: { id: number; name: string };
   strength_reason: string;
   growth_hurdle: { id: number; name: string };
