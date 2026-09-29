@@ -53,6 +53,8 @@ class StudentProfile < ApplicationRecord
   # 自分のやりとり（応募・スカウト）と、企業とのスレッド。窓口では、自分の分の中からだけ番号で探す（API設計.md の 16-1-10）
   has_many :candidacies
   has_many :message_threads
+  # プチ職業体験の自己分析（1講座に1件。サービス概要_コンセプト.md の 12-4）。窓口では、自分の分の中からだけ探す
+  has_many :self_analyses
   # 推薦の集計の行（1人1行）。student_profile.recommendation_stat で取り出す。Django の OneToOneField の逆向きの参照にあたる
   has_one :recommendation_stat, class_name: "StudentRecommendationStat"
 

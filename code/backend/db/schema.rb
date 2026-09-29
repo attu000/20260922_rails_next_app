@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_120001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_130001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -264,6 +264,44 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_120001) do
     t.check_constraint "status <> 1 OR internship_details IS NOT NULL AND hourly_wage IS NOT NULL", name: "job_postings_published_requires_details"
   end
 
+  create_table "job_trial_hurdles", force: :cascade do |t|
+    t.jsonb "choices", null: false
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.text "difficulty", null: false
+    t.text "example", null: false
+    t.text "goal", null: false
+    t.bigint "job_trial_id", null: false
+    t.string "name", null: false
+    t.text "overview", null: false
+    t.integer "position", null: false
+    t.text "question", null: false
+    t.text "tips", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_trial_id", "code"], name: "index_job_trial_hurdles_on_job_trial_id_and_code", unique: true
+  end
+
+  create_table "job_trial_work_processes", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_trial_id", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "work_process_id", null: false
+    t.index ["job_trial_id", "work_process_id"], name: "idx_on_job_trial_id_work_process_id_10317983da", unique: true
+    t.index ["work_process_id"], name: "index_job_trial_work_processes_on_work_process_id"
+  end
+
+  create_table "job_trials", force: :cascade do |t|
+    t.string "code", null: false
+    t.datetime "created_at", null: false
+    t.text "intro", null: false
+    t.bigint "job_middle_category_id", null: false
+    t.integer "position", null: false
+    t.string "title", null: false
+    t.datetime "updated_at", null: false
+    t.index ["code"], name: "index_job_trials_on_code", unique: true
+    t.index ["job_middle_category_id"], name: "index_job_trials_on_job_middle_category_id"
+  end
+
   create_table "message_threads", force: :cascade do |t|
     t.bigint "company_profile_id", null: false
     t.datetime "created_at", null: false
@@ -312,6 +350,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_120001) do
     t.datetime "updated_at", null: false
     t.index ["candidacy_id"], name: "index_scout_messages_on_candidacy_id", unique: true
     t.index ["message_id"], name: "index_scout_messages_on_message_id", unique: true
+  end
+
+  create_table "self_analyses", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.text "growth_detail", null: false
+    t.bigint "growth_hurdle_id", null: false
+    t.integer "growth_reason", null: false
+    t.bigint "job_trial_id", null: false
+    t.text "next_step", null: false
+    t.bigint "strength_hurdle_id", null: false
+    t.text "strength_reason", null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["growth_hurdle_id"], name: "index_self_analyses_on_growth_hurdle_id"
+    t.index ["job_trial_id"], name: "index_self_analyses_on_job_trial_id"
+    t.index ["strength_hurdle_id"], name: "index_self_analyses_on_strength_hurdle_id"
+    t.index ["student_profile_id", "job_trial_id"], name: "index_self_analyses_on_student_profile_id_and_job_trial_id", unique: true
   end
 
   create_table "sessions", force: :cascade do |t|
@@ -509,6 +564,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_120001) do
   add_foreign_key "job_posting_work_processes", "work_processes"
   add_foreign_key "job_postings", "company_profiles"
   add_foreign_key "job_postings", "prefectures"
+  add_foreign_key "job_trial_hurdles", "job_trials"
+  add_foreign_key "job_trial_work_processes", "job_trials"
+  add_foreign_key "job_trial_work_processes", "work_processes"
+  add_foreign_key "job_trials", "job_middle_categories"
   add_foreign_key "message_threads", "company_profiles"
   add_foreign_key "message_threads", "student_profiles"
   add_foreign_key "messages", "message_threads"
@@ -517,6 +576,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_120001) do
   add_foreign_key "notifications", "users"
   add_foreign_key "scout_messages", "candidacies"
   add_foreign_key "scout_messages", "messages"
+  add_foreign_key "self_analyses", "job_trial_hurdles", column: "growth_hurdle_id"
+  add_foreign_key "self_analyses", "job_trial_hurdles", column: "strength_hurdle_id"
+  add_foreign_key "self_analyses", "job_trials"
+  add_foreign_key "self_analyses", "student_profiles"
   add_foreign_key "sessions", "users"
   add_foreign_key "student_certifications", "student_profiles"
   add_foreign_key "student_commutable_prefectures", "prefectures"

@@ -119,6 +119,17 @@ ja:
         body: スカウト文
       message:
         body: 本文
+      # プチ職業体験（サービス概要_コンセプト.md の 12章）。choices は講座の YAML の読み込みの誤りに出る
+      job_trial_hurdle:
+        choices: 選択肢
+      # 自己分析（サービス概要_コンセプト.md の 12-4）。問いの文は画面に置き、ここはエラーの項目名だけ
+      self_analysis:
+        strength_hurdle_id: 得意なハードル
+        strength_reason: 得意だと感じた理由
+        growth_hurdle_id: 伸ばしたいハードル
+        growth_reason: 伸ばしたい理由
+        growth_detail: 伸ばしたい理由の深掘り
+        next_step: 次に知りたいこと・やってみたいこと
 
   # 選択肢（enum）の日本語の表示名。⑦ GET /api/options がここを読んで返す（API設計.md の 16-1-9）。
   # 画面側には選択肢の表を書かない
@@ -206,6 +217,14 @@ ja:
         declined: 見送り
         passed: 合格
         failed: 不合格
+    # 自己分析の2-2「伸ばしたい理由」（サービス概要_コンセプト.md の 12-4。PR360）。文言は仮（未決内容.md の 10-2）
+    self_analysis:
+      growth_reason:
+        challenge: 解けなかった・迷ったのが悔しかった
+        curiosity: もっと深く知りたくなった、考えるのが楽しかった
+        importance: 仕事の中で重要そう、役に立ちそうだと思った
+        future: 将来やりたい仕事や、なりたい姿に近いと感じた
+        other: その他
 
   # 性格・カルチャーの5軸の名前と、両端の短い名前・説明（その他決め事.md の 5-5）。⑦ GET /api/options の culture_axes で返す。
   # 両端は形容詞ではなく具体的な行動で書き、「良さそうな方」を選びにくくしている
@@ -269,3 +288,5 @@ ja:
       http_url: はhttp://かhttps://で始まる形で入力してください
       # 学科が、選んだ学部のものでない。「学科は、選んだ学部の中から選んでください」になる
       not_in_selected_faculty: は、選んだ学部の中から選んでください
+      # 自己分析で選んだハードルが、その講座のものでない。「得意なハードルは、この講座のハードルから選んでください」になる
+      not_in_job_trial: は、この講座のハードルから選んでください

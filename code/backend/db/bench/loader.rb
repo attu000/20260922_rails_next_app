@@ -122,9 +122,9 @@ class BenchLoader
     JobPosting.where(id: posting_ids).delete_all
 
     [ CompanyIndustry, CompanyBusinessType ].each { |model| model.where(company_profile_id: company_ids).delete_all }
-    # 学生の付属テーブル。外部リンク・資格・就活希望エリアは順17 で足した（PR337。消さないと外部キーに弾かれる）
+    # 学生の付属テーブル。外部リンク・資格・就活希望エリアは順17、プチ職業体験の自己分析は順18 で足した（PR337。消さないと外部キーに弾かれる）
     [ StudentSkill, StudentInterestedJobCategory, StudentInterestedIndustry, StudentCommutablePrefecture,
-      StudentLink, StudentCertification, StudentJobHuntingPrefecture, StudentRecommendationStat ].each do |model|
+      StudentLink, StudentCertification, StudentJobHuntingPrefecture, StudentRecommendationStat, SelfAnalysis ].each do |model|
       model.where(student_profile_id: student_ids).delete_all
     end
 

@@ -196,6 +196,12 @@ end
   end
 end
 
+# ── プチ職業体験の講座 ──
+# db/job_trials/ の YAML を読み込む（design/designs/データベース.md の 8-5 I。PR376）。
+# 講座は中分類と工程を名前・code で指すので、それらのマスタを入れたあとに読む
+require Rails.root.join("db/job_trials/loader").to_s
+JobTrialLoader.load!
+
 # ── 試しのアカウント ──
 
 # 企業のアカウント
