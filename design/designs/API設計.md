@@ -219,6 +219,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | 学生 | すべての学生 | ― |
 | 企業 | ― | すべての企業 |
 | 通知 | 自社宛ての通知 | ― |
+| プチ職業体験の講座・ハードル | すべての講座（㊾） | すべての講座（㊻㊼㊽） |
+| 自己分析 | 学生詳細（㉓）の中で、その学生の分をすべて読む。番号で直接は探さない | 自分の分だけ（㊻㊽。講座の番号で探す） |
 
 - 理由
   - 「自社の募集の中から番号で探す」形で書くと、Rails では見つからないときに自然に 404 になる。わざわざ 403 を返す仕組みを作るより単純
@@ -297,6 +299,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | C8 ログイン | `/company/login` |
 | C9 新規登録 | `/company/signup` |
 | C10 通知 | `/company/notifications` |
+| C11 プチ職業体験の内容 | `/company/job_trials/[id]` |
 
 学生側
 
@@ -311,6 +314,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | S7 企業詳細 | `/student/companies/[id]` |
 | S8 ログイン | `/student/login` |
 | S9 新規登録 | `/student/signup` |
+| S11 プチ職業体験一覧 | `/student/job_trials` |
+| S12 プチ職業体験 | `/student/job_trials/[id]`（講座と自己分析を1つの URL の中のステップで進む。PR388） |
 
 - `[id]` の部分には番号が入る（例：`/company/students/5`）
 - 通知の移動先（notifications.link_path）は、通知先の募集のタブを選んだ状態の C6 にする。例：`/company/students/5?job_posting_id=12`
@@ -335,7 +340,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 画面ごとに、画面の URL（Next.js のページ）と、その画面で呼ぶ API（`/api/`）を、タイミングの順に並べる
 - すべての画面で、開いたときに ③ GET /api/me を呼ぶ（16-1-6）。下の表では、トップとログイン画面以外は省く
 - ⑦ GET /api/options は、一度取ったら使い回す（まだ取っていなければ呼ぶ）
-- ①〜㊹ は 16-3 の窓口の番号。「→」は成功したあとに移る画面
+- ①〜㊾ は 16-3 の窓口の番号。「→」は成功したあとに移る画面
 
 #### 16-2-1. 共通
 
@@ -346,7 +351,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | 企業のヘッダー | タブ | `/company/profile`、`/company/job_postings`、`/company/candidacies`、`/company/students`、`/company/messages` | 会社情報、募集管理、候補者管理、学生検索、メッセージ |
 | | ベルのアイコン | `/company/notifications` | 未読件数は ③ の unread_notifications_count |
 | | ログアウト | ② DELETE /api/session | → `/company/login` |
-| 学生のヘッダー | タブ | `/student/profile`、`/student/job_postings`、`/student/candidacies`、`/student/scouts`、`/student/messages` | マイページ、募集検索、募集管理、スカウト管理、メッセージ |
+| 学生のヘッダー | タブ | `/student/profile`、`/student/job_postings`、`/student/job_trials`、`/student/candidacies`、`/student/scouts`、`/student/messages` | マイページ、募集検索、プチ職業体験、募集管理、スカウト管理、メッセージ（プチ職業体験は順18。PR385） |
 | | ログアウト | ② DELETE /api/session | → `/student/login` |
 
 #### 16-2-2. 企業側
@@ -373,6 +378,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 開いたとき | ⑧ GET /api/company/profile | 同上 |
 | | 開いたとき | ⑫ GET /api/company/job_postings/:id | 募集の全項目 |
 | | 保存 | ⑭ PATCH /api/company/job_postings/:id | → `/company/job_postings` |
+| C3 募集詳細編集（新規・編集とも） | この募集に近いプチ職業体験の講座名 | `/company/job_trials/[id]` | 新しいタブで開く（順19）。講座の選択肢は ⑦ の masters.job_trials |
 | C4 候補者一覧 | 画面の URL | `/company/candidacies` | `?job_posting_id=`（タブ）、`?show_all=true`（見送り・合格・不合格も表示） |
 | | 開いたとき | ⑪ GET /api/company/job_postings | タブに出す募集の名前 |
 | | 開いたとき・タブや表示の切り替え・ページ送り | ㉑ GET /api/company/candidacies | やりとりの一覧 |
@@ -396,6 +402,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 合格として保存 | ㉙ POST /api/company/candidacies/:id/pass | |
 | | 不合格として保存 | ㉚ POST /api/company/candidacies/:id/fail | |
 | | この学生とのメッセージ（㉓ の has_message_thread が true のとき） | `/company/messages?student_id=[id]` | 画面の移動だけ。募集の選択欄の外に置く |
+| | 修了したプチ職業体験を押す | （窓口なし） | 自己分析のポップアップを開く。中身は ㉓ の self_analyses に入っている（順19） |
+| | ポップアップの「講座の内容を見る」 | `/company/job_trials/[id]` | 新しいタブで開く（順19） |
 | C7 メッセージ管理 | 画面の URL | `/company/messages` | `?student_id=`（開くスレッド）、`?page=`（スレッド一覧のページ） |
 | | 開いたとき・ページ送り | ㊱ GET /api/company/message_threads | スレッド一覧 |
 | | 開いたとき（student_id があるとき）・スレッドを選んだとき | ㊲ GET /api/company/students/:id/message_thread | その学生とのチャット |
@@ -416,6 +424,9 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 開いたとき・ページ送り | ㊷ GET /api/company/notifications | 自社宛ての通知 |
 | | 通知を押す | ㊸ POST /api/company/notifications/:id/read | → link_path（`/company/students/[id]?job_posting_id=[id]`） |
 | | すべて既読にする | ㊹ POST /api/company/notifications/read_all | |
+| C11 プチ職業体験の内容 | 画面の URL | `/company/job_trials/[id]` | 順19 |
+| | 開いたとき | ⑦ GET /api/options | 中分類・工程の名前、理由の種類の表示名 |
+| | 開いたとき | ㊾ GET /api/company/job_trials/:id | 講座の中身（正解と解説を含む） |
 
 #### 16-2-3. 学生側
 
@@ -453,6 +464,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | マッチする（マッチ理由を選ぶ） | ㉜ POST /api/student/candidacies/:id/match | スカウトにマッチする |
 | | この企業とのメッセージ（⑲ の has_message_thread が true のとき） | `/student/messages?company_id=[id]` | 画面の移動だけ |
 | | 会社名 | `/student/companies/[id]` | 画面の移動だけ |
+| | この募集に近いプチ職業体験の講座名 | `/student/job_trials/[id]` | 画面の移動だけ（順19。中身は ⑲ の job_trials） |
 | S7 企業詳細 | 画面の URL | `/student/companies/[id]` | |
 | | 開いたとき | ⑦ GET /api/options | 業界・事業形態・人数の表示名 |
 | | 開いたとき | ⑳ GET /api/student/companies/:id | 企業のプロフィールと掲載中の募集 |
@@ -469,6 +481,15 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | | 登録する | ⑥ POST /api/student_registrations | アカウントとプロフィールを作り、自動でログイン |
 | | 登録の直後（アイコンを選んでいたとき） | ⑰ POST /api/student/profile/icon | → `/student/job_postings` |
 | | すでにアカウントをお持ちの方はこちら | `/student/login` | 画面の移動だけ |
+| S11 プチ職業体験一覧 | 画面の URL | `/student/job_trials` | 順18 |
+| | 開いたとき | ⑦ GET /api/options | 中分類・工程の名前 |
+| | 開いたとき | ㊺ GET /api/student/job_trials | 講座の一覧と、自分が修了済みか |
+| | 講座を押す | `/student/job_trials/[id]` | 画面の移動だけ |
+| S12 プチ職業体験 | 画面の URL | `/student/job_trials/[id]` | 順18。講座と自己分析を1つの URL の中のステップで進む（PR388） |
+| | 開いたとき | ⑦ GET /api/options | 中分類・工程の名前、理由の種類の表示名 |
+| | 開いたとき | ㊻ GET /api/student/job_trials/:id | 講座の中身（正解と解説は含まない）と、自分の自己分析（なければ null） |
+| | 問題に答える | ㊼ POST /api/student/job_trial_hurdles/:id/check | 正否と、選んだ選択肢の解説。正解なら「次へ」を押せるようにする |
+| | 自己分析を送る | ㊽ PUT /api/student/job_trials/:id/self_analysis | → `/student/job_trials` |
 
 ### 16-3. 窓口ごとの詳細
 
@@ -520,6 +541,11 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | ㊷ | GET | /api/company/notifications | 企業 | C10 表示 | 強み |
 | ㊸ | POST | /api/company/notifications/:id/read | 企業 | C10 通知を押す | 強み |
 | ㊹ | POST | /api/company/notifications/read_all | 企業 | C10 すべて既読にする | 強み |
+| ㊺ | GET | /api/student/job_trials | 学生 | S11 表示 | 後付け |
+| ㊻ | GET | /api/student/job_trials/:id | 学生 | S12 表示 | 後付け |
+| ㊼ | POST | /api/student/job_trial_hurdles/:id/check | 学生 | S12 問題に答える | 後付け |
+| ㊽ | PUT | /api/student/job_trials/:id/self_analysis | 学生 | S12 自己分析を送る | 後付け |
+| ㊾ | GET | /api/company/job_trials/:id | 企業 | C11 表示 | 後付け |
 
 #### 16-3-2. 共通の決まりと、繰り返し出てくる形
 
@@ -796,10 +822,10 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 
 | まとまり | 中身 |
 | --- | --- |
-| enums | 画面に出す選択肢すべて：grade、activity_status、employee_size、skill_level、job_posting_status、work_style、purpose、hiring_possibility、candidacy_reason、candidacy_status、**candidacy_tag**、**my_status**、technology_category、last_active_range |
+| enums | 画面に出す選択肢すべて：grade、activity_status、employee_size、skill_level、job_posting_status、work_style、purpose、hiring_possibility、candidacy_reason、candidacy_status、**candidacy_tag**、**my_status**、technology_category、last_active_range、growth_reason |
 | work_conditions | 稼働条件の数値の選択肢（週の日数、1日の時間、継続期間。本書5-6） |
 | culture_axes | 性格・カルチャーの5軸の名前と、両端の短い名前・説明（本書5-5） |
-| masters | 職種（大分類の中に中分類）、工程、技術、業界、事業形態、都道府県、大学、学部（中に学科） |
+| masters | 職種（大分類の中に中分類）、工程、技術、業界、事業形態、都道府県、大学、学部（中に学科）、プチ職業体験の講座（job_trials） |
 
 ```json
 {
@@ -853,6 +879,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 順5（応募 → 企業がマッチ）：candidacy_reason（12個。画面に出す順）、my_status（4つ）、candidacy_tag（6つ）。candidacy_status は、状態そのものを表示する画面ができたときに足す
   - 順9（性格・カルチャー・工程の入力）：culture_axes（5軸）、masters の work_processes（番号と名前だけ。上流 → 下流の表示順）
   - 順16（【仕上げ】）：last_active_range（4つ。値の一覧は `StudentProfile::LAST_ACTIVE_RANGE_VALUES`、表示名は `config/locales/ja.yml` の `enums.student_profile.last_active_range`）
+  - 順18（プチ職業体験）：growth_reason（自己分析の2-2 の理由の種類。5つ。本書12-4）、masters の job_trials（講座の一覧。`{ "id": 1, "title": "…", "job_middle_category_id": 16 }` の形で、表示順）。講座もマスタなので、業界や技術と同じくここで配る。C3 の選ぶ欄（順19）でも使う
 - culture_axes
   - 軸の並びは、Rails の検証と同じ定数（`app/models/concerns/culture_axes.rb` の `CultureAxes::AXES`）から作る。軸の名前・両端の短い名前・説明の文言は `config/locales/ja.yml` の `culture_axes`（本書5-5 の文をそのまま）
   - 学生の働き方の好み（S1・S9）と、募集のカルチャーグラフ（C3・S6）で共通。画面側は軸ごとの文言を持たない
@@ -969,6 +996,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "technology_ids": [1, 7],
   "industry_ids": [1],
   "business_type_ids": [2],
+  "job_trial_ids": [1],
   "updated_at": "2026-09-21T18:00:00.000+09:00"
 }
 ```
@@ -976,6 +1004,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 職種と工程は、「主な／関連する」「メインで担当する／関われる」で配列を分けて返す（Rails とのやりとりの形。画面は1つの一覧に直して見せ、チェックを入れた項目ごとにメイン／サブを選ぶ。本書6-5 C3。PR234・PR235）
 - about・business_description が空欄なら、null のまま返す。画面側は、⑧の企業プロフィールの値を薄く表示する
 - industry_ids・business_type_ids：この募集の業界・事業形態（任意）。企業プロフィールの値とは別に持つ（本書5-8）
+- job_trial_ids：この募集に近いプチ職業体験の講座（任意、複数。S6 の枠に出す。PR374）。順19 で足す
 - culture_ の5つ：カルチャーグラフ。−2〜2 の数値（空欄にはならない）
 - 作る順：工程・業界・事業形態・カルチャーは順9 で足した。目的・求める人材は【仕上げ】だが、今回の開発では作らない（議事録28。PR333）
 - 求める人材（学生には見せない）
@@ -990,7 +1019,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 送るもの：⑫と同じ項目（id、published_at、updated_at は除く）
 - 新規作成のときは、非公開か掲載中を選ぶ（本書17-2-2）
 - 返すもの：201、⑫と同じ形
-- 処理：job_postings と中間テーブル5つ（職種・工程・使用技術・業界・事業形態）を、1つのトランザクションで作る。状態が掲載中なら published_at を記録する
+- 処理：job_postings と中間テーブル5つ（職種・工程・使用技術・業界・事業形態）を、1つのトランザクションで作る。状態が掲載中なら published_at を記録する。順19 で、募集に近い講座（job_posting_job_trials）も同じトランザクションで作る（知らない講座の番号は 422）
 - 主なエラー：422（必須の項目（本書5-9。インターンですること・時給は、状態が掲載中のときだけ必須）、選択肢の範囲、主と関連に同じ中分類がある、メインと関われるに同じ工程がある（PR242）、カルチャーが −2〜2 の整数でない、状態の誤り、など）
 - 処理の置き場所：モデルの `JobPosting#save_posting`（先に全部確かめてから、トランザクションの中で書き込む。本書9-2）。工程は職種と同じく、メインか関われるのどちらかが送られたら置き換え、送られなかった側は今の内容のままにする
 - 推薦の集計：同じトランザクションで、その募集の job_posting_recommendation_stats の項目数を保存し直す（新しく作ったときは行を作る）。裏側のジョブはない（本書7-5）【強み】。順12 で `JobPosting#save_posting` の中に足した
@@ -1122,7 +1151,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   "my_personality_novelty": 0,
   "my_status": "scouted",
   "my_candidacy_id": 34,
-  "has_message_thread": true
+  "has_message_thread": true,
+  "job_trials": [{ "id": 1, "title": "新しいクーポン機能、どこを確かめる？", "completed": false }]
 }
 ```
 
@@ -1137,12 +1167,14 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - has_message_thread：**その企業とのスレッドがあるか**。true なら画面に「この企業とのメッセージ」のボタンを出す（本書17-2-3）
   - 送れるかどうか（can_send）とは別。スカウトが届いてまだマッチしていない相手でも、スカウト文を読みに行けるようにするため
   - スレッドができるのは「スカウトを受けたとき」か「応募がマッチしたとき」（本書5-2）
-- 段階タグ：【コア】（my_personality_ の5つは【強み】）
+- job_trials：企業が選んだ、この募集に近いプチ職業体験の講座（講座の表示順）。completed は、自分がその講座の自己分析を送っているか（修了済み。判定は Rails）。1つもなければ空の配列（PR374）
+- 段階タグ：【コア】（my_personality_ の5つは【強み】、job_trials は【後付け】）
 - 作る順：項目は、元になるテーブルや列ができる順で足していく
   - 順4（募集を探す）：上の例と説明のうち、次の順で足すもの以外。見られる範囲は掲載中の募集だけ
   - 順5（応募 → 企業がマッチ）：my_status、my_candidacy_id。見られる範囲に「自分とやりとりがある募集」を足す
   - 順6（スカウト → 学生がマッチ）：has_message_thread（`MessageThread.exists_between?`）。「この企業とのメッセージ」のボタンは、行き先の S5 ができた順7 で画面に足した（PR213）
   - 順9（性格・カルチャー・工程の入力）：industry_ids、business_type_ids、職種と並ぶ工程の配列（main_work_process_ids、involved_work_process_ids）、culture_ の5つ（済み）。順10（比較の表示）：my_personality_ の5つ（済み）
+  - 順19（プチ職業体験の企業の側）：job_trials
   - 仮の値（常に「関係なし」など）を先に返すことはしない。仮の値が残ったままになるのを防ぐため
 
 **⑳ GET /api/student/companies/:id（企業詳細）**
@@ -1281,6 +1313,20 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 {
   "student": { "…⑮と同じ項目…": "…", "icon_url": null, "last_active_range": "within_7_days" },
   "has_message_thread": true,
+  "self_analyses": [
+    {
+      "job_trial": { "id": 1, "title": "新しいクーポン機能、どこを確かめる？" },
+      "strength_hurdle": { "id": 1, "name": "理解する" },
+      "strength_reason": "…",
+      "growth_hurdle": { "id": 4, "name": "判断する" },
+      "growth_reason": "curiosity",
+      "growth_detail": "…",
+      "next_step": "…",
+      "same_hurdle": false,
+      "created_at": "2026-09-29T10:00:00.000+09:00",
+      "updated_at": "2026-09-29T10:00:00.000+09:00"
+    }
+  ],
   "job_postings": [
     {
       "id": 12, "title": "自社サービスのバックエンド開発インターン", "status": "published",
@@ -1320,6 +1366,11 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - has_message_thread：**その学生とのスレッドがあるか**。募集ごとではなく学生ごとの値なので、job_postings の中ではなく外に置く
   - true なら、どの募集を選んでいても「この学生とのメッセージ」のボタンを出す（本書17-2-3、6-5 C6）
   - 送れるかどうか（can_send）とは別。自分が送ったスカウト文を読み直せるようにするため
+- self_analyses：その学生の自己分析（修了したプチ職業体験）のすべて。修了した日（created_at）の新しい順。なければ空の配列（本書6-5 C6。PR372）
+  - 学生ごとの値なので、job_postings の中ではなく外に置く
+  - same_hurdle：1-1 と 2-1 が同じハードルか（「得意を伸ばしたい」と添えるか）。判定は Rails（PR360）
+  - 学生の自己分析は数件なので、ポップアップを開くたびに取りに行かず、ここに全部入れる（PR386）。ハードルの名前は、C6 が講座の中身を持たないので、ここに入れて返す
+  - 講座・ハードルは最初にまとめて読み込み、自己分析の数だけ問い合わせを増やさない
 - job_postings：自社の全募集（掲載中以外も含む）。各要素は形D に comparison を加えたもの。並び順は⑪と同じ。最初に選ぶ募集は画面側が決める（遷移元の job_posting_id、なければ先頭）
 - comparison（学生と、その募集の比較。順10）
   - この窓口だけに入れる。形D を返すスカウト・マッチの返事（㉔㉖）には入れない。スカウトやマッチをしても比較は変わらないため。画面は、返事を元の中身に重ねて書き換える
@@ -1336,12 +1387,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
     - work_location：募集がフルリモートなら match。募集の都道府県が空、または学生の出社できる都道府県が空なら not_judged（通えないのではなく、答えていないだけのため。PR257）。検索（⑱㉒）では、未入力は今のまま合致外（PR261）
   - 判定は `app/services/student_job_posting_comparison.rb`（`StudentJobPostingComparison`）の1か所。形は `app/views/api/company/students/_comparison.json.jbuilder`
   - 比較に使う関連（学生の興味のある業界・興味のある職種・プログラミング歴・出社できる都道府県、募集の業界・職種・使用技術）は、最初にまとめて読み込む。募集が何件あっても、問い合わせの回数は増えない
-- 段階タグ：【コア】（comparison と reasons は【強み】、last_active_range は【仕上げ】）
+- 段階タグ：【コア】（comparison と reasons は【強み】、last_active_range は【仕上げ】、self_analyses は【後付け】）
 - 作る順：⑲と同じく、項目は元になるものができる順で足していく
   - 順5（応募 → 企業がマッチ）：student、job_postings（形D の candidacy のうち reasons 以外と、available_actions）。available_actions は、窓口ができている操作だけを返す（順5 は match だけ。scout は順6、decline・undo_decline・pass・fail は順11 で足した）
   - 順6（スカウト → 学生がマッチ）：has_message_thread。スレッドは順5 のマッチでもできるが、⑲⑳の has_message_thread と同じ順でそろえる。available_actions に scout を足す。「この学生とのメッセージ」のボタンは、行き先の C7 ができた順7 で画面に足した（PR213）
   - 順10（比較の表示）：comparison、candidacy.reasons
   - 順16（【仕上げ】）：last_active_range
+  - 順19（プチ職業体験の企業の側）：self_analyses
 
 **状態を変える操作（㉔・㉖〜㉜）の共通の決まり**
 
@@ -1563,3 +1615,129 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 通知は会社ではなくアカウント（user_id）宛てなので、「今の会社」のヘルパーではなく、ログイン中の人の通知（`current_user.notifications`）から探す。1社のアカウントは1つなので、自社宛てと同じ意味になる
 - 既読にする処理はモデルに置く：1件は `Notification#mark_read!`（未読のときだけ read_at を入れる）、まとめては `Notification.mark_all_read!`（未読をまとめて1本の UPDATE で既読にする）
 - 通知を作る処理（通知先の選び方、本文、移動先）は本書7-3・7-5 と 6-5 C10
+
+#### 16-3-9. まとまり7：プチ職業体験（Phase 7。本書12章）
+
+- 講座の中身の形は、学生（㊻）と企業（㊾）で同じ。違うのは、学生には正解と選択肢ごとの解説を返さず（㊼で答えるたびに返す。PR377）、企業には最初から返すこと（PR373）
+- 解説・問題の文は Markdown のまま返し、画面で表示する（PR382）
+- 学生の窓口（㊺〜㊽）は順18、企業の窓口（㊾）と、今ある窓口に足すもの（⑫⑬⑭⑲㉓）は順19 で作る（PR389）
+- 段階タグ：【後付け】
+
+**㊺ GET /api/student/job_trials（講座の一覧）**
+
+- 画面・操作：S11 の表示
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "title": "新しいクーポン機能、どこを確かめる？",
+      "job_middle_category_id": 16,
+      "work_process_ids": [4, 11],
+      "completed": true
+    }
+  ]
+}
+```
+
+- すべての講座を、講座の表示順（position）で返す。ページ分けしない（講座は数本の想定）
+- completed：自分がその講座の自己分析を送っているか（修了済み。PR369）。自分の自己分析は1回の問い合わせでまとめて調べる
+- 中分類・工程の名前は、⑦ の masters から画面が引く
+
+**㊻ GET /api/student/job_trials/:id（講座の中身と、自分の自己分析）**
+
+- 画面・操作：S12 の表示（講座と自己分析の両方のステップで使う）
+- 番号は、すべての講座の中から探す。なければ 404
+
+```json
+{
+  "id": 1,
+  "title": "新しいクーポン機能、どこを確かめる？",
+  "job_middle_category_id": 16,
+  "work_process_ids": [4, 11],
+  "intro": "アプリの新しい機能は、…（Markdown）",
+  "hurdles": [
+    {
+      "id": 1,
+      "name": "理解する",
+      "overview": "…", "difficulty": "…", "tips": "…", "example": "…", "goal": "…",
+      "question": "…",
+      "choices": [
+        { "key": "A", "body": "すべてのユーザーが、いつでも…" },
+        { "key": "B", "body": "クーポンの発行から30日以内の…" }
+      ]
+    }
+  ],
+  "self_analysis": null
+}
+```
+
+- hurdles：講座の中の順番（position）で返す。choices には key と body だけを入れ、正解（correct）と解説（explanation）は入れない
+- self_analysis：自分の自己分析。なければ null。あれば ㊽ の返事と同じ形。画面は、null でなければ「自己分析を書き直す」のボタンを出す（PR388）
+
+**㊼ POST /api/student/job_trial_hurdles/:id/check（問題の正否の判定）**
+
+- 画面・操作：S12 で選択肢を選んで答えたとき
+- 送るもの：`{ "choice": "B" }`（選んだ選択肢の key）
+- 返すもの：200
+
+```json
+{ "correct": false, "explanation": "送料を含むかどうかは、まだ決まっていません" }
+```
+
+- correct：正解か。explanation：選んだ選択肢の解説。間違えたときも、正解の選択肢は返さない（正解するまで選び直す形のため）
+- 何も記録しない（正否・やり直しの回数・講座の進み具合。PR355）
+- 番号は、すべての講座のハードルの中から探す。なければ 404。ハードルの番号だけで一意に決まるので、講座の番号はパスに入れない（PR386）
+- 主なエラー：422（choice がない、その問題にない key）
+- 判定はモデルに置く（ハードルのモデルのメソッド。名前は順18-2 で決める）
+
+**㊽ PUT /api/student/job_trials/:id/self_analysis（自己分析の保存）**
+
+- 画面・操作：S12 の自己分析の送信
+- 送るもの：
+
+```json
+{
+  "strength_hurdle_id": 1,
+  "strength_reason": "…",
+  "growth_hurdle_id": 4,
+  "growth_reason": "curiosity",
+  "growth_detail": "…",
+  "next_step": "…"
+}
+```
+
+- 返すもの：200。保存した自己分析
+
+```json
+{
+  "job_trial_id": 1,
+  "strength_hurdle_id": 1,
+  "strength_reason": "…",
+  "growth_hurdle_id": 4,
+  "growth_reason": "curiosity",
+  "growth_detail": "…",
+  "next_step": "…",
+  "same_hurdle": false,
+  "created_at": "2026-09-29T10:00:00.000+09:00",
+  "updated_at": "2026-09-29T10:00:00.000+09:00"
+}
+```
+
+- 処理：自分のその講座の自己分析があれば上書きし、なければ作る（1人×1講座に1件。PR371）。初めて作ったときも 200 にする（作る・上書きを1つの窓口で行うため）
+- 同時に2回押されて「1人×1講座に1件」の決まり（UNIQUE）に弾かれたときは、ほかの窓口と同じく 409（16-1-10）
+- 番号は、すべての講座の中から探す。なければ 404
+- 主なエラー：422（選んだハードルがその講座のものでない、growth_reason が知らない値、必須の項目がない、長すぎる）。必須と文字数の上限は順18-1 で決める（本書17-3）
+- 講座を最後まで通ったかは確かめない（PR387）
+- same_hurdle：1-1 と 2-1 が同じハードルか（判定は Rails。PR360）
+
+**㊾ GET /api/company/job_trials/:id（企業向けの講座の中身）**
+
+- 画面・操作：C11 の表示
+- 番号は、すべての講座の中から探す。なければ 404
+- 返すもの：㊻ と同じ形から self_analysis を除き、choices に correct と explanation を加えたもの
+
+```json
+{ "key": "B", "body": "…", "correct": true, "explanation": "境目の、すぐ前とちょうどを確かめます" }
+```
