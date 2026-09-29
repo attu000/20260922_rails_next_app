@@ -111,6 +111,18 @@ Rails.application.routes.draw do
       resources :scouts, only: :index
       # ㊴ GET /api/student/message_threads（スレッド一覧）
       resources :message_threads, only: :index
+      # ㊺ GET /api/student/job_trials（プチ職業体験の講座の一覧）、㊻ GET /api/student/job_trials/:id（講座の中身）。順18
+      resources :job_trials, only: %i[index show] do
+        # ㊽ PUT /api/student/job_trials/:job_trial_id/self_analysis（自己分析の保存）。
+        # 自己分析は学生×講座に1件なので、講座の下に番号を付けない単数形で置く（チャットと同じ形）。
+        # 作る・上書きを1つの窓口で行うので PUT にする（Rails の決まりで PATCH でも同じ処理につながる）
+        resource :self_analysis, only: :update
+      end
+      # ㊼ POST /api/student/job_trial_hurdles/:id/check（問題の正否の判定）。
+      # ハードルの番号だけで一意に決まるので、講座の番号はパスに入れない（PR386）
+      resources :job_trial_hurdles, only: [] do
+        post :check, on: :member
+      end
     end
   end
 

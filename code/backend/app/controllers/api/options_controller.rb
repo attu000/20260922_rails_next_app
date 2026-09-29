@@ -19,6 +19,8 @@ module Api
       @universities = University.ordered
       # 学部の中に学科を入れて返すので、学科もまとめて読む
       @faculties = Faculty.ordered.includes(:departments)
+      # プチ職業体験の講座（講座の表示順。順18）
+      @job_trials = JobTrial.ordered
     end
   end
 end

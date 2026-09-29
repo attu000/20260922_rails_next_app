@@ -58,6 +58,11 @@ json.enums do
     json.value value
     json.label t("enums.student_profile.last_active_range.#{value}")
   end
+  # プチ職業体験の自己分析の、伸ばしたい理由の種類（サービス概要_コンセプト.md の 12-4。順18）
+  json.growth_reason SelfAnalysis.growth_reasons.keys do |value|
+    json.value value
+    json.label t("enums.self_analysis.growth_reason.#{value}")
+  end
 end
 
 # 稼働条件の数値の選択肢。Rails の検証と同じ定数から作る（app/models/concerns/work_conditions.rb）
@@ -98,4 +103,6 @@ json.masters do
     json.extract! faculty, :id, :name
     json.departments faculty.departments, :id, :name
   end
+  # プチ職業体験の講座（講座の表示順。順18）。募集の近い講座の選ぶ欄（順19）でも使う
+  json.job_trials @job_trials, :id, :title, :job_middle_category_id
 end

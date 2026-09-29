@@ -62,6 +62,17 @@ RSpec.describe SelfAnalysis, type: :model do
         .to eq("不具合の報告の書き方を知りたい")
     end
 
+    it "同時に2回送られて「1人×1講座に1件」に弾かれたら、ConflictError を投げる（窓口では 409）" do
+      save_with
+      # 先に探したときにはまだなかった（同時に送られた）状態を作るため、探す処理が新しい自己分析を返すようにする
+      allow(described_class).to receive(:find_or_initialize_by) do |attributes|
+        described_class.new(attributes)
+      end
+
+      expect { save_with }.to raise_error(ConflictError)
+      expect(described_class.count).to eq(1)
+    end
+
     it "受け取る項目のほかは無視する（学生や講座を送っても変わらない）" do
       other_student = create(:student_user).student_profile
       self_analysis = save_with(student_profile_id: other_student.id)

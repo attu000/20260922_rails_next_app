@@ -32,13 +32,16 @@ class SelfAnalysis < ApplicationRecord
   validate :hurdles_must_belong_to_job_trial
 
   # 学生のその講座の自己分析を、あれば上書き、なければ作る（Django の update_or_create に近いが、確かめてから保存する）。
-  # 確かめに通らなければ保存せず、エラーを持ったまま返す。同時に2回送られて「1人×1講座に1件」に弾かれたときは、
-  # データベースのエラーがそのまま上がり、窓口の共通の部品が 409 にする（API設計.md の 16-1-10）
+  # 確かめに通らなければ保存せず、エラーを持ったまま返す（窓口では 422）。
+  # 同時に2回送られて「1人×1講座に1件」に弾かれたときは、ConflictError を投げる（窓口では 409。API設計.md の 16-3 ㊽）
   def self.save_for(student_profile, job_trial, attributes)
     self_analysis = find_or_initialize_by(student_profile: student_profile, job_trial: job_trial)
     self_analysis.assign_attributes(attributes.to_h.symbolize_keys.slice(*PERMITTED_ATTRIBUTES))
     self_analysis.save
     self_analysis
+  rescue ActiveRecord::RecordNotUnique
+    # 応募（Candidacy.apply）と同じ扱いにする
+    raise ConflictError
   end
 
   # 1-1 と 2-1 で同じハードルを選んだか（「得意を伸ばしたい」学生か）。保存せず、読むたびに計算する（PR360）
