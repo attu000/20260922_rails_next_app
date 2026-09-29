@@ -28,6 +28,7 @@ import {
   type InputProps,
 } from "@/components/form-fields";
 import { JobCategoryPicker } from "@/components/job-category-picker";
+import { JobTrialCheckboxGroup } from "@/components/job-trial-checkbox-group";
 import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { useRedirectIfUnauthorized } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
@@ -90,6 +91,8 @@ type FormValues = {
   technology_ids: number[];
   industry_ids: number[];
   business_type_ids: number[];
+  // この募集に近いプチ職業体験の講座（順19）
+  job_trial_ids: number[];
   // カルチャーの5軸は、スライダーの位置（−2〜2）を数のまま持つ（空欄がないため）
   culture_pace: number;
   culture_novelty: number;
@@ -177,6 +180,7 @@ const EMPTY_VALUES: FormValues = {
   technology_ids: [],
   industry_ids: [],
   business_type_ids: [],
+  job_trial_ids: [],
   // カルチャーは真ん中から（データベースの既定値と同じ）
   culture_pace: 0,
   culture_novelty: 0,
@@ -240,6 +244,8 @@ const SECTIONS = [
     ],
   },
   { value: "culture", title: "カルチャー", hint: "進め方・新しさなど5つの軸", fields: CULTURE_KEYS },
+  // 任意の後付けの項目なので、今の並びを崩さずに最後に置く（順19。PR399）
+  { value: "job_trials", title: "プチ職業体験", hint: "この募集に近い講座", fields: ["job_trial_ids"] },
 ] as const;
 
 type SectionValue = (typeof SECTIONS)[number]["value"];
@@ -283,6 +289,7 @@ function toFormValues(posting: JobPosting): FormValues {
     technology_ids: posting.technology_ids,
     industry_ids: posting.industry_ids,
     business_type_ids: posting.business_type_ids,
+    job_trial_ids: posting.job_trial_ids,
     culture_pace: posting.culture_pace,
     culture_novelty: posting.culture_novelty,
     culture_collaboration: posting.culture_collaboration,
@@ -777,6 +784,16 @@ export function JobPostingForm({ jobPostingId }: JobPostingFormProps) {
                 if (key) updateValue(key, value);
               }}
               errors={cultureErrors}
+            />
+          </FormSection>
+
+          {/* この募集に近いプチ職業体験（任意、複数。PR374）。選んだ講座は、学生の募集詳細の枠に出る */}
+          <FormSection {...sectionProps("job_trials")}>
+            <JobTrialCheckboxGroup
+              jobTrials={options.masters.job_trials}
+              selectedIds={values.job_trial_ids}
+              onChange={(ids) => updateValue("job_trial_ids", ids)}
+              errors={fieldErrors.job_trial_ids}
             />
           </FormSection>
         </Accordion>

@@ -1,6 +1,7 @@
 // 企業から見た学生の型。Rails の app/views/api/company/students/ の JSON と同じ形（design/designs/API設計.md の 16-3 ㉒㉓・形C・形D）。
 // 空欄は null。比較（comparison）と応募理由（candidacy.reasons）は順10 で足した
 
+import type { CompanySelfAnalysis } from "@/lib/job-trials";
 import { idsFromQuery, monthDateFromQuery, numberFromQuery, type QueryReader } from "@/lib/search-query";
 import type { StudentProfile } from "@/lib/student-profile";
 
@@ -85,6 +86,8 @@ export type CompanyStudentDetail = {
   // この学生とのスレッドがあるか（スカウトを送ったか、応募がマッチしたらできる）。
   // true なら「この学生とのメッセージ」のボタンを出す（PR213）
   has_message_thread: boolean;
+  // この学生の自己分析（修了したプチ職業体験）。修了した日の新しい順。なければ空の配列（順19。PR372）
+  self_analyses: CompanySelfAnalysis[];
   // 自社の全募集（非公開・終了も含む。最終更新の新しい順）
   job_postings: CompanyStudentJobPosting[];
 };

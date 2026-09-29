@@ -199,6 +199,9 @@ export type StudentJobPostingDetail = MyCandidacyStatus & {
   my_personality_collaboration: number;
   my_personality_decision: number;
   my_personality_atmosphere: number;
+  // 企業が選んだ、この募集に近いプチ職業体験の講座（講座の表示順。順19。PR374）。なければ空の配列。
+  // completed は、自分がその講座の自己分析を送っているか（修了済み。判定は Rails）
+  job_trials: { id: number; title: string; completed: boolean }[];
 };
 
 // ㉞ 募集管理と ㉟ スカウト管理の返事（同じ形）。行は形B に、やりとりの番号と自分の状態を足したもの。

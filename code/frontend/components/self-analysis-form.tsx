@@ -12,7 +12,12 @@ import { useRedirectIfUnauthorized } from "@/components/member-only";
 import { Button } from "@/components/ui/button";
 import { FieldGroup } from "@/components/ui/field";
 import { ApiError, apiFetch } from "@/lib/api";
-import type { JobTrialHurdle, SelfAnalysis } from "@/lib/job-trials";
+import {
+  SELF_ANALYSIS_GUIDE,
+  SELF_ANALYSIS_QUESTIONS,
+  type JobTrialHurdle,
+  type SelfAnalysis,
+} from "@/lib/job-trials";
 import type { GrowthReasonOption } from "@/lib/options";
 
 // 記述3つの文字数の上限。Rails と同じ値（app/models/self_analysis.rb の TEXT_MAX_LENGTH。PR391）
@@ -23,10 +28,6 @@ const INVALID_MESSAGE = "入力内容を確認してください";
 
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
-
-// はじめの案内文（仮。サービス概要_コンセプト.md の 12-4）
-const GUIDE_TEXT =
-  "ここに書いた内容は、企業があなたのプロフィールとして読みます。あなたの良さが伝わるように、正直に、自分の言葉で書きましょう。";
 
 // 入力中の値。選択は番号・名前を文字で持ち、選んでいなければ空文字
 type SelfAnalysisValues = {
@@ -132,7 +133,7 @@ export function SelfAnalysisForm({ jobTrialId, hurdles, initial, growthReasons, 
     <form ref={formRef} onSubmit={handleSubmit} noValidate className="space-y-6">
       <div className="space-y-2">
         <h2 className="text-lg font-bold">自己分析</h2>
-        <p className="text-sm">{GUIDE_TEXT}</p>
+        <p className="text-sm">{SELF_ANALYSIS_GUIDE}</p>
         <RequiredNote />
       </div>
       {message && <p className="text-sm text-destructive">{message}</p>}
@@ -140,7 +141,7 @@ export function SelfAnalysisForm({ jobTrialId, hurdles, initial, growthReasons, 
       <FieldGroup>
         <RadioField
           name="strength_hurdle_id"
-          legend="いちばん得意だと感じたハードルはどれですか？"
+          legend={SELF_ANALYSIS_QUESTIONS.strength_hurdle}
           choices={hurdleChoices}
           value={values.strength_hurdle_id}
           onChange={(value) => change("strength_hurdle_id", value)}
@@ -149,8 +150,8 @@ export function SelfAnalysisForm({ jobTrialId, hurdles, initial, growthReasons, 
         />
         <LongTextField
           id="strength_reason"
-          label="なぜそう感じたと思いますか？"
-          description="そのハードルの特徴と、自分の特徴や経験を結び付けて考えてみましょう。"
+          label={SELF_ANALYSIS_QUESTIONS.strength_reason}
+          description={SELF_ANALYSIS_QUESTIONS.strength_reason_note}
           value={values.strength_reason}
           onChange={(value) => change("strength_reason", value)}
           errors={fieldErrors.strength_reason}
@@ -159,7 +160,7 @@ export function SelfAnalysisForm({ jobTrialId, hurdles, initial, growthReasons, 
         />
         <RadioField
           name="growth_hurdle_id"
-          legend="今後、いちばん伸ばしてみたいと思ったハードルはどれですか？"
+          legend={SELF_ANALYSIS_QUESTIONS.growth_hurdle}
           choices={hurdleChoices}
           value={values.growth_hurdle_id}
           onChange={(value) => change("growth_hurdle_id", value)}
@@ -168,7 +169,7 @@ export function SelfAnalysisForm({ jobTrialId, hurdles, initial, growthReasons, 
         />
         <RadioField
           name="growth_reason"
-          legend="そのハードルを伸ばしたいと思った理由に、いちばん近いものを選んでください。"
+          legend={SELF_ANALYSIS_QUESTIONS.growth_reason}
           choices={growthReasons}
           value={values.growth_reason}
           onChange={(value) => change("growth_reason", value)}
@@ -188,7 +189,7 @@ export function SelfAnalysisForm({ jobTrialId, hurdles, initial, growthReasons, 
         )}
         <LongTextField
           id="next_step"
-          label="そのハードルを伸ばすとしたら、次に何を知りたいですか。または、何をやってみたいですか。"
+          label={SELF_ANALYSIS_QUESTIONS.next_step}
           value={values.next_step}
           onChange={(value) => change("next_step", value)}
           errors={fieldErrors.next_step}

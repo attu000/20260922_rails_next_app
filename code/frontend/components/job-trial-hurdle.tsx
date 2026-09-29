@@ -29,6 +29,21 @@ const SECTIONS = [
   { title: "ゴール", key: "goal" },
 ] as const;
 
+// ハードルの解説（概要・難しさ・コツ・具体例・ゴール）。Markdown で書かれているので、そのまま表示の部品に渡す。
+// 学生の講座の画面（S12）と、企業のプチ職業体験の内容（C11）で共通
+export function HurdleExplanation({ hurdle }: { hurdle: Pick<Hurdle, (typeof SECTIONS)[number]["key"]> }) {
+  return (
+    <>
+      {SECTIONS.map((section) => (
+        <section key={section.key} className="space-y-2">
+          <h3 className="font-bold">{section.title}</h3>
+          <MarkdownText>{hurdle[section.key]}</MarkdownText>
+        </section>
+      ))}
+    </>
+  );
+}
+
 type JobTrialHurdleProps = {
   hurdle: Hurdle;
   // 講座の中で何番目か（1から数える）。見出しの「ハードル1」に使う
@@ -85,13 +100,7 @@ export function JobTrialHurdle({ hurdle, number, onPassed }: JobTrialHurdleProps
         ハードル{number}　{hurdle.name}
       </h2>
 
-      {/* 解説。Markdown で書かれているので、そのまま表示の部品に渡す */}
-      {SECTIONS.map((section) => (
-        <section key={section.key} className="space-y-2">
-          <h3 className="font-bold">{section.title}</h3>
-          <MarkdownText>{hurdle[section.key]}</MarkdownText>
-        </section>
-      ))}
+      <HurdleExplanation hurdle={hurdle} />
 
       {/* 問題 */}
       <form onSubmit={handleSubmit} noValidate className="space-y-4 rounded-lg border p-4">

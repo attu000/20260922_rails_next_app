@@ -6,13 +6,15 @@
 // 自分とやりとりがある募集は、非公開・終了でも開ける（「募集終了」と出す）。
 // 自分の状態の表示と「応募する」「マッチする」は components/student-candidacy-actions.tsx。
 // 「この企業とのメッセージ」は、Rails の has_message_thread が true のときだけ出す（PR213）。
-// カルチャーグラフには、自分の働き方の好みを黒丸で重ねる（順10。一致・ずれの判定は出さない。PR258）
+// カルチャーグラフには、自分の働き方の好みを黒丸で重ねる（順10。一致・ずれの判定は出さない。PR258）。
+// いちばん下に、企業が選んだ「この募集に近いプチ職業体験」を出す（順19）
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { CultureAxesView } from "@/components/culture-axes-field";
 import { PageTitle } from "@/components/page-title";
 import { ProfileIcon } from "@/components/profile-icon";
+import { StatusBadge } from "@/components/status-badge";
 import { StudentCandidacyActions } from "@/components/student-candidacy-actions";
 import { buttonVariants } from "@/components/ui/button";
 import { useApi } from "@/lib/api";
@@ -210,6 +212,29 @@ export function StudentJobPostingDetail({ jobPostingId }: { jobPostingId: string
         <DetailItem label="使用技術" value={joinNames(namesOf(masters.technologies, data.technology_ids))} />
         <DetailItem label="補足" value={data.technology_note} />
       </DetailSection>
+
+      {/* この募集に近いプチ職業体験（順19。PR374）。企業が1つも選んでいなければ出さない。
+          置き場所は、設計書の並びどおりいちばん下（PR400） */}
+      {data.job_trials.length > 0 && (
+        <section className="space-y-3 rounded-lg border p-4">
+          <h2 className="font-bold">この募集に近いプチ職業体験</h2>
+          <ul className="space-y-2">
+            {data.job_trials.map((jobTrial) => (
+              <li key={jobTrial.id} className="text-sm">
+                <Link href={`/student/job_trials/${jobTrial.id}`} className="hover:underline">
+                  {jobTrial.title}
+                </Link>
+                {/* 見た目は、プチ職業体験一覧の札とそろえる（同じ部品） */}
+                {jobTrial.completed && (
+                  <StatusBadge size="sm" className="ml-2">
+                    修了済み
+                  </StatusBadge>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }

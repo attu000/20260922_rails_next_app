@@ -53,5 +53,7 @@ export type JobPosting = {
   // この募集の業界・事業形態。会社情報の値とは別に持つ（その他決め事.md の 5-8）
   industry_ids: number[];
   business_type_ids: number[];
+  // この募集に近いプチ職業体験の講座（講座の表示順。順19。PR374）
+  job_trial_ids: number[];
   updated_at: string;
 };
