@@ -115,7 +115,7 @@ RSpec.describe "企業の募集（/api/company/job_postings）", type: :request 
         "culture_pace", "culture_novelty", "culture_collaboration", "culture_decision", "culture_atmosphere",
         "main_job_middle_category_ids", "related_job_middle_category_ids",
         "main_work_process_ids", "involved_work_process_ids",
-        "technology_ids", "industry_ids", "business_type_ids",
+        "technology_ids", "industry_ids", "business_type_ids", "job_trial_ids",
         "updated_at"
       )
       expect(body["status"]).to eq("unpublished")
@@ -373,6 +373,44 @@ RSpec.describe "企業の募集（/api/company/job_postings）", type: :request 
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body["errors"]["prefecture_id"]).to eq([ "勤務地は一覧にありません" ])
+    end
+  end
+
+  # 順19：この募集に近いプチ職業体験の講座（PR374）
+  describe "近い講座（job_trial_ids）" do
+    before { log_in_as(company_user) }
+
+    let(:later_trial) { create(:job_trial, position: 2) }
+    let(:earlier_trial) { create(:job_trial, position: 1) }
+
+    it "新規作成で講座を保存し、講座の表示順で返す" do
+      post_job_posting(status: "unpublished", title: "募集", job_trial_ids: [ later_trial.id, earlier_trial.id ])
+
+      expect(response).to have_http_status(:created)
+      expect(response.parsed_body["job_trial_ids"]).to eq([ earlier_trial.id, later_trial.id ])
+      expect(JobPosting.sole.job_trial_ids).to contain_exactly(earlier_trial.id, later_trial.id)
+    end
+
+    it "保存で送った内容に置き換え、1件の取得でも講座の表示順で返す" do
+      job_posting = create(:job_posting, company_profile: company)
+      job_posting.job_trials << earlier_trial
+
+      patch_job_posting(job_posting, job_trial_ids: [ later_trial.id ])
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body["job_trial_ids"]).to eq([ later_trial.id ])
+
+      patch_job_posting(job_posting, job_trial_ids: [ later_trial.id, earlier_trial.id ])
+      get "/api/company/job_postings/#{job_posting.id}"
+      expect(response.parsed_body["job_trial_ids"]).to eq([ earlier_trial.id, later_trial.id ])
+    end
+
+    it "知らない講座の番号なら 422 で、保存しない" do
+      post_job_posting(status: "unpublished", title: "募集", job_trial_ids: [ 0 ])
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]["job_trial_ids"])
+        .to eq([ "この募集に近いプチ職業体験に選べない値が含まれています" ])
+      expect(JobPosting.count).to eq(0)
     end
   end
 end

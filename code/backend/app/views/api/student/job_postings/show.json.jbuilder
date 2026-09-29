@@ -6,6 +6,7 @@
 #   - 業界・事業形態・工程、カルチャーの5つ：順9（済み）
 #   - 自分の働き方の好みの5つ（my_personality_）：順10（済み）。
 #     一致・ずれの判定（culture_comparison）はやめ、カルチャーグラフに自分の値を黒丸で重ねるだけにした（PR258）
+#   - この募集に近いプチ職業体験（job_trials）：順19（済み）
 
 company = @job_posting.company_profile
 
@@ -43,4 +44,10 @@ json.extract! @job_posting,
 # 名前に my_ を付けて、募集のカルチャー（culture_）と区別する（my_status と同じ付け方）
 CultureAxes::AXES.each do |axis|
   json.set! "my_personality_#{axis}", @student.public_send("personality_#{axis}")
+end
+# 企業が選んだ、この募集に近いプチ職業体験の講座（講座の表示順。順19。PR374）。なければ空の配列。
+# completed は、自分がその講座の自己分析を送っているか（修了済み。判定は Rails）
+json.job_trials @job_trials do |job_trial|
+  json.extract! job_trial, :id, :title
+  json.completed @completed_job_trial_ids.include?(job_trial.id)
 end

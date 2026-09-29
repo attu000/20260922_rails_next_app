@@ -30,6 +30,11 @@ module Api
         @has_message_thread = MessageThread.exists_between?(@job_posting.company_profile, current_student)
         # 自分の働き方の好み。カルチャーグラフに黒丸で重ねる（順10。PR258）
         @student = current_student
+        # この募集に近いプチ職業体験の講座（講座の表示順。順19。PR374）
+        @job_trials = @job_posting.job_trials.to_a
+        # そのうち、自分が修了済み（自己分析を送った）の講座の番号。1回の問い合わせでまとめて調べる
+        @completed_job_trial_ids = current_student.self_analyses.where(job_trial_id: @job_trials.map(&:id))
+                                                  .pluck(:job_trial_id).to_set
       end
 
       private

@@ -177,7 +177,7 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         "culture_pace", "culture_novelty", "culture_collaboration", "culture_decision", "culture_atmosphere",
         "published_at", "my_status", "my_candidacy_id", "has_message_thread",
         "my_personality_pace", "my_personality_novelty", "my_personality_collaboration",
-        "my_personality_decision", "my_personality_atmosphere"
+        "my_personality_decision", "my_personality_atmosphere", "job_trials"
       )
       expect(body).to include(
         "id" => posting.id,
@@ -346,6 +346,34 @@ RSpec.describe "学生の募集検索・募集詳細（/api/student/job_postings
         get "/api/student/job_postings/#{posting.id}"
 
         expect(response.parsed_body["has_message_thread"]).to be(false)
+      end
+    end
+
+    # 順19：この募集に近いプチ職業体験の講座（PR374）
+    describe "この募集に近い講座（job_trials）" do
+      it "講座がなければ空の配列" do
+        posting = create_posting
+
+        get "/api/student/job_postings/#{posting.id}"
+
+        expect(response.parsed_body["job_trials"]).to eq([])
+      end
+
+      it "企業が選んだ講座を、講座の表示順で返す。completed は自分の自己分析だけで決まる" do
+        mine = create(:job_trial, :with_hurdles, position: 2)
+        others = create(:job_trial, :with_hurdles, position: 1)
+        create(:job_trial, position: 3)
+        posting = create_posting
+        posting.job_trials << mine << others
+        create(:self_analysis, student_profile: student_user.student_profile, job_trial: mine)
+        create(:self_analysis, job_trial: others)
+
+        get "/api/student/job_postings/#{posting.id}"
+
+        expect(response.parsed_body["job_trials"]).to eq([
+          { "id" => others.id, "title" => others.title, "completed" => false },
+          { "id" => mine.id, "title" => mine.title, "completed" => true }
+        ])
       end
     end
   end

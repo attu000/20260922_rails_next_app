@@ -76,6 +76,8 @@ Rails.application.routes.draw do
         post :read, on: :member
         post :read_all, on: :collection
       end
+      # ㊾ GET /api/company/job_trials/:id（プチ職業体験の講座の中身。正解と解説を含む）。順19
+      resources :job_trials, only: :show
     end
 
     # /api/student/…：学生の窓口（16-1-3）。コントローラーは app/controllers/api/student/ に置き、

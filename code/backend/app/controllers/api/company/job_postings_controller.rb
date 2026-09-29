@@ -63,7 +63,9 @@ module Api
           :culture_pace, :culture_novelty, :culture_collaboration, :culture_decision, :culture_atmosphere,
           main_job_middle_category_ids: [], related_job_middle_category_ids: [],
           main_work_process_ids: [], involved_work_process_ids: [],
-          technology_ids: [], industry_ids: [], business_type_ids: []
+          technology_ids: [], industry_ids: [], business_type_ids: [],
+          # この募集に近いプチ職業体験の講座（順19。PR374）
+          job_trial_ids: []
         )
       end
     end

@@ -34,7 +34,7 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
 
       expect(response).to have_http_status(:ok)
       body = response.parsed_body
-      expect(body.keys).to contain_exactly("student", "has_message_thread", "job_postings")
+      expect(body.keys).to contain_exactly("student", "has_message_thread", "self_analyses", "job_postings")
       expect(body["student"].keys).to contain_exactly(
         "name", "university_id", "university_other_name", "faculty_id", "department_id", "grade",
         "graduation_year", "prefecture_id", "activity_status",
@@ -199,6 +199,45 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
     end
 
     # 順6：この学生とのスレッドがあるか（16-3 ㉓、権限_バリデーション.md の 17-2-3。PR208）
+    # 順19：修了したプチ職業体験の自己分析（PR372）
+    describe "自己分析（self_analyses）" do
+      it "なければ空の配列" do
+        get "/api/company/students/#{student.id}"
+
+        expect(response.parsed_body["self_analyses"]).to eq([])
+      end
+
+      it "その学生の自己分析を、修了した日の新しい順に、講座名・ハードル名と一緒に返す。ほかの学生の分は入らない" do
+        older_trial = create(:job_trial, :with_hurdles)
+        newer_trial = create(:job_trial, :with_hurdles)
+        older = create(:self_analysis, student_profile: student, job_trial: older_trial, created_at: 2.days.ago)
+        hurdle = newer_trial.hurdles.second
+        newer = create(:self_analysis, student_profile: student, job_trial: newer_trial,
+                                       strength_hurdle: hurdle, growth_hurdle: hurdle, growth_reason: :future,
+                                       created_at: 1.day.ago)
+        create(:self_analysis, job_trial: newer_trial)
+
+        get "/api/company/students/#{student.id}"
+
+        self_analyses = response.parsed_body["self_analyses"]
+        expect(self_analyses.map { |item| item["job_trial"]["id"] }).to eq([ newer_trial.id, older_trial.id ])
+        expect(self_analyses.first.keys).to contain_exactly(
+          "job_trial", "strength_hurdle", "strength_reason", "growth_hurdle", "growth_reason",
+          "growth_detail", "next_step", "same_hurdle", "created_at", "updated_at"
+        )
+        expect(self_analyses.first).to include(
+          "job_trial" => { "id" => newer_trial.id, "title" => newer_trial.title },
+          "strength_hurdle" => { "id" => hurdle.id, "name" => hurdle.name },
+          "strength_reason" => newer.strength_reason,
+          "growth_hurdle" => { "id" => hurdle.id, "name" => hurdle.name },
+          "growth_reason" => "future",
+          "same_hurdle" => true
+        )
+        expect(self_analyses.second["same_hurdle"]).to be(false)
+        expect(self_analyses.second["strength_hurdle"]["id"]).to eq(older.strength_hurdle_id)
+      end
+    end
+
     describe "この学生とのスレッドがあるか（has_message_thread）" do
       it "スレッドがなければ false" do
         get "/api/company/students/#{student.id}"

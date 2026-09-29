@@ -17,4 +17,6 @@ json.extract! @job_posting,
               :technology_ids,
               # この募集の業界・事業形態。企業プロフィールの値とは別に持つ（その他決め事.md の 5-8）
               :industry_ids, :business_type_ids,
+              # この募集に近いプチ職業体験の講座（講座の表示順。順19。PR374）
+              :job_trial_ids,
               :updated_at

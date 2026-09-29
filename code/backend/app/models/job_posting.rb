@@ -29,9 +29,10 @@ class JobPosting < ApplicationRecord
   has_many :industries, through: :job_posting_industries
   has_many :job_posting_business_types
   has_many :business_types, through: :job_posting_business_types
-  # この募集に近いプチ職業体験の講座（任意、複数。学生の募集詳細の枠に出す。PR374）。job_trial_ids が自動でできる
+  # この募集に近いプチ職業体験の講座（任意、複数。学生の募集詳細の枠に出す。PR374）。job_trial_ids が自動でできる。
+  # 講座の表示順で並べる（job_trial_ids もこの順になる）
   has_many :job_posting_job_trials
-  has_many :job_trials, through: :job_posting_job_trials
+  has_many :job_trials, -> { order(:position) }, through: :job_posting_job_trials
   # この募集とのやりとり（応募・スカウト）
   has_many :candidacies
   # 推薦の集計の行（1募集1行）。job_posting.recommendation_stat で取り出す
@@ -164,7 +165,11 @@ class JobPosting < ApplicationRecord
       self.technology_ids = technology_ids unless technology_ids.nil?
       self.industry_ids = industry_ids unless industry_ids.nil?
       self.business_type_ids = business_type_ids unless business_type_ids.nil?
-      self.job_trial_ids = job_trial_ids unless job_trial_ids.nil?
+      unless job_trial_ids.nil?
+        self.job_trial_ids = job_trial_ids
+        # 代入した直後は、送られた順のまま覚えている。返事で講座の表示順に並ぶよう、覚えている一覧を捨てて読み直させる
+        job_trials.reset
+      end
       # 最終更新日は「企業が最後に保存した日」にする。
       # Rails は本体の列が変わったときだけ updated_at を変えるので、職種や技術だけを直したときなど、
       # 本体が変わらなかった場合は touch（updated_at だけを今にする）で更新する
