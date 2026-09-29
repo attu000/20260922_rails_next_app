@@ -100,6 +100,67 @@ RSpec.describe MessageThread, type: :model do
     end
   end
 
+  describe "企業の返事を待っている学生（awaiting_reply_student_ids。候補者一覧の未返信）" do
+    # 同じ企業の、もう1人の学生とのスレッド
+    let(:other_thread) { create(:message_thread, company_profile: company) }
+
+    it "最後のメッセージを学生が送ったスレッドの学生だけが入る" do
+      create(:message, message_thread: thread, sender_user: company.user, created_at: 2.hours.ago)
+      create(:message, message_thread: thread, sender_user: student.user, created_at: 1.hour.ago)
+      # こちらは学生が送ったあと、企業が返した
+      create(:message, message_thread: other_thread, sender_user: other_thread.student_profile.user, created_at: 2.hours.ago)
+      create(:message, message_thread: other_thread, sender_user: company.user, created_at: 1.hour.ago)
+
+      ids = described_class.awaiting_reply_student_ids(company, [ student.id, other_thread.student_profile_id ])
+
+      expect(ids).to eq(Set[student.id])
+    end
+
+    it "同じ日時なら、番号の大きい（あとに作った）メッセージを最後とみなす" do
+      sent_at = 1.hour.ago
+      create(:message, message_thread: thread, sender_user: company.user, created_at: sent_at)
+      create(:message, message_thread: thread, sender_user: student.user, created_at: sent_at)
+
+      expect(described_class.awaiting_reply_student_ids(company, [ student.id ])).to eq(Set[student.id])
+    end
+
+    it "メッセージがまだないスレッドは入らない" do
+      thread
+
+      expect(described_class.awaiting_reply_student_ids(company, [ student.id ])).to eq(Set[])
+    end
+
+    it "渡していない学生と、他社とのスレッドは入らない" do
+      create(:message, message_thread: other_thread, sender_user: other_thread.student_profile.user)
+      # 同じ学生と、他社とのスレッド。学生が最後に送っている
+      others = create(:message_thread, student_profile: student)
+      create(:message, message_thread: others, sender_user: student.user)
+
+      expect(described_class.awaiting_reply_student_ids(company, [ student.id ])).to eq(Set[])
+    end
+  end
+
+  describe "マッチしている募集（matched_job_postings）" do
+    it "この学生とのやりとりがマッチ・合格・不合格の募集が、マッチした日の古い順に入る" do
+      postings = Array.new(3) { create(:job_posting, :published, company_profile: company) }
+      create(:candidacy, job_posting: postings[0], student_profile: student, status: :failed, matched_at: 1.day.ago)
+      create(:candidacy, job_posting: postings[1], student_profile: student, status: :matched, matched_at: 3.days.ago)
+      create(:candidacy, job_posting: postings[2], student_profile: student, status: :passed, matched_at: 2.days.ago)
+
+      expect(thread.matched_job_postings).to eq([ postings[1], postings[2], postings[0] ])
+    end
+
+    it "未マッチ・見送りのやりとり、他社の募集、ほかの学生とのマッチは入らない" do
+      create(:candidacy, :scout, job_posting: job_posting, student_profile: student)
+      create(:candidacy, job_posting: create(:job_posting, :published, company_profile: company),
+                         student_profile: student, status: :declined)
+      create(:candidacy, job_posting: create(:job_posting, :published), student_profile: student, status: :matched)
+      create(:candidacy, job_posting: create(:job_posting, :published, company_profile: company), status: :matched)
+
+      expect(thread.matched_job_postings).to eq([])
+    end
+  end
+
   describe "並び順（recent_first）" do
     it "最後のメッセージの新しい順。メッセージがないスレッドは作った日時で比べ、先頭に居座らない" do
       old_message = create(:message_thread, last_message_at: 3.days.ago)

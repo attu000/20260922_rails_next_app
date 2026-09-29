@@ -9,7 +9,7 @@
 // やりとりを変えるボタン（マッチする・見送る・見送りを取り消す・合格・不合格）は、すべて確認のポップアップを挟む（順11）。
 // 「この学生とのメッセージ」は、募集の選択欄の外（名前の横）に、Rails の has_message_thread が true のときだけ出す（PR213）。
 // スカウトを送ったら、「この学生に似た学生」のポップアップを開く（components/similar-students-dialog.tsx。順14）。
-// 最終活動の目安は【仕上げ】で足す
+// 最終活動の目安は、名前の下に出す。一度もログインしていない学生（Rails が null を返す）には出さない（PR335）
 
 import { useState } from "react";
 import { cn } from "cn";
@@ -101,11 +101,19 @@ export function CompanyStudentDetail({ studentId }: { studentId: string }) {
     void mutate();
   }
 
+  // 最終活動の目安（「7日以内」など）。Rails が返した名前を ⑦ の表示名にするだけ。null なら出さない（PR335）
+  const lastActiveLabel = labelOf(options.enums.last_active_range, data.student.last_active_range);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
         <ProfileIcon src={data.student.icon_url} name={data.student.name} size="lg" />
-        <PageTitle>{data.student.name}</PageTitle>
+        <div className="space-y-1">
+          <PageTitle>{data.student.name}</PageTitle>
+          {lastActiveLabel !== null && (
+            <p className="text-sm text-muted-foreground">最終活動：{lastActiveLabel}</p>
+          )}
+        </div>
         {/* メッセージは募集ごとではなく相手ごとなので、募集の選択欄の外に置く。
             スレッドがあれば出す（送れるかどうかは、行き先のメッセージ管理が決める。権限_バリデーション.md の 17-2-3） */}
         {data.has_message_thread && (

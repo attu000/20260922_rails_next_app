@@ -6,8 +6,7 @@
 // 企業の募集一覧の「この募集の候補者を見る」から来たときは、その募集のタブが選ばれた状態で開く。
 // 見送り・合格・不合格は既定で隠し、「見送り・合格・不合格も表示」にチェックを付けると出す（隠すのは Rails。順11。PR273）。
 // マッチ以降の行には「メッセージ」のボタンを出す。出すかは Rails の after_match に従う（PR209・PR224）。
-// 次のものは、それを作る順で足す
-//   - 未返信のタグ：【仕上げ】
+// 学生が最後に送り、まだ返していない行には「未返信」の札を出す。出すかは Rails の unreplied に従う（【仕上げ】順16）
 
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -182,6 +181,8 @@ function CandidacyRow({ candidacy, options }: CandidacyRowProps) {
         </Link>
         {/* タグは Rails が計算したものを日本語にするだけ（画面側では組み立てない。16-1-9） */}
         <StatusBadge size="sm">{labelOf(options.enums.candidacy_tag, candidacy.tag) ?? candidacy.tag}</StatusBadge>
+        {/* 未返信（学生が最後に送り、まだ返していない）。判定は Rails（unreplied）で、画面側では組み立てない（16-1-9） */}
+        {candidacy.unreplied && <StatusBadge size="sm">未返信</StatusBadge>}
       </div>
 
       <div className="space-y-1 text-sm">

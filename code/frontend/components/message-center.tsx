@@ -9,9 +9,8 @@
 // 候補者一覧・学生詳細・募集詳細・企業詳細のメッセージのボタンから来たときは、その相手のスレッドが開いた状態になる。
 // リアルタイム更新はしない。送ったメッセージは返事をそのまま末尾に足し、相手からの新しいメッセージは開き直したときに取る（16-3-7）。
 // 学生の画面では、まだマッチしていないスカウトがあれば、チャットの下の方に「マッチする」を出す（PR222・PR223）。
-// 次のものは【仕上げ】で足す
-//   - チャットの上部の「マッチしている募集」
-//   - 相手の名前から学生詳細・企業詳細へのリンク
+// チャットの上部には、相手のアイコンと名前（押すと学生詳細・企業詳細へ）と、その相手とマッチしている募集の名前を出す。
+// マッチしている募集は名前を並べるだけで、リンクにしない（ページ設計.md の 6-5 C7・6-6 S5。【仕上げ】順16）
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
@@ -56,6 +55,8 @@ const SETTINGS = {
     threadsApiPath: "/api/company/message_threads",
     // ㊲ チャット（この後ろに /messages を付けると ㊳ 送信）
     threadApiPath: (partnerId: string) => `/api/company/students/${encodeURIComponent(partnerId)}/message_thread`,
+    // 相手のアイコンと名前を押したときの行き先（学生詳細）
+    partnerHref: (partnerId: number) => `/company/students/${partnerId}`,
     // まだ送れないとき（スカウトの返事待ち）に、送信欄の下に出す一言
     cannotSendMessage: "この学生とマッチすると、メッセージを送れるようになります",
   },
@@ -66,6 +67,8 @@ const SETTINGS = {
     threadsApiPath: "/api/student/message_threads",
     // ㊵ チャット（この後ろに /messages を付けると ㊶ 送信）
     threadApiPath: (partnerId: string) => `/api/student/companies/${encodeURIComponent(partnerId)}/message_thread`,
+    // 相手のアイコンと名前を押したときの行き先（企業詳細）
+    partnerHref: (partnerId: number) => `/student/companies/${partnerId}`,
     cannotSendMessage: "この企業とマッチすると、メッセージを送れるようになります",
   },
 } as const;
@@ -245,9 +248,18 @@ function ChatPanel({ settings, partnerId, onSent }: ChatPanelProps) {
 
   return (
     <div className="space-y-4 rounded-lg border p-4">
-      <div className="flex items-center gap-2">
-        <ProfileIcon src={data.partner.icon_url} name={data.partner.name} size="sm" />
-        <h2 className="font-bold">{data.partner.name}</h2>
+      <div className="space-y-1">
+        {/* アイコンと名前を1つのリンクにする（押すと学生詳細・企業詳細へ） */}
+        <Link href={settings.partnerHref(data.partner.id)} className="flex w-fit items-center gap-2 hover:underline">
+          <ProfileIcon src={data.partner.icon_url} name={data.partner.name} size="sm" />
+          <h2 className="font-bold">{data.partner.name}</h2>
+        </Link>
+        {/* マッチしている募集。まだ1つもなければ（スカウトの返事待ち）出さない */}
+        {data.matched_job_postings.length > 0 && (
+          <p className="text-sm text-muted-foreground">
+            マッチしている募集：{data.matched_job_postings.map((jobPosting) => jobPosting.title).join("、")}
+          </p>
+        )}
       </div>
 
       {data.messages.length === 0 ? (

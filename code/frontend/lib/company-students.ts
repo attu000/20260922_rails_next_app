@@ -78,8 +78,10 @@ export type CompanyStudentJobPosting = CompanyJobPostingState & {
 
 // ㉓ 学生詳細
 export type CompanyStudentDetail = {
-  // マイページ（⑮）と同じ項目
-  student: StudentProfile;
+  // マイページ（⑮）と同じ項目に、最終活動の目安を足したもの。
+  // 目安は "within_3_days" など（表示名は ⑦ の enums.last_active_range）。ここだけ "over_30_days" も来る。
+  // 一度もログインしていない学生は null（PR335）
+  student: StudentProfile & { last_active_range: string | null };
   // この学生とのスレッドがあるか（スカウトを送ったか、応募がマッチしたらできる）。
   // true なら「この学生とのメッセージ」のボタンを出す（PR213）
   has_message_thread: boolean;
@@ -87,8 +89,7 @@ export type CompanyStudentDetail = {
   job_postings: CompanyStudentJobPosting[];
 };
 
-// 形C：企業向けの学生の行（㉒ 学生検索）。スカウトするかどうかの判断に使う情報だけ。
-// 最終活動の目安（last_active_range）は【仕上げ】で足す
+// 形C：企業向けの学生の行（㉒ 学生検索）。スカウトするかどうかの判断に使う情報だけ
 export type CompanyStudentRow = {
   id: number;
   name: string;
@@ -105,6 +106,8 @@ export type CompanyStudentRow = {
   work_days_per_week: number | null;
   work_hours_per_day: number | null;
   duration_months: number | null;
+  // 最終活動の目安（"within_3_days" など。表示名は ⑦ の enums.last_active_range）。日付そのものは来ない
+  last_active_range: string | null;
 };
 
 // ㉕ この学生に似た学生の返事（学生詳細のスカウト送信後のポップアップ。順14）。

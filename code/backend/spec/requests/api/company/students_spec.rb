@@ -43,9 +43,25 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         "can_full_remote", "can_partial_remote", "can_onsite", "work_note",
         "personality_pace", "personality_novelty", "personality_collaboration",
         "personality_decision", "personality_atmosphere",
-        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids", "skills", "icon_url"
+        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids", "skills", "icon_url",
+        "last_active_range"
       )
       expect(body["student"]).to include("name" => student.name, "self_pr_strength" => "粘り強い", "work_days_per_week" => 3)
+    end
+
+    # 最終活動の目安（【仕上げ】順16）。学生詳細だけ、30日より前も出る
+    it "最終活動の目安を返す。30日より前なら over_30_days、一度もログインしていなければ null（PR335）" do
+      student.user.update!(last_active_on: Time.zone.today - 5)
+      get "/api/company/students/#{student.id}"
+      expect(response.parsed_body["student"]["last_active_range"]).to eq("within_7_days")
+
+      student.user.update!(last_active_on: Time.zone.today - 31)
+      get "/api/company/students/#{student.id}"
+      expect(response.parsed_body["student"]["last_active_range"]).to eq("over_30_days")
+
+      student.user.update!(last_active_on: nil)
+      get "/api/company/students/#{student.id}"
+      expect(response.parsed_body["student"]["last_active_range"]).to be_nil
     end
 
     it "自社の全募集（非公開・終了も含む）を、最終更新の新しい順に返す。他社の募集は入らない" do
@@ -244,7 +260,7 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         expect(first.keys).to contain_exactly(
           "id", "name", "icon_url", "grade", "graduation_year", "activity_status",
           "interested_job_middle_category_ids", "skills",
-          "work_days_per_week", "work_hours_per_day", "duration_months", "matched",
+          "work_days_per_week", "work_hours_per_day", "duration_months", "last_active_range", "matched",
           "candidacy", "candidacy_count"
         )
         expect(first).to include(
@@ -253,6 +269,8 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
           "interested_job_middle_category_ids" => [ middle.id ],
           "skills" => [ { "technology_id" => technology.id, "other_name" => nil, "level" => "v2" } ],
           "work_days_per_week" => 3, "work_hours_per_day" => 4, "duration_months" => 6,
+          # 今日活動した（テスト用のアカウントの既定）
+          "last_active_range" => "within_3_days",
           "matched" => true
         )
         # 条件に合わない学生も、減らさずに後ろに出す

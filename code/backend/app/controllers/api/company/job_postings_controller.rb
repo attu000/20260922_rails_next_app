@@ -8,6 +8,10 @@ module Api
       # 返事は app/views/api/company/job_postings/index.json.jbuilder
       def index
         @job_postings = current_company.job_postings.order(updated_at: :desc, id: :desc)
+        # 募集ごとの未対応の応募の件数（募集の番号 => 件数。0件の募集は入らない）。
+        # 全募集ぶんを1回の問い合わせで数える（行ごとに数えない。N+1問題を避ける）。
+        # Django の values("job_posting_id").annotate(Count("id")) にあたる
+        @pending_application_counts = current_company.candidacies.pending_application.group(:job_posting_id).count
       end
 
       # ⑫ 1件。返事は app/views/api/company/job_postings/show.json.jbuilder

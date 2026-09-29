@@ -48,6 +48,9 @@ class Candidacy < ApplicationRecord
   # 企業の候補者一覧（C4。API設計.md の 16-3 ㉑）に既定で出すやりとり。状態が未マッチかマッチのもの。
   # 見送り・合格・不合格は既定で隠し、show_all のときだけ出す（ページ設計.md の 6-5 C4）
   scope :listed_in_company_candidacies, -> { where(status: %i[unmatched matched]) }
+  # 未対応の応募（応募から始まり、未マッチのやりとり）。企業の募集一覧（C2。API設計.md の 16-3 ⑪）の件数に使う。
+  # 1件ずつのタグ（下の tag）の「pending_application」と同じ条件。どちらかを変えるときは、もう一方も合わせる
+  scope :pending_application, -> { application.unmatched }
   # 推薦で「興味」として数えるやりとり（処理設計_類似度.md の 7-2 の A(S)・B(P)）。応募理由・マッチ理由が付いたもの。
   # 応募は状態を問わない（見送られても学生の意思表示なので数える）。スカウトは学生が応じてマッチしたものだけ。
   # 理由の組の写し（reason_mask）は理由と同じトランザクションで書くので、これが空かどうかで見分ける。

@@ -154,6 +154,12 @@ ja:
         not_looking: 今は探していない
         skill_up: スキルアップ目的
         job_hunting: 就活目的
+      # 企業に見せる最終活動の目安（その他決め事.md の 5-4）
+      last_active_range:
+        within_3_days: 3日以内
+        within_7_days: 7日以内
+        within_30_days: 30日以内
+        over_30_days: 30日より前
     # プログラミング歴のレベル（自己申告。その他決め事.md の 5-3）
     student_skill:
       level:

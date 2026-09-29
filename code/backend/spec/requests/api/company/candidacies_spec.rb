@@ -45,7 +45,7 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
 
         item = response.parsed_body["items"].sole
         expect(item.keys).to contain_exactly(
-          "id", "job_posting", "student", "origin", "status", "tag", "after_match", "created_at", "matched_at"
+          "id", "job_posting", "student", "origin", "status", "tag", "after_match", "unreplied", "created_at", "matched_at"
         )
         expect(item).to include(
           "id" => candidacy.id,
@@ -58,8 +58,51 @@ RSpec.describe "企業のやりとり（/api/company/candidacies）", type: :req
           "status" => "unmatched",
           "tag" => "pending_application",
           "after_match" => false,
+          "unreplied" => false,
           "matched_at" => nil
         )
+      end
+
+      # 未返信のタグ（【仕上げ】順16）。マッチ以降で、学生が最後に送り、企業がまだ返していない
+      it "unreplied は、マッチ以降で、その学生とのスレッドの最後のメッセージを学生が送ったときだけ true" do
+        waiting = create(:candidacy, job_posting: posting, status: :matched)
+        replied = create(:candidacy, job_posting: posting, status: :matched)
+        no_message = create(:candidacy, job_posting: posting, status: :matched)
+        waiting_thread = create(:message_thread, company_profile: company, student_profile: waiting.student_profile)
+        create(:message, message_thread: waiting_thread, sender_user: waiting.student_profile.user)
+        replied_thread = create(:message_thread, company_profile: company, student_profile: replied.student_profile)
+        create(:message, message_thread: replied_thread, sender_user: replied.student_profile.user, created_at: 1.hour.ago)
+        create(:message, message_thread: replied_thread, sender_user: company_user)
+        create(:message_thread, company_profile: company, student_profile: no_message.student_profile)
+
+        get "/api/company/candidacies"
+
+        expect(response.parsed_body["items"].to_h { |item| [ item["id"], item["unreplied"] ] })
+          .to eq(waiting.id => true, replied.id => false, no_message.id => false)
+      end
+
+      it "同じ学生の行が2つあれば、マッチ以降の行にだけ付く（メッセージは相手ごと）" do
+        student = create(:student_user).student_profile
+        matched = create(:candidacy, job_posting: posting, student_profile: student, status: :matched)
+        pending = create(:candidacy, job_posting: create(:job_posting, :published, company_profile: company),
+                                     student_profile: student)
+        thread = create(:message_thread, company_profile: company, student_profile: student)
+        create(:message, message_thread: thread, sender_user: student.user)
+
+        get "/api/company/candidacies"
+
+        expect(response.parsed_body["items"].to_h { |item| [ item["id"], item["unreplied"] ] })
+          .to eq(matched.id => true, pending.id => false)
+      end
+
+      it "同じ学生が他社に最後に送っていても、自社の行には付かない" do
+        candidacy = create(:candidacy, job_posting: posting, status: :matched)
+        other_thread = create(:message_thread, student_profile: candidacy.student_profile)
+        create(:message, message_thread: other_thread, sender_user: candidacy.student_profile.user)
+
+        get "/api/company/candidacies"
+
+        expect(response.parsed_body["items"].sole["unreplied"]).to be(false)
       end
 
       # 「メッセージ」のボタンを出すか（PR224）。見送り・合格の行は既定で隠れるので、show_all を付けて確かめる

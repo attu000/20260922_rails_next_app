@@ -57,6 +57,8 @@ export type Options = {
     my_status: EnumOption[];
     // 企業から見た、やりとりの状態のタグ（未対応応募・スカウト済み など。順5）
     candidacy_tag: EnumOption[];
+    // 企業に見せる学生の最終活動の目安（3日以内・7日以内・30日以内・30日より前。【仕上げ】順16）
+    last_active_range: EnumOption[];
   };
   // 稼働条件の数値の選択肢（その他決め事.md の 5-6）
   work_conditions: {

@@ -136,6 +136,18 @@ RSpec.describe Candidacy, type: :model do
     end
   end
 
+  # 企業の募集一覧の「未対応の応募」の件数に使う絞り込み（API設計.md の 16-3 ⑪）
+  describe ".pending_application（未対応の応募）" do
+    it "応募から始まった未マッチのやりとりだけを返す。1件ずつのタグの pending_application と同じ" do
+      pending = create(:candidacy)
+      create(:candidacy, :scout)
+      %i[matched declined passed failed].each { |status| create(:candidacy, status: status) }
+
+      expect(described_class.pending_application).to eq([ pending ])
+      expect(described_class.all.select { |candidacy| candidacy.tag == "pending_application" }).to eq([ pending ])
+    end
+  end
+
   # 順12：学生が興味を示したあと（応募・スカウトへのマッチ）だけ、推薦の集計を数え直すジョブを積む（処理設計_類似度.md の 7-5）。
   # テストでは、ジョブは実行されず、積まれたことだけが記録される（config/environments/test.rb の queue_adapter = :test）
   describe "推薦のジョブ（InterestRecordedJob）を積むか" do

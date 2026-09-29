@@ -2,7 +2,7 @@
 # ㉒ 学生検索で使う（【強み】の ㉕ 似た学生でも使い回す）。
 # 使い方：json.partial! "api/company/students/row", student: 学生プロフィール
 # 行には、スカウトするかどうかの判断に使う情報を絞って載せる。大学名などは学生詳細で見る。
-# 最終活動の目安（last_active_range）は【仕上げ】で足す
+# 最終活動の目安（last_active_range）は、呼ぶ側が user をまとめて読んでおく（StudentsController::ROW_ASSOCIATIONS）
 
 json.extract! student, :id, :name
 json.partial! "api/shared/icon_url", record: student
@@ -16,3 +16,5 @@ json.skills student.student_skills do |skill|
   json.level skill.level
 end
 json.extract! student, :work_days_per_week, :work_hours_per_day, :duration_months
+# 最終活動の目安（"within_3_days" など）。日付そのものは返さない。表示名は ⑦ の enums.last_active_range
+json.last_active_range student.last_active_range

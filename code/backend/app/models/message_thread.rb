@@ -24,6 +24,32 @@ class MessageThread < ApplicationRecord
     exists?(company_profile: company_profile, student_profile: student_profile)
   end
 
+  # 企業の返事を待っている学生の番号の集まり（候補者一覧の unreplied。API設計.md の 16-3 ㉑）。
+  # その企業と、渡した学生たちのスレッドのうち、最後のメッセージを学生本人が送ったものの学生の番号を返す。
+  # メッセージがまだないスレッドは入らない。
+  # スレッドごとの最後のメッセージは、PostgreSQL の DISTINCT ON で1回の問い合わせで取る
+  # （スレッドの番号ごとに、新しい順に並べた先頭の1行だけを残す。スレッドごとに問い合わせない。N+1問題を避ける）
+  def self.awaiting_reply_student_ids(company_profile, student_profile_ids)
+    last_messages = Message.joins(message_thread: :student_profile)
+                           .where(message_threads: { company_profile_id: company_profile.id,
+                                                     student_profile_id: student_profile_ids })
+                           .select("DISTINCT ON (messages.message_thread_id) message_threads.student_profile_id, " \
+                                   "messages.sender_user_id = student_profiles.user_id AS sent_by_student")
+                           .order(Arel.sql("messages.message_thread_id, messages.created_at DESC, messages.id DESC"))
+    last_messages.select(&:sent_by_student).map(&:student_profile_id).to_set
+  end
+
+  # このスレッドの企業の募集のうち、この学生とマッチしている募集（チャットの matched_job_postings。API設計.md の 16-3 ㊲㊵）。
+  # やりとりがマッチ以降（マッチ・合格・不合格）のもの。学生にも同じ一覧を返すが、合格・不合格の区別は返さない。
+  # 並びはマッチした日の古い順。
+  # Django の JobPosting.objects.filter(candidacies__student_profile=…, candidacies__status__in=…) にあたる
+  def matched_job_postings
+    JobPosting.joins(:candidacies)
+              .merge(Candidacy.after_match)
+              .where(company_profile_id: company_profile_id, candidacies: { student_profile_id: student_profile_id })
+              .order("candidacies.matched_at", "candidacies.id")
+  end
+
   # このスレッドで今メッセージを送れるか（チャットの can_send。API設計.md の 16-3 ㊲㊵、権限_バリデーション.md の 17-2-3）。
   # この企業の募集と、この学生とのやりとりに、マッチ以降（マッチ・合格・不合格）が1つでもあれば true。
   # 募集の状態は見ない（一度マッチしていれば、募集が終了しても会話は続けられる）。

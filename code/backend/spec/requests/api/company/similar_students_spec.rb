@@ -37,7 +37,8 @@ RSpec.describe "企業の似た学生（/api/company/students/:student_id/simila
       expect(items.map { |item| item["id"] }).to eq([ second.id, first.id ])
       expect(items.first.keys).to contain_exactly(
         "id", "name", "icon_url", "grade", "graduation_year", "activity_status",
-        "interested_job_middle_category_ids", "skills", "work_days_per_week", "work_hours_per_day", "duration_months"
+        "interested_job_middle_category_ids", "skills", "work_days_per_week", "work_hours_per_day", "duration_months",
+        "last_active_range"
       )
     end
 

@@ -1,4 +1,5 @@
 // 企業向けの学生の行の見た目（形C。design/designs/ページ設計.md の 6-5 C5「各行」）。
+// 最終活動の目安は、学年などと同じ行の最後に出す（【仕上げ】順16）。
 // 学生検索と、学生詳細のスカウト送信後のポップアップ（この学生に似た学生。順14。PR319）で使い回す。
 // 「ここから条件に合いません」の区切りは、並べる側（学生検索）が入れる
 
@@ -24,11 +25,14 @@ export function CompanyStudentRow({ student, options, jobPostingId, tag }: Compa
   const detailHref = `/company/students/${student.id}${
     jobPostingId === null ? "" : `?job_posting_id=${encodeURIComponent(jobPostingId)}`
   }`;
-  // 学年・卒業年度・活動状況。空欄の項目は飛ばす
+  // 最終活動の目安（「3日以内」など）。Rails が返した名前を ⑦ の表示名にするだけ
+  const lastActiveLabel = labelOf(options.enums.last_active_range, student.last_active_range);
+  // 学年・卒業年度・活動状況・最終活動の目安。空欄の項目は飛ばす
   const profileParts = [
     labelOf(options.enums.grade, student.grade),
     student.graduation_year === null ? null : `${student.graduation_year}年卒`,
     labelOf(options.enums.activity_status, student.activity_status),
+    lastActiveLabel === null ? null : `最終活動：${lastActiveLabel}`,
   ].filter((part) => part !== null);
   const jobCategoryNames = jobMiddleCategoryNames(
     options.masters.job_major_categories,

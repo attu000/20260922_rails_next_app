@@ -53,6 +53,11 @@ json.enums do
     json.value value
     json.label t("enums.candidacy.tag.#{value}")
   end
+  # 企業に見せる学生の最終活動の目安（学生検索・学生詳細）
+  json.last_active_range StudentProfile::LAST_ACTIVE_RANGE_VALUES do |value|
+    json.value value
+    json.label t("enums.student_profile.last_active_range.#{value}")
+  end
 end
 
 # 稼働条件の数値の選択肢。Rails の検証と同じ定数から作る（app/models/concerns/work_conditions.rb）

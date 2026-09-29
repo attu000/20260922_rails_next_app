@@ -16,6 +16,15 @@ class StudentProfile < ApplicationRecord
   # 最終活動日からこの日数以内なら「最近活動した学生」とする（その他決め事.md の 5-4）。
   # ちょうど30日前も含める。企業に見せる最終活動の目安の「30日以内」とそろえるため（PR216）
   ACTIVE_WITHIN_DAYS = 30
+  # 企業に見せる最終活動の目安（その他決め事.md の 5-4、API設計.md の形C）。目安の名前 => 最終活動日から今日までの日数の上限。
+  # 上から順に当てはめ、どれにも入らなければ over_30_days（30日より前）。ちょうど3日前は「3日以内」に入れる
+  LAST_ACTIVE_RANGES = {
+    "within_3_days" => 3,
+    "within_7_days" => 7,
+    "within_30_days" => ACTIVE_WITHIN_DAYS
+  }.freeze
+  # ⑦ の選択肢（last_active_range）に使う、目安の名前の一覧
+  LAST_ACTIVE_RANGE_VALUES = [ *LAST_ACTIVE_RANGES.keys, "over_30_days" ].freeze
 
   belongs_to :user
   # 大学・学部・学科・在住の都道府県（どれも任意）
@@ -111,6 +120,19 @@ class StudentProfile < ApplicationRecord
   # 一度も掲載していない募集にはやりとりができないので、ここには入らない
   def visible_job_postings
     JobPosting.published.or(JobPosting.where(id: candidacies.select(:job_posting_id)))
+  end
+
+  # 企業に見せる最終活動の目安（学生検索・似た学生の行と学生詳細。API設計.md の形C・16-3 ㉓）。
+  # 日付そのものは見せず、"within_3_days" などの名前を返す。表示名は ⑦ の enums.last_active_range。
+  # 最終活動日が空（一度もログインしていない）なら nil（PR335）。「30日より前」と出すと、前は活動していたように読めるため。
+  # user を読むので、一覧で使うときは呼ぶ側が includes(:user) でまとめて読んでおく（N+1問題を避ける）。
+  # Django のモデルの @property にあたる
+  def last_active_range
+    last_active_on = user.last_active_on
+    return nil if last_active_on.nil?
+
+    days = (Time.zone.today - last_active_on).to_i
+    LAST_ACTIVE_RANGES.find { |_range, max_days| days <= max_days }&.first || "over_30_days"
   end
 
   # 学生プロフィールの保存（⑯ PATCH /api/student/profile）。窓口はこれを呼ぶだけにする（技術構成.md の 9-2）。

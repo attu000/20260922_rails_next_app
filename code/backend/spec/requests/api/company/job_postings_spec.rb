@@ -71,7 +71,25 @@ RSpec.describe "企業の募集（/api/company/job_postings）", type: :request 
       expect(response).to have_http_status(:ok)
       items = response.parsed_body["items"]
       expect(items.map { |item| item["id"] }).to eq([ newer.id, older.id ])
-      expect(items.first.keys).to contain_exactly("id", "title", "status", "published_at", "updated_at")
+      expect(items.first.keys).to contain_exactly(
+        "id", "title", "status", "published_at", "updated_at", "pending_application_count"
+      )
+    end
+
+    it "未対応の応募の件数は、応募の未マッチだけを募集ごとに数える。ない募集は0" do
+      counted = create(:job_posting, :published, company_profile: company, updated_at: 1.day.ago)
+      empty = create(:job_posting, :published, company_profile: company, updated_at: 2.days.ago)
+      create_list(:candidacy, 2, job_posting: counted)
+      # 数えないもの：スカウト、マッチ・見送りになった応募
+      create(:candidacy, :scout, job_posting: counted)
+      create(:candidacy, job_posting: counted, status: :matched)
+      create(:candidacy, job_posting: counted, status: :declined)
+      log_in_as(company_user)
+
+      get "/api/company/job_postings"
+
+      counts = response.parsed_body["items"].to_h { |item| [ item["id"], item["pending_application_count"] ] }
+      expect(counts).to eq(counted.id => 2, empty.id => 0)
     end
   end
 

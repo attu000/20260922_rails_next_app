@@ -28,6 +28,8 @@ export type CompanyCandidacyRow = {
   tag: string;
   // マッチ以降（マッチ・合格・不合格）か。Rails が判定する。true の行に「メッセージ」のボタンを出す（PR224）
   after_match: boolean;
+  // 未返信か（マッチ以降で、学生が最後に送り、企業がまだ返していない）。Rails が判定する。true の行に「未返信」の札を出す
+  unreplied: boolean;
   // やりとりが始まった日時（応募日・スカウト日）
   created_at: string;
   matched_at: string | null;

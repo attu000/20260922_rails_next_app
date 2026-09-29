@@ -95,6 +95,8 @@ RSpec.describe "学生のメッセージ（/api/student/message_threads・/api/s
         expect(response.parsed_body).to eq(
           "partner" => { "id" => company.id, "name" => company.name, "icon_url" => nil },
           "can_send" => false,
+          # まだマッチしていないので空
+          "matched_job_postings" => [],
           "messages" => [
             {
               "id" => scout_message.id, "is_mine" => false, "body" => "はじめまして",
@@ -127,7 +129,26 @@ RSpec.describe "学生のメッセージ（/api/student/message_threads・/api/s
 
         get "/api/student/companies/#{company.id}/message_thread"
 
-        expect(response.parsed_body).to include("can_send" => true, "matchable_scouts" => [])
+        expect(response.parsed_body).to include(
+          "can_send" => true, "matchable_scouts" => [],
+          "matched_job_postings" => [ { "id" => posting.id, "title" => posting.title } ]
+        )
+      end
+
+      # 上部に出すマッチしている募集（【仕上げ】順16）。合格・不合格の区別は見せない
+      it "マッチしている募集は、合格・不合格も含めて同じ形で返す。ほかの企業の募集は入らない" do
+        thread
+        failed = create(:job_posting, :published, company_profile: company)
+        create(:candidacy, job_posting: failed, student_profile: student, status: :failed, matched_at: 2.days.ago)
+        match_company.update!(matched_at: 1.day.ago)
+        create(:candidacy, job_posting: create(:job_posting, :published), student_profile: student, status: :matched)
+
+        get "/api/student/companies/#{company.id}/message_thread"
+
+        expect(response.parsed_body["matched_job_postings"]).to eq([
+          { "id" => failed.id, "title" => failed.title },
+          { "id" => posting.id, "title" => posting.title }
+        ])
       end
 
       # 必須テスト：見てよい範囲の外は 404（16-1-10）

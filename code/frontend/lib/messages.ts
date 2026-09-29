@@ -46,12 +46,13 @@ export type MatchableScout = {
   job_posting: { id: number; title: string };
 };
 
-// ㊲㊵ チャット。
-// マッチしている募集（matched_job_postings）は【仕上げ】で足す
+// ㊲㊵ チャット
 export type MessageThreadDetail = {
   partner: MessagePartner;
   // 今送れるか（その相手とマッチ以降のやりとりが1つでもあるか）。Rails が判定する（権限_バリデーション.md の 17-2-3）
   can_send: boolean;
+  // その相手とマッチしている募集（マッチ・合格・不合格。区別は来ない）。マッチした日の古い順。画面は名前を並べるだけ
+  matched_job_postings: { id: number; title: string }[];
   // 古い順に全件
   messages: Message[];
   // 学生のチャット（㊵）だけが返す。今マッチできるスカウト（Rails が判定する）。企業のチャット（㊲）にはない

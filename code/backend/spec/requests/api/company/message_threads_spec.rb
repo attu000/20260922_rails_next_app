@@ -99,6 +99,7 @@ RSpec.describe "企業のメッセージ（/api/company/message_threads・/api/c
         expect(response.parsed_body).to eq(
           "partner" => { "id" => student.id, "name" => student.name, "icon_url" => nil },
           "can_send" => true,
+          "matched_job_postings" => [ { "id" => posting.id, "title" => posting.title } ],
           "messages" => [
             {
               "id" => scout_message.id, "is_mine" => true, "body" => "はじめまして",
@@ -113,12 +114,30 @@ RSpec.describe "企業のメッセージ（/api/company/message_threads・/api/c
         )
       end
 
-      it "スカウトしただけ（まだマッチしていない）なら can_send は false" do
+      it "スカウトしただけ（まだマッチしていない）なら can_send は false で、マッチしている募集は空" do
         Candidacy.send_scout(posting, student, "はじめまして")
 
         get "/api/company/students/#{student.id}/message_thread"
 
-        expect(response.parsed_body["can_send"]).to be(false)
+        expect(response.parsed_body).to include("can_send" => false, "matched_job_postings" => [])
+      end
+
+      # 上部に出すマッチしている募集（【仕上げ】順16）
+      it "マッチしている募集は、マッチ・合格・不合格の自社の募集だけ。見送り・他社の募集は入らない" do
+        thread
+        passed = create(:job_posting, :published, company_profile: company)
+        create(:candidacy, job_posting: passed, student_profile: student, status: :passed, matched_at: 2.days.ago)
+        match_student.update!(matched_at: 1.day.ago)
+        create(:candidacy, job_posting: create(:job_posting, :published, company_profile: company),
+                           student_profile: student, status: :declined)
+        create(:candidacy, job_posting: create(:job_posting, :published), student_profile: student, status: :matched)
+
+        get "/api/company/students/#{student.id}/message_thread"
+
+        expect(response.parsed_body["matched_job_postings"]).to eq([
+          { "id" => passed.id, "title" => passed.title },
+          { "id" => posting.id, "title" => posting.title }
+        ])
       end
 
       # 必須テスト：見てよい範囲の外は 404（16-1-10）

@@ -8,6 +8,31 @@ RSpec.describe StudentProfile, type: :model do
   let(:profile) { create(:student_user).student_profile }
   let(:technology) { create(:technology) }
 
+  # 企業に見せる最終活動の目安（その他決め事.md の 5-4。【仕上げ】順16）
+  describe "#last_active_range（最終活動の目安）" do
+    {
+      0 => "within_3_days",
+      3 => "within_3_days",
+      4 => "within_7_days",
+      7 => "within_7_days",
+      8 => "within_30_days",
+      30 => "within_30_days",
+      31 => "over_30_days"
+    }.each do |days_ago, range|
+      it "最終活動日が#{days_ago}日前なら #{range}" do
+        profile.user.update!(last_active_on: Time.zone.today - days_ago)
+
+        expect(profile.last_active_range).to eq(range)
+      end
+    end
+
+    it "最終活動日が空（一度もログインしていない）なら nil（PR335）" do
+      profile.user.update!(last_active_on: nil)
+
+      expect(profile.last_active_range).to be_nil
+    end
+  end
+
   describe "データベースの CHECK（プログラミング歴は、技術か「その他」の名前のどちらか一方だけ）" do
     # save(validate: false) は、モデルの検証を飛ばして保存する
     it "技術も「その他」の名前もない行は、データベースが拒否する" do

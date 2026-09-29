@@ -3,8 +3,9 @@
 module Api
   module Company
     class StudentsController < BaseController
-      # 企業向けの学生の行（形C）を出すときに、まとめて読み込む関連（アイコン、プログラミング歴、興味のある職種）
-      ROW_ASSOCIATIONS = [ { icon_attachment: :blob }, :student_skills, :student_interested_job_categories ].freeze
+      # 企業向けの学生の行（形C）を出すときに、まとめて読み込む関連
+      # （アイコン、プログラミング歴、興味のある職種、最終活動の目安に使うログイン情報）
+      ROW_ASSOCIATIONS = [ { icon_attachment: :blob }, :student_skills, :student_interested_job_categories, :user ].freeze
       # 学生詳細の比較（順10）で使う関連。学生の側と募集の側（app/services/student_job_posting_comparison.rb）
       COMPARISON_STUDENT_ASSOCIATIONS = %i[
         student_interested_industries student_interested_job_categories student_skills student_commutable_prefectures
@@ -42,7 +43,8 @@ module Api
         # 存在しない番号は 404。
         # 比較に使う関連は、最初にまとめて読み込む（includes。Django の prefetch_related にあたる）。
         # 募集が何件あっても、学生の関連を募集ごとに読み直さない（N+1問題を避ける）
-        @student = StudentProfile.includes(*COMPARISON_STUDENT_ASSOCIATIONS).find(params[:id])
+        # 最終活動の目安に使うログイン情報（user）も一緒に読む
+        @student = StudentProfile.includes(*COMPARISON_STUDENT_ASSOCIATIONS, :user).find(params[:id])
         # 自社の全募集（非公開・終了も含む）を、⑪ 募集一覧と同じ順（最終更新の新しい順）に。比較に使う関連も一緒に読む
         @job_postings = current_company.job_postings.includes(*COMPARISON_JOB_POSTING_ASSOCIATIONS)
                                        .order(updated_at: :desc, id: :desc)

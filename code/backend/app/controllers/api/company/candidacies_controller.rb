@@ -26,6 +26,10 @@ module Api
                                  # 行に出す募集と、学生・学生のアイコンをまとめて読む（N+1問題を避ける）
                                  .includes(:job_posting, student_profile: { icon_attachment: :blob })
         @pagy, @candidacies = paginate(candidacies)
+        # 未返信のタグ用。このページの学生のうち、最後のメッセージを学生が送った（企業の返事待ちの）学生の番号。
+        # 1ページ分まとめて1回で取り出す（1行ごとに問い合わせない。N+1問題を避ける）
+        @awaiting_reply_student_ids =
+          MessageThread.awaiting_reply_student_ids(current_company, @candidacies.map(&:student_profile_id).uniq)
       end
 
       # 下の5つの操作の処理は、モデルの Candidacy にまとめてある（技術構成.md の 9-2）。

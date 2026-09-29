@@ -2,8 +2,9 @@
 
 // 募集一覧（C2。企業のホーム）の中身。詳しくは design/designs/ページ設計.md の 6-5 C2、API設計.md の 16-3 ⑪。
 // 開いたら ⑪ 自社の募集の一覧と ⑦ 選択肢（状態の表示名）を取り、行を並べる。並び順は Rails が決める（最終更新の新しい順）。
-// 未対応の応募の件数は【仕上げ】で足す
+// 未対応の応募の件数は Rails が数えたものを出し、1件以上なら目立たせる（対応が必要な募集が一目でわかるように）
 
+import { cn } from "cn";
 import Link from "next/link";
 import { PageTitle } from "@/components/page-title";
 import { buttonVariants } from "@/components/ui/button";
@@ -58,6 +59,10 @@ export function JobPostingList() {
                   {jobPosting.published_at ? formatDate(jobPosting.published_at) : "未掲載"}
                   {" ・ "}
                   最終更新日：{formatDate(jobPosting.updated_at)}
+                  {" ・ "}
+                  <span className={cn(jobPosting.pending_application_count > 0 && "font-bold text-foreground")}>
+                    未対応の応募：{jobPosting.pending_application_count}件
+                  </span>
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">

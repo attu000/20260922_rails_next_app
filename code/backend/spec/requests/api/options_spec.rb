@@ -200,5 +200,16 @@ RSpec.describe "選択肢とマスタ（GET /api/options）", type: :request do
         { "value" => "failed", "label" => "不合格" }
       ])
     end
+
+    it "最終活動の目安の4つを、名前と日本語の表示名で返す" do
+      get "/api/options"
+
+      expect(response.parsed_body["enums"]["last_active_range"]).to eq([
+        { "value" => "within_3_days", "label" => "3日以内" },
+        { "value" => "within_7_days", "label" => "7日以内" },
+        { "value" => "within_30_days", "label" => "30日以内" },
+        { "value" => "over_30_days", "label" => "30日より前" }
+      ])
+    end
   end
 end

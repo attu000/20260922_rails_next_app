@@ -9,6 +9,8 @@ export type JobPostingRow = {
   // 最初に掲載した日時。一度も掲載していなければ null
   published_at: string | null;
   updated_at: string;
+  // 未対応の応募の件数（応募から始まり、未マッチのやりとり）。Rails が数える
+  pending_application_count: number;
 };
 
 // ⑫ 自社の募集1件（show.json.jbuilder）。⑬ 新規作成・⑭ 保存の返事も同じ形。空欄は null

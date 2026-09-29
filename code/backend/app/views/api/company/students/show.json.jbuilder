@@ -1,9 +1,11 @@
 # ㉓ GET /api/company/students/:id の形（design/designs/API設計.md の 16-3-6）。
-# last_active_range は【仕上げ】で足す（16-3 ㉓ の作る順。has_message_thread は順6、comparison は順10 で足した）
+# has_message_thread は順6、comparison は順10、last_active_range は【仕上げ】の順16 で足した
 
 # 学生のプロフィール。マイページと同じ項目（マッチ前でもすべて見せる）
 json.student do
   json.partial! "api/shared/student_profile", student: @student
+  # 最終活動の目安。学生詳細だけ、30日より前（over_30_days）も出る。一度もログインしていなければ null（PR335）
+  json.last_active_range @student.last_active_range
 end
 # この学生とのスレッドがあるか。募集ごとではなく学生ごとの値なので、job_postings の外に置く。
 # true なら、どの募集タブでも「この学生とのメッセージ」のボタンを出す（ボタンは順7。PR213）
