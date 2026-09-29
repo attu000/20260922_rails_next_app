@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_29_130001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_140001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -185,6 +185,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130001) do
     t.index ["job_middle_category_id"], name: "index_job_posting_job_categories_on_job_middle_category_id"
     t.index ["job_posting_id", "job_middle_category_id"], name: "idx_on_job_posting_id_job_middle_category_id_ff30f932c4", unique: true
     t.index ["job_posting_id"], name: "index_job_posting_job_categories_on_job_posting_id"
+  end
+
+  create_table "job_posting_job_trials", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "job_posting_id", null: false
+    t.bigint "job_trial_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["job_posting_id", "job_trial_id"], name: "idx_on_job_posting_id_job_trial_id_1392cad0ab", unique: true
+    t.index ["job_posting_id"], name: "index_job_posting_job_trials_on_job_posting_id"
+    t.index ["job_trial_id"], name: "index_job_posting_job_trials_on_job_trial_id"
   end
 
   create_table "job_posting_recommendation_stats", force: :cascade do |t|
@@ -557,6 +567,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_29_130001) do
   add_foreign_key "job_posting_industries", "job_postings"
   add_foreign_key "job_posting_job_categories", "job_middle_categories"
   add_foreign_key "job_posting_job_categories", "job_postings"
+  add_foreign_key "job_posting_job_trials", "job_postings"
+  add_foreign_key "job_posting_job_trials", "job_trials"
   add_foreign_key "job_posting_recommendation_stats", "job_postings"
   add_foreign_key "job_posting_technologies", "job_postings"
   add_foreign_key "job_posting_technologies", "technologies"

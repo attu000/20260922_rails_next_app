@@ -115,8 +115,9 @@ class BenchLoader
     Candidacy.where(id: candidacy_ids).delete_all
     MessageThread.where(id: thread_ids).delete_all
 
+    # 募集に近い講座は順19 で足した（消さないと外部キーに弾かれる）
     [ JobPostingJobCategory, JobPostingTechnology, JobPostingWorkProcess, JobPostingIndustry, JobPostingBusinessType,
-      JobPostingRecommendationStat ].each do |model|
+      JobPostingJobTrial, JobPostingRecommendationStat ].each do |model|
       model.where(job_posting_id: posting_ids).delete_all
     end
     JobPosting.where(id: posting_ids).delete_all

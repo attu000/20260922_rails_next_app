@@ -71,7 +71,9 @@ class DemoLoader
     Candidacy.where(id: candidacy_ids).delete_all
     MessageThread.where(id: thread_ids).delete_all
 
-    [ JobPostingJobCategory, JobPostingTechnology, JobPostingWorkProcess, JobPostingIndustry, JobPostingBusinessType ].each do |model|
+    # 募集に近い講座は順19 で足した（消さないと外部キーに弾かれる）
+    [ JobPostingJobCategory, JobPostingTechnology, JobPostingWorkProcess, JobPostingIndustry, JobPostingBusinessType,
+      JobPostingJobTrial ].each do |model|
       model.where(job_posting_id: posting_ids).delete_all
     end
     # 推薦の集計の行（順12。募集の保存・新規登録で自動でできる）

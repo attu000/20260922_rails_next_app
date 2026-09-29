@@ -9,6 +9,8 @@ class JobTrial < ApplicationRecord
   # 工程は工程の表示順で並べる。まとめて読んだ（includes）ときもこの順になるので、work_process_ids も表示順になる
   has_many :work_processes, -> { order(:position) }, through: :job_trial_work_processes
   has_many :self_analyses
+  # この講座を「近い講座」に選んでいる募集との中間の行（PR374）
+  has_many :job_posting_job_trials
 
   validates :code, presence: true, uniqueness: true
   validates :title, :intro, :position, presence: true

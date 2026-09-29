@@ -29,6 +29,9 @@ class JobPosting < ApplicationRecord
   has_many :industries, through: :job_posting_industries
   has_many :job_posting_business_types
   has_many :business_types, through: :job_posting_business_types
+  # この募集に近いプチ職業体験の講座（任意、複数。学生の募集詳細の枠に出す。PR374）。job_trial_ids が自動でできる
+  has_many :job_posting_job_trials
+  has_many :job_trials, through: :job_posting_job_trials
   # この募集とのやりとり（応募・スカウト）
   has_many :candidacies
   # 推薦の集計の行（1募集1行）。job_posting.recommendation_stat で取り出す
@@ -117,6 +120,7 @@ class JobPosting < ApplicationRecord
     technology_ids = attributes.delete(:technology_ids)
     industry_ids = attributes.delete(:industry_ids)
     business_type_ids = attributes.delete(:business_type_ids)
+    job_trial_ids = attributes.delete(:job_trial_ids)
 
     # ① 本体の値を、保存せずにモデルに入れるだけ
     assign_attributes(attributes)
@@ -130,6 +134,8 @@ class JobPosting < ApplicationRecord
     validate_master_ids(:technology_ids, technology_ids, Technology)
     validate_master_ids(:industry_ids, industry_ids, Industry)
     validate_master_ids(:business_type_ids, business_type_ids, BusinessType)
+    # 講座もマスタと同じく削除しないので、同じ確かめを使う（知らない講座の番号は 422。API設計.md の 16-3 ⑬）
+    validate_master_ids(:job_trial_ids, job_trial_ids, JobTrial)
 
     # 職種は、主か関連のどちらかが送られてきたら置き換える。送られなかった側は今の内容のままにする
     # （画面は常に両方送る。画面を通さずに API を呼ばれたときへの備え）
@@ -154,10 +160,11 @@ class JobPosting < ApplicationRecord
       save!
       replace_job_categories(main_ids, related_ids) unless main_ids.nil?
       replace_work_processes(main_process_ids, involved_process_ids) unless main_process_ids.nil?
-      # 使用技術・業界・事業形態を、送られた一覧でまるごと置き換える（16-3 ⑭）。送られなかったら変えない
+      # 使用技術・業界・事業形態・近い講座を、送られた一覧でまるごと置き換える（16-3 ⑭）。送られなかったら変えない
       self.technology_ids = technology_ids unless technology_ids.nil?
       self.industry_ids = industry_ids unless industry_ids.nil?
       self.business_type_ids = business_type_ids unless business_type_ids.nil?
+      self.job_trial_ids = job_trial_ids unless job_trial_ids.nil?
       # 最終更新日は「企業が最後に保存した日」にする。
       # Rails は本体の列が変わったときだけ updated_at を変えるので、職種や技術だけを直したときなど、
       # 本体が変わらなかった場合は touch（updated_at だけを今にする）で更新する

@@ -98,6 +98,53 @@ RSpec.describe JobPosting, type: :model do
   end
 
   # 順12：推薦の集計の項目数は、中間テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5）
+  # 順19：この募集に近いプチ職業体験の講座（PR374）
+  describe "#save_posting（近い講座）" do
+    let(:job_posting) { create(:job_posting) }
+    let(:job_trials) { create_list(:job_trial, 3) }
+
+    it "講座の番号を送ると付き、もう一度送ると送った内容に置き換わる" do
+      expect(job_posting.save_posting(job_trial_ids: [ job_trials[0].id, job_trials[1].id ])).to be(true)
+      expect(job_posting.reload.job_trial_ids).to contain_exactly(job_trials[0].id, job_trials[1].id)
+
+      expect(job_posting.save_posting(job_trial_ids: [ job_trials[2].id ])).to be(true)
+      expect(job_posting.reload.job_trial_ids).to eq([ job_trials[2].id ])
+    end
+
+    it "空の配列を送ると全部外れる" do
+      job_posting.save_posting(job_trial_ids: [ job_trials[0].id ])
+
+      expect(job_posting.save_posting(job_trial_ids: [])).to be(true)
+      expect(job_posting.reload.job_trial_ids).to eq([])
+    end
+
+    it "送らなければ今の講座のまま" do
+      job_posting.save_posting(job_trial_ids: [ job_trials[0].id ])
+
+      expect(job_posting.save_posting(title: "書き換えたタイトル")).to be(true)
+      expect(job_posting.reload.job_trial_ids).to eq([ job_trials[0].id ])
+    end
+
+    it "講座にない番号なら保存せず、エラーが付く。ほかの項目も書き込まれない" do
+      result = job_posting.save_posting(title: "書き換えたタイトル", job_trial_ids: [ job_trials[0].id, 0 ])
+
+      expect(result).to be(false)
+      expect(job_posting.errors.to_hash(true))
+        .to eq(job_trial_ids: [ "この募集に近いプチ職業体験に選べない値が含まれています" ])
+      job_posting.reload
+      expect(job_posting.title).not_to eq("書き換えたタイトル")
+      expect(job_posting.job_trial_ids).to eq([])
+    end
+
+    it "同じ講座を重複して送ると保存せず、エラーが付く" do
+      result = job_posting.save_posting(job_trial_ids: [ job_trials[0].id, job_trials[0].id ])
+
+      expect(result).to be(false)
+      expect(job_posting.errors.to_hash(true))
+        .to eq(job_trial_ids: [ "この募集に近いプチ職業体験に同じ値が重複しています" ])
+    end
+  end
+
   describe "#save_posting（推薦の集計の項目数）" do
     let(:company) { create(:company_user).company_profile }
     let(:technologies) { create_list(:technology, 2) }
