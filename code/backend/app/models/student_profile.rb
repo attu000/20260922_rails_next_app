@@ -1,6 +1,6 @@
 # 学生プロフィール（design/designs/データベース.md の 8-5）。
 # 必須は氏名と活動状況だけで、マイページでも新規登録でも同じ（その他決め事.md の 5-9）。
-# 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は、学生詳細の比較に使うので順10 で前倒しした。PR254）
+# 外部リンク・資格・就活希望エリアは【仕上げ】の順17 で足した（興味のある業界は、学生詳細の比較に使うので順10 で前倒しした。PR254）
 class StudentProfile < ApplicationRecord
   # 稼働条件の選択肢と検証。募集と共通（concerns/work_conditions.rb）
   include WorkConditions
@@ -11,8 +11,10 @@ class StudentProfile < ApplicationRecord
   # アイコンの添付と検証（形式・2MB）。企業プロフィールと共通（concerns/icon_attachment.rb）
   include IconAttachment
 
-  # プログラミング歴の件数の上限（権限_バリデーション.md の 17-3-4）
+  # プログラミング歴・外部リンク・資格の件数の上限（権限_バリデーション.md の 17-3-4）
   SKILLS_MAX = 50
+  LINKS_MAX = 20
+  CERTIFICATIONS_MAX = 50
   # 最終活動日からこの日数以内なら「最近活動した学生」とする（その他決め事.md の 5-4）。
   # ちょうど30日前も含める。企業に見せる最終活動の目安の「30日以内」とそろえるため（PR216）
   ACTIVE_WITHIN_DAYS = 30
@@ -33,16 +35,21 @@ class StudentProfile < ApplicationRecord
   belongs_to :department, optional: true
   belongs_to :prefecture, optional: true
 
-  # プログラミング歴。送られた順のまま返すため、作った順（id の順）に並べる
+  # プログラミング歴・外部リンク・資格。送られた順のまま返すため、作った順（id の順）に並べる
   has_many :student_skills, -> { order(:id) }
-  # 興味のある職種・興味のある業界・出社できる都道府県。Django の ManyToManyField(through=...) にあたる。
-  # through を書くと、interested_job_middle_category_ids・interested_industry_ids・commutable_prefecture_ids が自動でできる
+  has_many :student_links, -> { order(:id) }
+  has_many :student_certifications, -> { order(:id) }
+  # 興味のある職種・興味のある業界・出社できる都道府県・就活希望エリア。Django の ManyToManyField(through=...) にあたる。
+  # through を書くと、interested_job_middle_category_ids・interested_industry_ids・commutable_prefecture_ids・
+  # job_hunting_prefecture_ids が自動でできる
   has_many :student_interested_job_categories
   has_many :interested_job_middle_categories, through: :student_interested_job_categories, source: :job_middle_category
   has_many :student_interested_industries
   has_many :interested_industries, through: :student_interested_industries, source: :industry
   has_many :student_commutable_prefectures
   has_many :commutable_prefectures, through: :student_commutable_prefectures, source: :prefecture
+  has_many :student_job_hunting_prefectures
+  has_many :job_hunting_prefectures, through: :student_job_hunting_prefectures, source: :prefecture
   # 自分のやりとり（応募・スカウト）と、企業とのスレッド。窓口では、自分の分の中からだけ番号で探す（API設計.md の 16-1-10）
   has_many :candidacies
   has_many :message_threads
@@ -107,12 +114,15 @@ class StudentProfile < ApplicationRecord
     validate_master_id(:prefecture_id, prefecture_id, Prefecture)
   end
 
-  # エラーの項目名を引くとき、プログラミング歴の行のエラー（skills[0].years など）は、
-  # 1行分のモデル（StudentSkill）の項目名を使う。これで「年数は50以下の値にしてください」のような文になる（API設計.md の 16-3 ⑯）。
+  # エラーの項目名を引くとき、行ごとの付属情報のエラー（skills[0].years・links[0].url・certifications[0].name など）は、
+  # 1行分のモデルの項目名を使う。これで「年数は50以下の値にしてください」のような文になる（API設計.md の 16-3 ⑯）。
   # 何もしないと、Rails は skills[0].years という項目名を見つけられず「Skills[0] years は…」になる
   def self.human_attribute_name(attribute, options = {})
-    skill_attribute = attribute.to_s[/\Askills(?:\[\d+\])?\.(.+)\z/, 1]
-    skill_attribute ? StudentSkill.human_attribute_name(skill_attribute, options) : super
+    row_name, row_attribute = attribute.to_s.match(/\A(skills|links|certifications)(?:\[\d+\])?\.(.+)\z/)&.captures
+    return super if row_name.nil?
+
+    row_model = { "skills" => StudentSkill, "links" => StudentLink, "certifications" => StudentCertification }.fetch(row_name)
+    row_model.human_attribute_name(row_attribute, options)
   end
 
   # 自分が見てよい募集（API設計.md の 16-1-10、16-3 ⑲）。募集詳細と応募の窓口は、ここから番号で探す（範囲の外は 404）。
@@ -148,23 +158,29 @@ class StudentProfile < ApplicationRecord
   end
 
   # 値をモデルに入れて確かめる。まだ何も書き込まない。誤りがなければ true（誤りは errors に入る）。
-  # 中間テーブルに書く番号の一覧と、作り直すプログラミング歴は、write_profile! で使うために覚えておく
+  # 中間テーブルに書く番号の一覧と、作り直すプログラミング歴・外部リンク・資格は、write_profile! で使うために覚えておく
   def assign_profile(attributes)
     attributes = attributes.to_h.symbolize_keys
     @pending_job_middle_category_ids = attributes.delete(:interested_job_middle_category_ids)
     @pending_industry_ids = attributes.delete(:interested_industry_ids)
     @pending_commutable_prefecture_ids = attributes.delete(:commutable_prefecture_ids)
+    @pending_job_hunting_prefecture_ids = attributes.delete(:job_hunting_prefecture_ids)
     skill_rows = attributes.delete(:skills)
+    link_rows = attributes.delete(:links)
+    certification_names = attributes.delete(:certifications)
 
     # ① 本体の値を、保存せずにモデルに入れるだけ
     assign_attributes(attributes)
 
-    # ② 検証する。③ 番号の一覧と、プログラミング歴の各行を確かめる
+    # ② 検証する。③ 番号の一覧と、プログラミング歴・外部リンク・資格の各行を確かめる
     valid?
     validate_master_ids(:interested_job_middle_category_ids, @pending_job_middle_category_ids, JobMiddleCategory)
     validate_master_ids(:interested_industry_ids, @pending_industry_ids, Industry)
     validate_master_ids(:commutable_prefecture_ids, @pending_commutable_prefecture_ids, Prefecture)
+    validate_master_ids(:job_hunting_prefecture_ids, @pending_job_hunting_prefecture_ids, Prefecture)
     @pending_skills = build_skills(skill_rows)
+    @pending_links = build_links(link_rows)
+    @pending_certifications = build_certifications(certification_names)
     errors.empty?
   end
 
@@ -176,7 +192,11 @@ class StudentProfile < ApplicationRecord
     self.interested_job_middle_category_ids = @pending_job_middle_category_ids unless @pending_job_middle_category_ids.nil?
     self.interested_industry_ids = @pending_industry_ids unless @pending_industry_ids.nil?
     self.commutable_prefecture_ids = @pending_commutable_prefecture_ids unless @pending_commutable_prefecture_ids.nil?
-    replace_skills(@pending_skills) unless @pending_skills.nil?
+    self.job_hunting_prefecture_ids = @pending_job_hunting_prefecture_ids unless @pending_job_hunting_prefecture_ids.nil?
+    # 行ごとの付属情報は、消して作り直す（16-3 ⑯）
+    replace_rows(StudentSkill, student_skills, @pending_skills) unless @pending_skills.nil?
+    replace_rows(StudentLink, student_links, @pending_links) unless @pending_links.nil?
+    replace_rows(StudentCertification, student_certifications, @pending_certifications) unless @pending_certifications.nil?
     # 推薦の集計の項目数を、付属テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5。PR286）。
     # 項目と数が同じ時点で変わらないと、Content の分母がずれるため。新規登録のときは、ここで集計の行ができる（件数と self_weight は0）。
     # どの項目が変わったかは見ずに、毎回数え直す（自分の1行だけなので軽い）
@@ -184,10 +204,13 @@ class StudentProfile < ApplicationRecord
   end
 
   # エラーの文を作るとき、Rails は項目の今の値を読みに行く（文の中に %{value} で差し込めるようにするため）。
-  # プログラミング歴の欄全体のエラーは skills の名前で入れるので、その名前でプログラミング歴を読めるようにする。
+  # プログラミング歴・外部リンク・資格の欄全体のエラーは skills・links・certifications の名前で入れるので、
+  # その名前で読めるようにする。
   # alias_method で作ったメソッドは private の指定が効かないので、下の行で外から呼べないようにする
   alias_method :skills, :student_skills
-  private :skills
+  alias_method :links, :student_links
+  alias_method :certifications, :student_certifications
+  private :skills, :links, :certifications
 
   private
 
@@ -212,30 +235,34 @@ class StudentProfile < ApplicationRecord
     errors.add(:department_id, :not_in_selected_faculty) if department.faculty_id != faculty_id
   end
 
-  # プログラミング歴を、送られた行から作って確かめる（まだ保存しない）。送られなかったら nil を返す。
+  # 行ごとの付属情報（プログラミング歴・外部リンク・資格）を、送られた行から作って確かめる（まだ保存しない）。
+  # 送られなかったら nil を返す。1行分のモデルは、ブロック（呼ぶ側の do … end）が作る。
   # 行ごとの誤りは skills[0].years のように行の番号を付けた名前で、欄全体の誤りは skills の名前で入れる（API設計.md の 16-3 ⑯）
-  def build_skills(rows)
+  def build_rows(name, rows, max)
     return nil if rows.nil?
 
     rows = Array(rows)
-    errors.add(:skills, :too_many, count: SKILLS_MAX) if rows.size > SKILLS_MAX
+    errors.add(name, :too_many, count: max) if rows.size > max
 
-    skills = rows.each_with_index.map do |row, index|
+    rows.each_with_index.map do |row, index|
+      record = yield(row)
+      record.valid?
+      # 1行分の誤りを、行の番号を付けた名前で写す。文（「は50以下の値にしてください」）は1行分のモデルが作ったものを使う
+      record.errors.each { |error| errors.import(error, attribute: "#{name}[#{index}].#{error.attribute}") }
+      record
+    end
+  end
+
+  # プログラミング歴。送られるのは { technology_id, other_name, years, level } の行の一覧
+  def build_skills(rows)
+    skills = build_rows(:skills, rows, SKILLS_MAX) do |row|
       # save_profile の symbolize_keys は外側の名前だけをシンボルにし、中の各行は「名前が文字列の普通の辞書」にしてしまう。
       # row[:technology_id] で取り出せるよう、文字列でもシンボルでも取り出せる形に直す
       row = row.to_h.with_indifferent_access
-      skill = StudentSkill.new(
-        student_profile: self,
-        technology_id: row[:technology_id],
-        other_name: row[:other_name],
-        years: row[:years],
-        level: row[:level]
-      )
-      skill.valid?
-      # 1行分の誤りを、行の番号を付けた名前で写す。文（「は50以下の値にしてください」）は1行分のモデルが作ったものを使う
-      skill.errors.each { |error| errors.import(error, attribute: "skills[#{index}].#{error.attribute}") }
-      skill
+      StudentSkill.new(student_profile: self, technology_id: row[:technology_id], other_name: row[:other_name],
+                       years: row[:years], level: row[:level])
     end
+    return nil if skills.nil?
 
     # 同じ技術は1行だけ（データベースの UNIQUE と同じ決まり）。「その他」の行は技術が空なので対象外
     technology_ids = skills.map(&:technology_id).compact
@@ -244,12 +271,27 @@ class StudentProfile < ApplicationRecord
     skills
   end
 
-  # プログラミング歴を、送られた内容で消して作り直す（16-3 ⑯）。
+  # 外部リンク。送られるのは { url, title } の行の一覧
+  def build_links(rows)
+    build_rows(:links, rows, LINKS_MAX) do |row|
+      row = row.to_h.with_indifferent_access
+      StudentLink.new(student_profile: self, url: row[:url], title: row[:title])
+    end
+  end
+
+  # 資格。送られるのは資格名の文字の一覧（["基本情報技術者", …]。API設計.md の 16-3 ⑥）
+  def build_certifications(names)
+    build_rows(:certifications, names, CERTIFICATIONS_MAX) do |name|
+      StudentCertification.new(student_profile: self, name: name)
+    end
+  end
+
+  # 行ごとの付属情報を、送られた内容で消して作り直す（16-3 ⑯）。
   # 募集の職種と同じく、1行ずつ見比べるより、まとめて消して作り直す方が単純で間違えにくい。
   # トランザクションの中で呼ぶので、途中で失敗しても元に戻る
-  def replace_skills(new_skills)
-    StudentSkill.where(student_profile_id: id).delete_all
-    student_skills.reset
-    new_skills.each(&:save!)
+  def replace_rows(model, association, new_rows)
+    model.where(student_profile_id: id).delete_all
+    association.reset
+    new_rows.each(&:save!)
   end
 end

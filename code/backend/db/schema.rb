@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_09_28_130001) do
+ActiveRecord::Schema[8.1].define(version: 2026_09_29_120001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -323,6 +323,14 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_130001) do
     t.index ["user_id"], name: "index_sessions_on_user_id"
   end
 
+  create_table "student_certifications", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["student_profile_id"], name: "index_student_certifications_on_student_profile_id"
+  end
+
   create_table "student_commutable_prefectures", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.bigint "prefecture_id", null: false
@@ -351,6 +359,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_130001) do
     t.index ["job_middle_category_id"], name: "idx_on_job_middle_category_id_62e136b596"
     t.index ["student_profile_id", "job_middle_category_id"], name: "idx_on_student_profile_id_job_middle_category_id_2286816a98", unique: true
     t.index ["student_profile_id"], name: "index_student_interested_job_categories_on_student_profile_id"
+  end
+
+  create_table "student_job_hunting_prefectures", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "prefecture_id", null: false
+    t.bigint "student_profile_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["prefecture_id"], name: "index_student_job_hunting_prefectures_on_prefecture_id"
+    t.index ["student_profile_id", "prefecture_id"], name: "idx_on_student_profile_id_prefecture_id_0c2aa85a8b", unique: true
+    t.index ["student_profile_id"], name: "index_student_job_hunting_prefectures_on_student_profile_id"
+  end
+
+  create_table "student_links", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.bigint "student_profile_id", null: false
+    t.string "title"
+    t.datetime "updated_at", null: false
+    t.string "url", null: false
+    t.index ["student_profile_id"], name: "index_student_links_on_student_profile_id"
   end
 
   create_table "student_profiles", force: :cascade do |t|
@@ -491,12 +518,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_09_28_130001) do
   add_foreign_key "scout_messages", "candidacies"
   add_foreign_key "scout_messages", "messages"
   add_foreign_key "sessions", "users"
+  add_foreign_key "student_certifications", "student_profiles"
   add_foreign_key "student_commutable_prefectures", "prefectures"
   add_foreign_key "student_commutable_prefectures", "student_profiles"
   add_foreign_key "student_interested_industries", "industries"
   add_foreign_key "student_interested_industries", "student_profiles"
   add_foreign_key "student_interested_job_categories", "job_middle_categories"
   add_foreign_key "student_interested_job_categories", "student_profiles"
+  add_foreign_key "student_job_hunting_prefectures", "prefectures"
+  add_foreign_key "student_job_hunting_prefectures", "student_profiles"
+  add_foreign_key "student_links", "student_profiles"
   add_foreign_key "student_profiles", "departments"
   add_foreign_key "student_profiles", "faculties"
   add_foreign_key "student_profiles", "prefectures"

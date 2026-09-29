@@ -3,8 +3,14 @@
 // （design/designs/ページ設計.md の 6-6 S1・S9、API設計.md の 16-3 ⑮⑯⑥）。
 // マイページと登録では欄のまとまり方が違うので、欄を小さな部品に分け、使う側が並べる。
 // 氏名とアイコンは、登録ではステップ1と最後のステップに分かれるので、ここには入れない（会社情報の部品と同じ）。
-// 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
+// 外部リンク・資格・就活希望エリアは【仕上げ】の順17 で足した（興味のある業界は順10 で前倒しした。PR254）
 
+import {
+  toCertificationRequest,
+  toCertificationRows,
+  validateCertificationRows,
+  type CertificationRow,
+} from "@/components/certification-rows-field";
 import { CultureAxesField } from "@/components/culture-axes-field";
 import {
   LONG_TEXT_MAX_LENGTH,
@@ -18,6 +24,7 @@ import {
   type InputProps,
 } from "@/components/form-fields";
 import { JobCategoryPicker } from "@/components/job-category-picker";
+import { toLinkRequest, toLinkRows, validateLinkRows, type LinkRow } from "@/components/link-rows-field";
 import { MasterCheckboxGroup } from "@/components/master-checkbox-group";
 import { toSkillRequest, toSkillRows, validateSkillRows, type SkillRow } from "@/components/skill-rows-field";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -50,6 +57,16 @@ export const PERSONALITY_KEYS = [
 
 type PersonalityKey = (typeof PERSONALITY_KEYS)[number];
 
+// 行ごとに入力する付属情報の項目名（プログラミング歴・外部リンク・資格）。Rails の errors では
+// 欄全体の誤りが "links"、行の誤りが "links[0].url" のような名前で来る
+export const ROW_FIELD_NAMES = ["skills", "links", "certifications"] as const;
+
+// エラーの名前が、行ごとに入力する付属情報のものなら、その項目名（"links[0].url" → "links"）を返す。違えば null。
+// マイページのまとまり・新規登録のステップのどこを開くかと、行を足し引きしたときにエラーを消すのに使う
+export function rowFieldOfErrorKey(key: string): (typeof ROW_FIELD_NAMES)[number] | null {
+  return ROW_FIELD_NAMES.find((name) => key === name || key.startsWith(`${name}[`)) ?? null;
+}
+
 // 学生プロフィールの値（氏名を除く）。入力欄にそのまま入れるため、空欄は "" で持つ（選択欄の数値も文字で持つ）。
 // 大学は「一覧の大学の番号」か「その他」を1つの選択欄で持ち、開始時期は年と月の2つの選択欄に分けて持つ
 export type StudentProfileValues = {
@@ -76,6 +93,7 @@ export type StudentProfileValues = {
   can_partial_remote: boolean;
   can_onsite: boolean;
   commutable_prefecture_ids: number[];
+  job_hunting_prefecture_ids: number[];
   work_note: string;
   // 働き方の好みの5軸は、スライダーの位置（−2〜2）を数のまま持つ（空欄がないため）
   personality_pace: number;
@@ -84,6 +102,8 @@ export type StudentProfileValues = {
   personality_decision: number;
   personality_atmosphere: number;
   skills: SkillRow[];
+  links: LinkRow[];
+  certifications: CertificationRow[];
 };
 
 // 何も入れていない値（新規登録の最初）。データベースの既定値と同じ（データベース.md の 8-5）。
@@ -111,6 +131,7 @@ export const EMPTY_STUDENT_PROFILE: StudentProfileValues = {
   can_partial_remote: true,
   can_onsite: true,
   commutable_prefecture_ids: [],
+  job_hunting_prefecture_ids: [],
   work_note: "",
   personality_pace: 0,
   personality_novelty: 0,
@@ -118,6 +139,8 @@ export const EMPTY_STUDENT_PROFILE: StudentProfileValues = {
   personality_decision: 0,
   personality_atmosphere: 0,
   skills: [],
+  links: [],
+  certifications: [],
 };
 
 // 文字の入力欄の名前
@@ -173,6 +196,7 @@ export function toStudentProfileValues(profile: StudentProfile): StudentProfileV
     can_partial_remote: profile.can_partial_remote,
     can_onsite: profile.can_onsite,
     commutable_prefecture_ids: profile.commutable_prefecture_ids,
+    job_hunting_prefecture_ids: profile.job_hunting_prefecture_ids,
     work_note: toText(profile.work_note),
     personality_pace: profile.personality_pace,
     personality_novelty: profile.personality_novelty,
@@ -180,6 +204,8 @@ export function toStudentProfileValues(profile: StudentProfile): StudentProfileV
     personality_decision: profile.personality_decision,
     personality_atmosphere: profile.personality_atmosphere,
     skills: toSkillRows(profile.skills),
+    links: toLinkRows(profile.links),
+    certifications: toCertificationRows(profile.certifications),
   };
 }
 
@@ -210,6 +236,7 @@ export function toStudentProfileRequest(values: StudentProfileValues) {
     can_partial_remote: values.can_partial_remote,
     can_onsite: values.can_onsite,
     commutable_prefecture_ids: values.commutable_prefecture_ids,
+    job_hunting_prefecture_ids: values.job_hunting_prefecture_ids,
     work_note: values.work_note,
     personality_pace: values.personality_pace,
     personality_novelty: values.personality_novelty,
@@ -217,6 +244,8 @@ export function toStudentProfileRequest(values: StudentProfileValues) {
     personality_decision: values.personality_decision,
     personality_atmosphere: values.personality_atmosphere,
     skills: toSkillRequest(values.skills),
+    links: toLinkRequest(values.links),
+    certifications: toCertificationRequest(values.certifications),
   };
 }
 
@@ -249,7 +278,12 @@ export function validateStudentProfile(values: StudentProfileValues): FieldError
     errors.available_from = ["開始時期は年と月の両方を選んでください"];
   }
 
-  return { ...errors, ...validateSkillRows(values.skills) };
+  return {
+    ...errors,
+    ...validateSkillRows(values.skills),
+    ...validateLinkRows(values.links),
+    ...validateCertificationRows(values.certifications),
+  };
 }
 
 // ── 入力欄の部品 ──
@@ -396,10 +430,65 @@ export function InterestedJobCategoriesField({ values, onChange, errors, options
   );
 }
 
+type PrefectureAccordionFieldProps = {
+  // チェック欄の id の頭に付ける名前（同じ画面に2つ置いても重ならないように）
+  name: string;
+  legend: string;
+  rows: { id: number; name: string }[];
+  selectedIds: number[];
+  onChange: (ids: number[]) => void;
+  errors: string[] | undefined;
+};
+
+// 都道府県を複数選ぶ欄。47個あって長いので、開閉する行の中に入れ、選んでいる件数を行に出す。
+// 出社できる都道府県と就活希望エリアの2か所で使う
+function PrefectureAccordionField({ name, legend, rows, selectedIds, onChange, errors }: PrefectureAccordionFieldProps) {
+  return (
+    <FieldSet>
+      <FieldLegend variant="label">{legend}</FieldLegend>
+      <Accordion multiple className="gap-2">
+        <AccordionItem value={name} className="rounded-lg border">
+          <AccordionTrigger className="items-center px-3 py-2 hover:no-underline">
+            <span>都道府県を選ぶ</span>
+            {selectedIds.length > 0 && (
+              <span className="mr-2 ml-auto text-xs font-normal text-muted-foreground">{selectedIds.length}件選択中</span>
+            )}
+          </AccordionTrigger>
+          <AccordionContent keepMounted className="px-3 pb-3">
+            <MasterCheckboxGroup
+              name={name}
+              legend={legend}
+              hideLegend
+              rows={rows}
+              selectedIds={selectedIds}
+              onChange={onChange}
+            />
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+      {/* エラーは開閉する行の外に出す（閉じたままでも見えるように） */}
+      <FieldError errors={toFieldErrorItems(errors)} />
+    </FieldSet>
+  );
+}
+
+// 就活希望エリア（順17）。検索やおすすめには使わず、学生詳細に表示するだけ
+export function JobHuntingPrefecturesField({ values, onChange, errors, options }: StudentFieldsProps) {
+  return (
+    <PrefectureAccordionField
+      name="job-hunting-prefecture"
+      legend="就活希望エリア"
+      rows={options.masters.prefectures}
+      selectedIds={values.job_hunting_prefecture_ids}
+      onChange={(ids) => onChange({ job_hunting_prefecture_ids: ids })}
+      errors={errors.job_hunting_prefecture_ids}
+    />
+  );
+}
+
 // 稼働条件。すべて任意。学生は「無理なく出せる量（上限）」を入れる（その他決め事.md の 5-6）
 export function StudentWorkConditionFields(props: StudentFieldsProps & WithCurrentYear) {
   const { values, onChange, errors, options, currentYear } = props;
-  const commutableCount = values.commutable_prefecture_ids.length;
 
   return (
     <>
@@ -462,32 +551,15 @@ export function StudentWorkConditionFields(props: StudentFieldsProps & WithCurre
         </div>
       </FieldSet>
 
-      {/* 出社できる都道府県：47個あって長いので、開閉する行の中に入れ、選んでいる件数を行に出す。初期値はなし */}
-      <FieldSet>
-        <FieldLegend variant="label">出社できる都道府県</FieldLegend>
-        <Accordion multiple className="gap-2">
-          <AccordionItem value="commutable_prefectures" className="rounded-lg border">
-            <AccordionTrigger className="items-center px-3 py-2 hover:no-underline">
-              <span>都道府県を選ぶ</span>
-              {commutableCount > 0 && (
-                <span className="mr-2 ml-auto text-xs font-normal text-muted-foreground">{commutableCount}件選択中</span>
-              )}
-            </AccordionTrigger>
-            <AccordionContent keepMounted className="px-3 pb-3">
-              <MasterCheckboxGroup
-                name="commutable-prefecture"
-                legend="出社できる都道府県"
-                hideLegend
-                rows={options.masters.prefectures}
-                selectedIds={values.commutable_prefecture_ids}
-                onChange={(ids) => onChange({ commutable_prefecture_ids: ids })}
-              />
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-        {/* エラーは開閉する行の外に出す（閉じたままでも見えるように） */}
-        <FieldError errors={toFieldErrorItems(errors.commutable_prefecture_ids)} />
-      </FieldSet>
+      {/* 出社できる都道府県。初期値はなし（在住の都道府県から自動で選ばない） */}
+      <PrefectureAccordionField
+        name="commutable-prefecture"
+        legend="出社できる都道府県"
+        rows={options.masters.prefectures}
+        selectedIds={values.commutable_prefecture_ids}
+        onChange={(ids) => onChange({ commutable_prefecture_ids: ids })}
+        errors={errors.commutable_prefecture_ids}
+      />
 
       <LongTextField {...textProps(props, "work_note")} label="稼働条件の備考" placeholder="例：テスト期間は稼働を減らしたい" />
     </>

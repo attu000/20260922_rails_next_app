@@ -77,7 +77,8 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
         "can_full_remote", "can_partial_remote", "can_onsite", "work_note",
         "personality_pace", "personality_novelty", "personality_collaboration",
         "personality_decision", "personality_atmosphere",
-        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids", "skills", "icon_url"
+        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids",
+        "job_hunting_prefecture_ids", "skills", "links", "certifications", "icon_url"
       )
       expect(body["name"]).to eq("テスト 太郎")
       expect(body["grade"]).to eq("undergrad_3")
@@ -127,10 +128,13 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
         interested_job_middle_category_ids: [ middle_b.id ],
         interested_industry_ids: [ industry_b.id ],
         commutable_prefecture_ids: [ prefecture.id ],
+        job_hunting_prefecture_ids: [ prefecture.id ],
         skills: [
           { technology_id: technology.id, other_name: nil, years: 1.5, level: "v2" },
           other_skill("Elm")
-        ]
+        ],
+        links: [ { url: "https://github.com/example", title: "GitHub" }, { url: "https://example.com", title: nil } ],
+        certifications: [ "基本情報技術者" ]
       )
 
       expect(response).to have_http_status(:ok)
@@ -143,6 +147,13 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
         { "technology_id" => technology.id, "other_name" => nil, "years" => 1.5, "level" => "v2" },
         { "technology_id" => nil, "other_name" => "Elm", "years" => nil, "level" => "v1" }
       ])
+      # 外部リンク・資格・就活希望エリア（順17）。⑥ で送る形と同じ形で、送った順のまま返る
+      expect(body["job_hunting_prefecture_ids"]).to eq([ prefecture.id ])
+      expect(body["links"]).to eq([
+        { "url" => "https://github.com/example", "title" => "GitHub" },
+        { "url" => "https://example.com", "title" => nil }
+      ])
+      expect(body["certifications"]).to eq([ "基本情報技術者" ])
 
       profile.reload
       expect(profile.university).to eq(university)
@@ -260,6 +271,30 @@ RSpec.describe "学生のプロフィール（/api/student/profile）", type: :r
 
         expect(response).to have_http_status(:unprocessable_content)
         expect(response.parsed_body["errors"]["skills"]).to eq([ "プログラミング歴は50件までにしてください" ])
+      end
+    end
+
+    # 順17：外部リンク・資格も、プログラミング歴と同じく行の番号を付けた名前で返す
+    describe "外部リンク・資格の行の誤り" do
+      it "URL の形の誤りは links[0].url、空の資格名は certifications[1].name で 422。何も変わらない" do
+        profile.student_certifications.create!(name: "元の資格")
+
+        patch_with_required(links: [ { url: "github.com/example", title: "GitHub" } ],
+                            certifications: [ "基本情報技術者", "" ])
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"]).to eq(
+          "links[0].url" => [ "URLはhttp://かhttps://で始まる形で入力してください" ],
+          "certifications[1].name" => [ "資格名を入力してください" ]
+        )
+        expect(profile.reload.student_certifications.map(&:name)).to eq([ "元の資格" ])
+      end
+
+      it "21件の外部リンクは、欄全体の誤りとして 422（20件まで）" do
+        patch_with_required(links: Array.new(21) { |index| { url: "https://example.com/#{index}" } })
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"]).to eq("links" => [ "外部リンクは20件までにしてください" ])
       end
     end
 

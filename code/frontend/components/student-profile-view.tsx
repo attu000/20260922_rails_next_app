@@ -2,12 +2,17 @@
 // 項目はマイページ（S1）の入力項目と同じ。マッチ前でもすべて見せる。
 // 名前とアイコンは、使う側の見出しに出すので、ここには入れない。
 // 空欄の項目は「未入力」と出す（募集詳細と同じ部品）。
-// 働き方の好み（性格）は、順10 の比較（カルチャーの2点）で見せる。外部リンク・資格・就活希望エリアは【仕上げ】で、Rails が返すようになってから足す
+// 働き方の好み（性格）は、順10 の比較（カルチャーの2点）で見せる。
+// 外部リンク・資格は「資格・技術」のまとまり（マイページと同じ。PR336）、就活希望エリアは「就活状況」に、順17 で足した
 
+import { HTTP_URL_FORMAT } from "@/components/link-rows-field";
 import { DetailItem, DetailSection } from "@/components/student-job-posting-detail";
 import { formatStartMonth } from "@/lib/format";
 import { jobMiddleCategoryNames, labelOf, nameOf, type Options } from "@/lib/options";
-import type { StudentProfile, StudentSkill } from "@/lib/student-profile";
+import type { StudentLink, StudentProfile, StudentSkill } from "@/lib/student-profile";
+
+// 空の項目に出す文字（DetailItem と同じ）
+const EMPTY_TEXT = "未入力";
 
 // 名前の一覧を「・」でつなぐ。空なら null（「未入力」と出す）
 function joinNames(names: string[]): string | null {
@@ -43,6 +48,37 @@ export function workStyleNames(student: StudentProfile, options: Options): strin
   return styles.flatMap((style) => labelOf(options.enums.work_style, style) ?? []);
 }
 
+// 外部リンクの一覧。見た目は DetailItem と同じ（名前と中身）で、中身をリンクにする。
+// 表示名（なければ URL）を押すと、新しいタブで開く。開いた先のページから、この画面を操作できないようにする（noopener）。
+// URL は Rails が http:// か https:// で始まることを確かめているが、画面でも同じ形のときだけリンクにする
+// （javascript: で始まる URL などを押して開かせないため。それ以外は文字のまま出す）
+function LinkListItem({ links }: { links: StudentLink[] }) {
+  return (
+    <div className="space-y-1">
+      <dt className="text-sm text-muted-foreground">外部リンク</dt>
+      <dd className="text-sm">
+        {links.length === 0 ? (
+          EMPTY_TEXT
+        ) : (
+          <ul className="space-y-1">
+            {links.map((link, index) => (
+              <li key={index} className="break-all">
+                {HTTP_URL_FORMAT.test(link.url) ? (
+                  <a href={link.url} target="_blank" rel="noopener noreferrer" className="underline">
+                    {link.title ?? link.url}
+                  </a>
+                ) : (
+                  (link.title ?? link.url)
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </dd>
+    </div>
+  );
+}
+
 export function StudentProfileView({ student, options }: { student: StudentProfile; options: Options }) {
   return (
     <div className="space-y-6">
@@ -69,12 +105,14 @@ export function StudentProfileView({ student, options }: { student: StudentProfi
         <DetailItem label="この先やりたいこと、挑戦したいこと" value={student.self_pr_future} />
       </DetailSection>
 
-      <DetailSection title="プログラミング歴">
+      <DetailSection title="資格・技術">
         <DetailItem
-          label="言語・フレームワーク"
+          label="プログラミング歴"
           // 1行に1つ（DetailItem は改行をそのまま出す）
           value={student.skills.length > 0 ? student.skills.map((skill) => formatSkill(skill, options)).join("\n") : null}
         />
+        <LinkListItem links={student.links} />
+        <DetailItem label="資格" value={student.certifications.length > 0 ? student.certifications.join("\n") : null} />
       </DetailSection>
 
       <DetailSection title="就活状況">
@@ -86,6 +124,12 @@ export function StudentProfileView({ student, options }: { student: StudentProfi
           label="興味のある職種"
           value={joinNames(
             jobMiddleCategoryNames(options.masters.job_major_categories, student.interested_job_middle_category_ids),
+          )}
+        />
+        <DetailItem
+          label="就活希望エリア"
+          value={joinNames(
+            student.job_hunting_prefecture_ids.flatMap((id) => nameOf(options.masters.prefectures, id) ?? []),
           )}
         />
       </DetailSection>

@@ -2,7 +2,7 @@
 # ⑮ マイページと ㉓ 学生詳細（企業が見る。マッチ前でもすべて見せる）で使い回す。
 # 使い方：json.partial! "api/shared/student_profile", student: 学生プロフィール
 # 項目の名前と形は、⑥ 学生の新規登録で送るものと同じ（アカウントの項目は除く）。icon_url を加える。
-# 空欄は null のまま返す。外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
+# 空欄は null のまま返す。外部リンク・資格・就活希望エリアは【仕上げ】の順17 で足した（興味のある業界は順10 で前倒しした。PR254）
 
 json.extract! student,
               :name, :university_id, :university_other_name, :faculty_id, :department_id, :grade,
@@ -13,7 +13,8 @@ json.extract! student,
               # 働き方の好み（性格）の5軸。−2〜2 の数値
               :personality_pace, :personality_novelty, :personality_collaboration,
               :personality_decision, :personality_atmosphere,
-              :interested_job_middle_category_ids, :interested_industry_ids, :commutable_prefecture_ids
+              :interested_job_middle_category_ids, :interested_industry_ids, :commutable_prefecture_ids,
+              :job_hunting_prefecture_ids
 
 # プログラミング歴。保存のたびに消して作り直すので、各行の番号（id）は返さない
 json.skills student.student_skills do |skill|
@@ -23,5 +24,13 @@ json.skills student.student_skills do |skill|
   json.years skill.years&.to_f
   json.level skill.level
 end
+
+# 外部リンク（{ url, title }）と資格（資格名の文字の配列）。⑥ で送る形と同じ。
+# プログラミング歴と同じく保存のたびに作り直すので、各行の番号（id）は返さない
+json.links student.student_links do |link|
+  json.url link.url
+  json.title link.title
+end
+json.certifications student.student_certifications.map(&:name)
 
 json.partial! "api/shared/icon_url", record: student

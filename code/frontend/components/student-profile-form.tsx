@@ -2,24 +2,28 @@
 
 // マイページ（S1 学生プロフィール編集）の入力フォーム。詳しくは design/designs/ページ設計.md の 6-6 S1、API設計.md の 16-3 ⑦⑮⑯⑰。
 // 開いたら ⑦ 選択肢と ⑮ 自分のプロフィールを SWR で取り、保存で ⑯ を送る。アイコンを選んでいたら、⑯ の成功後に ⑰ を続けて送る。
-// 入力欄は7つのまとまり（基本・学校・自己PR・プログラミング歴・就活状況・働き方の好み・稼働条件）に分け、見出しの行を押すと開く形（アコーディオン）にしている。
+// 入力欄は7つのまとまり（基本・学校・自己PR・「資格・技術」・就活状況・働き方の好み・稼働条件）に分け、見出しの行を押すと開く形（アコーディオン）にしている。
 // 氏名とアイコン以外の欄と、値の変換・その場の確認は、新規登録と共通の部品（components/student-profile-fields.tsx）。
 // 必須は氏名と活動状況だけ（その他決め事.md の 5-9）。
-// 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
+// 外部リンク・資格は「資格・技術」のまとまり（PR336）、就活希望エリアは「就活状況」のまとまりに、順17 で足した
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { CertificationRowsField } from "@/components/certification-rows-field";
 import { FormSection, RequiredNote, TextField, type FieldErrors } from "@/components/form-fields";
 import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
+import { LinkRowsField } from "@/components/link-rows-field";
 import { useRedirectIfUnauthorized, useRefreshMe } from "@/components/member-only";
 import { PageTitle } from "@/components/page-title";
-import { SkillRowsField, type SkillRow } from "@/components/skill-rows-field";
+import { SkillRowsField } from "@/components/skill-rows-field";
 import {
   ActivityStatusField,
   GraduationYearField,
   InterestedIndustriesField,
   InterestedJobCategoriesField,
+  JobHuntingPrefecturesField,
   PERSONALITY_KEYS,
   ResidencePrefectureField,
+  rowFieldOfErrorKey,
   StudentSchoolFields,
   StudentSelfPrFields,
   StudentWorkConditionFields,
@@ -46,7 +50,7 @@ const NAME_MAX_LENGTH = 100;
 
 // フォームのまとまり。見出しの行を押すと中身が開く（アコーディオン）。並びはこの順。
 // fields は、そのまとまりに入っている項目の名前（エラーのときに、どのまとまりを開くかを決めるのに使う。Rails の errors のキーと同じ）。
-// プログラミング歴の行のエラー（skills[0].years など）は、下の sectionHasError で拾う
+// プログラミング歴・外部リンク・資格の行のエラー（skills[0].years・links[0].url など）は、下の sectionHasError で拾う
 const SECTIONS = [
   {
     value: "basic",
@@ -66,12 +70,23 @@ const SECTIONS = [
     hint: "3つの問い",
     fields: ["self_pr_strength", "self_pr_weakness", "self_pr_future"],
   },
-  { value: "skills", title: "プログラミング歴", hint: "言語・フレームワークと年数・レベル", fields: ["skills"] },
+  // プログラミング歴・外部リンク・資格を1つのまとまりにした（PR336）
+  {
+    value: "skills",
+    title: "資格・技術",
+    hint: "プログラミング歴・外部リンク・資格",
+    fields: ["skills", "links", "certifications"],
+  },
   {
     value: "job_hunting",
     title: "就活状況",
-    hint: "卒業年度・興味のある業界・職種",
-    fields: ["graduation_year", "interested_industry_ids", "interested_job_middle_category_ids"],
+    hint: "卒業年度・興味のある業界・職種・就活希望エリア",
+    fields: [
+      "graduation_year",
+      "interested_industry_ids",
+      "interested_job_middle_category_ids",
+      "job_hunting_prefecture_ids",
+    ],
   },
   {
     value: "work_style_preference",
@@ -105,17 +120,10 @@ const INITIAL_OPEN_SECTIONS: SectionValue[] = ["basic"];
 // 通信そのものに失敗したとき（Rails の message がないとき）の一言
 const FALLBACK_ERROR_MESSAGE = "エラーが起きました";
 
-// プログラミング歴のエラー（欄全体の skills と、行ごとの skills[0].years など）か
-function isSkillsErrorKey(key: string): boolean {
-  return key === "skills" || key.startsWith("skills[");
-}
-
-// そのまとまりの項目に、エラーがあるか
+// そのまとまりの項目に、エラーがあるか。行のエラー（links[0].url など）は、項目名（links）に直して比べる
 function sectionHasError(section: (typeof SECTIONS)[number], errors: FieldErrors): boolean {
-  if (section.value === "skills") {
-    return Object.keys(errors).some(isSkillsErrorKey);
-  }
-  return section.fields.some((field) => errors[field] !== undefined);
+  const fields: readonly string[] = section.fields;
+  return Object.keys(errors).some((key) => fields.includes(rowFieldOfErrorKey(key) ?? key));
 }
 
 // ⑮ の返事を、フォームの値に直す
@@ -200,12 +208,17 @@ export function StudentProfileForm() {
     setSaved(false);
   }
 
-  // プログラミング歴を変えたら、プログラミング歴のエラーを消す。
+  // プログラミング歴・外部リンク・資格の行を変えたら、その項目のエラーを消す。
   // エラーの名前に行の番号が入っているので、行を足したり消したりすると、エラーが別の行の下に出てしまうため。保存を押せば確かめ直される
-  function updateSkills(rows: SkillRow[]) {
-    changeValues({ skills: rows });
+  function updateRows(change: Pick<Partial<FormValues>, "skills" | "links" | "certifications">) {
+    changeValues(change);
     setFieldErrors((current) =>
-      Object.fromEntries(Object.entries(current).filter(([key]) => !isSkillsErrorKey(key))),
+      Object.fromEntries(
+        Object.entries(current).filter(([key]) => {
+          const rowField = rowFieldOfErrorKey(key);
+          return rowField === null || !(rowField in change);
+        }),
+      ),
     );
   }
 
@@ -357,7 +370,13 @@ export function StudentProfileForm() {
               categories={options.enums.technology_category}
               levels={options.enums.skill_level}
               errors={fieldErrors}
-              onChange={updateSkills}
+              onChange={(rows) => updateRows({ skills: rows })}
+            />
+            <LinkRowsField rows={values.links} errors={fieldErrors} onChange={(rows) => updateRows({ links: rows })} />
+            <CertificationRowsField
+              rows={values.certifications}
+              errors={fieldErrors}
+              onChange={(rows) => updateRows({ certifications: rows })}
             />
           </FormSection>
 
@@ -366,6 +385,7 @@ export function StudentProfileForm() {
             {/* 業界 → 職種の順（募集詳細編集と同じ。PR262） */}
             <InterestedIndustriesField {...fieldsProps} />
             <InterestedJobCategoriesField {...fieldsProps} />
+            <JobHuntingPrefecturesField {...fieldsProps} />
           </FormSection>
 
           <FormSection {...sectionProps("work_style_preference")}>

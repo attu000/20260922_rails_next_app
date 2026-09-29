@@ -43,8 +43,8 @@ RSpec.describe "企業の学生詳細・学生検索（/api/company/students）"
         "can_full_remote", "can_partial_remote", "can_onsite", "work_note",
         "personality_pace", "personality_novelty", "personality_collaboration",
         "personality_decision", "personality_atmosphere",
-        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids", "skills", "icon_url",
-        "last_active_range"
+        "interested_job_middle_category_ids", "interested_industry_ids", "commutable_prefecture_ids",
+        "job_hunting_prefecture_ids", "skills", "links", "certifications", "icon_url", "last_active_range"
       )
       expect(body["student"]).to include("name" => student.name, "self_pr_strength" => "粘り強い", "work_days_per_week" => 3)
     end

@@ -8,12 +8,14 @@
 // ボタンは「戻る」「次へ」（最後だけ「登録する」）。「次へ」は、そのステップの必須と形式を確かめてから進む。
 // 飛ばしてよいことは、見出しの下の一言で伝える（PR230）。
 // 欄は、マイページと共通の部品（components/student-profile-fields.tsx）。守りは Rails にある。画面側の確認は、送る手間を省くためだけ。
-// 利用規約・プライバシーポリシーへの同意と、進み具合の表示（「3／6」）は【仕上げ】で足す
+// 利用規約・プライバシーポリシーへの同意と、進み具合の表示（「3／7」）は、今回の開発では作らない（PR333）
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { CertificationRowsField } from "@/components/certification-rows-field";
 import type { FieldErrors } from "@/components/form-fields";
 import { IconField, uploadIcon, useIconPicker, validateIconFile } from "@/components/icon-field";
+import { LinkRowsField } from "@/components/link-rows-field";
 import {
   ACCOUNT_KEYS,
   checkEmail,
@@ -23,15 +25,17 @@ import {
   type AccountValues,
 } from "@/components/signup-account-fields";
 import { SignupIconFailed, SignupLayout } from "@/components/signup-layout";
-import { SkillRowsField, type SkillRow } from "@/components/skill-rows-field";
+import { SkillRowsField } from "@/components/skill-rows-field";
 import {
   ActivityStatusField,
   EMPTY_STUDENT_PROFILE,
   GraduationYearField,
   InterestedIndustriesField,
   InterestedJobCategoriesField,
+  JobHuntingPrefecturesField,
   PERSONALITY_KEYS,
   ResidencePrefectureField,
+  rowFieldOfErrorKey,
   StudentSchoolFields,
   StudentSelfPrFields,
   StudentWorkConditionFields,
@@ -83,10 +87,10 @@ const STEPS: { title: string; notes: string[]; fields: string[] }[] = [
   {
     title: "興味",
     notes: [OPTIONAL_NOTE, RECOMMEND_NOTE],
-    fields: ["interested_industry_ids", "interested_job_middle_category_ids"],
+    fields: ["interested_industry_ids", "interested_job_middle_category_ids", "job_hunting_prefecture_ids"],
   },
-  // プログラミング歴の行の誤り（skills[0].years など）も、このステップ（stepOfField で拾う）
-  { title: "スキル", notes: [OPTIONAL_NOTE, RECOMMEND_NOTE], fields: ["skills"] },
+  // プログラミング歴・外部リンク・資格の行の誤り（skills[0].years・links[0].url など）も、このステップ（stepOfField で拾う）
+  { title: "スキル", notes: [OPTIONAL_NOTE, RECOMMEND_NOTE], fields: ["skills", "links", "certifications"] },
   {
     title: "稼働条件",
     notes: [OPTIONAL_NOTE],
@@ -114,16 +118,11 @@ const STEPS: { title: string; notes: string[]; fields: string[] }[] = [
 // 最後のステップの番号（ここで「登録する」）
 const LAST_STEP = STEPS.length;
 
-// プログラミング歴のエラー（欄全体の skills と、行ごとの skills[0].years など）か
-function isSkillsErrorKey(key: string): boolean {
-  return key === "skills" || key.startsWith("skills[");
-}
-
-// その項目が入っているステップの番号。どのステップにも当たらない項目は、最後のステップにする
+// その項目が入っているステップの番号。どのステップにも当たらない項目は、最後のステップにする。
+// 行のエラー（links[0].url など）は、項目名（links）に直して探す
 function stepOfField(key: string): number {
-  const index = STEPS.findIndex(
-    (step) => step.fields.includes(key) || (step.fields.includes("skills") && isSkillsErrorKey(key)),
-  );
+  const field = rowFieldOfErrorKey(key) ?? key;
+  const index = STEPS.findIndex((step) => step.fields.includes(field));
   return index === -1 ? LAST_STEP : index + 1;
 }
 
@@ -183,11 +182,16 @@ export function StudentSignupForm() {
     setProfile((current) => ({ ...current, ...change }));
   }
 
-  // プログラミング歴を変えたら、プログラミング歴のエラーを消す（マイページと同じ理由。行の番号がずれるため）
-  function updateSkills(rows: SkillRow[]) {
-    changeProfile({ skills: rows });
+  // プログラミング歴・外部リンク・資格の行を変えたら、その項目のエラーを消す（マイページと同じ理由。行の番号がずれるため）
+  function updateRows(change: Pick<Partial<StudentProfileValues>, "skills" | "links" | "certifications">) {
+    changeProfile(change);
     setFieldErrors((current) =>
-      Object.fromEntries(Object.entries(current).filter(([key]) => !isSkillsErrorKey(key))),
+      Object.fromEntries(
+        Object.entries(current).filter(([key]) => {
+          const rowField = rowFieldOfErrorKey(key);
+          return rowField === null || !(rowField in change);
+        }),
+      ),
     );
   }
 
@@ -305,18 +309,27 @@ export function StudentSignupForm() {
           <>
             <InterestedIndustriesField {...fieldsProps} />
             <InterestedJobCategoriesField {...fieldsProps} />
+            <JobHuntingPrefecturesField {...fieldsProps} />
           </>
         );
       case 4:
         return (
-          <SkillRowsField
-            rows={profile.skills}
-            technologies={loadedOptions.masters.technologies}
-            categories={loadedOptions.enums.technology_category}
-            levels={loadedOptions.enums.skill_level}
-            errors={fieldErrors}
-            onChange={updateSkills}
-          />
+          <>
+            <SkillRowsField
+              rows={profile.skills}
+              technologies={loadedOptions.masters.technologies}
+              categories={loadedOptions.enums.technology_category}
+              levels={loadedOptions.enums.skill_level}
+              errors={fieldErrors}
+              onChange={(rows) => updateRows({ skills: rows })}
+            />
+            <LinkRowsField rows={profile.links} errors={fieldErrors} onChange={(rows) => updateRows({ links: rows })} />
+            <CertificationRowsField
+              rows={profile.certifications}
+              errors={fieldErrors}
+              onChange={(rows) => updateRows({ certifications: rows })}
+            />
+          </>
         );
       case 5:
         return <StudentWorkConditionFields {...fieldsProps} currentYear={currentYear} />;

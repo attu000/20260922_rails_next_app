@@ -1,6 +1,13 @@
 // 学生プロフィールの型。Rails の app/views/api/student/profiles/show.json.jbuilder と同じ形
 // （design/designs/API設計.md の 16-3 ⑮⑯）。空欄は null。
-// 外部リンク・資格・就活希望エリアは【仕上げ】で足す（興味のある業界は順10 で前倒しした。PR254）
+// 外部リンク・資格・就活希望エリアは【仕上げ】の順17 で足した（興味のある業界は順10 で前倒しした。PR254）
+
+// 外部リンクの1行。URL は http:// か https:// で始まる（Rails が確かめる。PR338）
+export type StudentLink = {
+  url: string;
+  // 「GitHub」などの表示名。空欄は null
+  title: string | null;
+};
 
 // プログラミング歴の1行。技術をマスタから選んだか、「その他」に名前を書いたかの、どちらか一方
 export type StudentSkill = {
@@ -49,6 +56,11 @@ export type StudentProfile = {
   interested_job_middle_category_ids: number[];
   interested_industry_ids: number[];
   commutable_prefecture_ids: number[];
+  // 就活希望エリア（都道府県の番号）
+  job_hunting_prefecture_ids: number[];
   skills: StudentSkill[];
+  links: StudentLink[];
+  // 資格名の一覧（入力した順）
+  certifications: string[];
   icon_url: string | null;
 };

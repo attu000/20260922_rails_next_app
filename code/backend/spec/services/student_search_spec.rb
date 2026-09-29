@@ -196,14 +196,19 @@ RSpec.describe StudentSearch do
   end
 
   describe "フリーワード" do
-    it "自己PRの3つと、プログラミング歴の「その他」の名前で合う。大文字と小文字は区別しない" do
+    it "自己PRの3つと、資格名、プログラミング歴の「その他」の名前で合う。大文字と小文字は区別しない" do
       by_columns = %i[self_pr_strength self_pr_weakness self_pr_future].map do |column|
         create_student(column => "Ruby が好きです")
       end
       by_other_skill = create_student.tap { |student| student.student_skills.create!(other_name: "Ruby 製の自作ツール", level: :v1) }
+      # 資格名（順17）。資格を2つ持っていても1人として数える（表を結合せず、サブクエリで探すため）
+      by_certification = create_student.tap do |student|
+        student.student_certifications.create!(name: "Ruby技術者認定試験 Silver")
+        student.student_certifications.create!(name: "Ruby技術者認定試験 Gold")
+      end
       create_student(self_pr_strength: "Go が好きです")
 
-      expect(matched_ids(q: "ruby")).to contain_exactly(*by_columns.map(&:id), by_other_skill.id)
+      expect(matched_ids(q: "ruby")).to contain_exactly(*by_columns.map(&:id), by_other_skill.id, by_certification.id)
     end
 
     it "名前と大学名は対象にしない" do

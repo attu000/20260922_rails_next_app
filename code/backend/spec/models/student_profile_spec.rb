@@ -112,6 +112,105 @@ RSpec.describe StudentProfile, type: :model do
     end
   end
 
+  # 順17：就活希望エリア・外部リンク・資格（【仕上げ】）
+  describe "#save_profile（就活希望エリア・外部リンク・資格）" do
+    let(:prefectures) { create_list(:prefecture, 2) }
+    let(:full_attributes) do
+      {
+        job_hunting_prefecture_ids: prefectures.map(&:id),
+        links: [ { url: "https://github.com/example", title: "GitHub" }, { url: "http://example.com/works", title: " " } ],
+        certifications: [ "基本情報技術者", "TOEIC 800点" ]
+      }
+    end
+
+    it "3つとも保存でき、リンクと資格は送った順のまま。表示名が空白だけなら空欄にそろえる" do
+      result = profile.save_profile(full_attributes)
+
+      expect(result).to be(true)
+      profile.reload
+      expect(profile.job_hunting_prefecture_ids).to match_array(prefectures.map(&:id))
+      expect(profile.student_links.map { |link| [ link.url, link.title ] })
+        .to eq([ [ "https://github.com/example", "GitHub" ], [ "http://example.com/works", nil ] ])
+      expect(profile.student_certifications.map(&:name)).to eq([ "基本情報技術者", "TOEIC 800点" ])
+    end
+
+    it "送り直すと置き換わり、送らなかった項目は変わらない" do
+      profile.save_profile(full_attributes)
+
+      profile.save_profile(links: [ { url: "https://example.com/portfolio" } ], certifications: [])
+
+      profile.reload
+      expect(profile.student_links.map(&:url)).to eq([ "https://example.com/portfolio" ])
+      expect(profile.student_certifications).to be_empty
+      expect(profile.job_hunting_prefecture_ids).to match_array(prefectures.map(&:id))
+    end
+
+    # PR338：http:// か https:// で始まり、その後ろに空白でない文字が続くこと
+    it "URL の形と長さを確かめ、行の番号を付けた名前で誤りを返す" do
+      links = [
+        { url: "HTTPS://example.com" },
+        { url: "https://" },
+        { url: "https://example.com/a b" },
+        { url: "ftp://example.com" },
+        { url: "" },
+        # 「https://example.com/」の20文字 ＋ 481文字 ＝ 501文字
+        { url: "https://example.com/#{"a" * 481}" },
+        { url: "https://example.com", title: "a" * 101 }
+      ]
+
+      result = profile.save_profile(links: links)
+
+      expect(result).to be(false)
+      # to_hash(true) は、項目名を付けた文（「URLを入力してください」）で返す
+      expect(profile.errors.to_hash(true)).to eq(
+        "links[1].url": [ "URLはhttp://かhttps://で始まる形で入力してください" ],
+        "links[2].url": [ "URLはhttp://かhttps://で始まる形で入力してください" ],
+        "links[3].url": [ "URLはhttp://かhttps://で始まる形で入力してください" ],
+        "links[4].url": [ "URLを入力してください" ],
+        "links[5].url": [ "URLは500文字以内で入力してください" ],
+        "links[6].title": [ "表示名は100文字以内で入力してください" ]
+      )
+    end
+
+    it "資格名が空（空白だけも）や101文字なら誤り" do
+      result = profile.save_profile(certifications: [ "基本情報技術者", " ", "a" * 101 ])
+
+      expect(result).to be(false)
+      expect(profile.errors.full_messages_for(:"certifications[1].name")).to eq([ "資格名を入力してください" ])
+      expect(profile.errors.full_messages_for(:"certifications[2].name")).to eq([ "資格名は100文字以内で入力してください" ])
+    end
+
+    it "外部リンクは21件、資格は51件から誤り" do
+      result = profile.save_profile(
+        links: Array.new(21) { |index| { url: "https://example.com/#{index}" } },
+        certifications: Array.new(51) { |index| "資格#{index}" }
+      )
+
+      expect(result).to be(false)
+      expect(profile.errors.full_messages_for(:links)).to eq([ "外部リンクは20件までにしてください" ])
+      expect(profile.errors.full_messages_for(:certifications)).to eq([ "資格は50件までにしてください" ])
+    end
+
+    it "一覧にない都道府県の番号があると誤り" do
+      result = profile.save_profile(job_hunting_prefecture_ids: [ prefectures.first.id, 0 ])
+
+      expect(result).to be(false)
+      expect(profile.errors.full_messages_for(:job_hunting_prefecture_ids)).to eq([ "就活希望エリアに選べない値が含まれています" ])
+    end
+
+    it "どこかに誤りがあれば、ほかの項目も含めて何も書き込まない" do
+      profile.save_profile(full_attributes)
+
+      result = profile.save_profile(name: "新しい名前", certifications: [ "新しい資格" ], links: [ { url: "no-scheme" } ])
+
+      expect(result).to be(false)
+      profile.reload
+      expect(profile.name).not_to eq("新しい名前")
+      expect(profile.student_certifications.map(&:name)).to eq([ "基本情報技術者", "TOEIC 800点" ])
+      expect(profile.student_links.size).to eq(2)
+    end
+  end
+
   # 順12：推薦の集計の項目数は、付属テーブルと同じトランザクションで数え直す（処理設計_類似度.md の 7-5）
   describe "#save_profile（推薦の集計の項目数）" do
     let(:middles) { create_list(:job_middle_category, 2) }

@@ -602,8 +602,11 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - last_active_range：最終活動の目安。`within_3_days`（3日以内）、`within_7_days`（7日以内）、`within_30_days`（30日以内）、`over_30_days`（30日より前。C6 だけで使う）のどれか
   - 日付そのものは返さない。設計が「目安」を出す形であり、学生の行動を細かく見せすぎないため
 - 行には、スカウトするかどうかの判断に使う情報を絞って載せる。大学名などは C6 で見る
+  - 最終活動日が空（一度もログインしていない）学生は null。「30日より前」と返すと、以前は活動していたように読めるため。画面は null なら何も出さない（PR335）。㉒・㉕ は30日以内に活動した学生だけを出すので、実際に null や over_30_days が来るのは㉓ だけ
+  - 計算は `StudentProfile#last_active_range`（境目の日数は `StudentProfile::LAST_ACTIVE_RANGES`）。ちょうど3日前は「3日以内」、ちょうど30日前は「30日以内」（検索の対象の境目とそろえる。PR216）。表示名は⑦ の enums.last_active_range
+  - ログイン情報（users）を読むので、呼ぶ側が `Api::Company::StudentsController::ROW_ASSOCIATIONS`（`:user` を含む）でまとめて読んでおく
 - Rails では部品（partial。`app/views/api/company/students/_row.json.jbuilder`）1つにまとめる
-- 作る順：順6 で、last_active_range 以外を作った。last_active_range は【仕上げ】
+- 作る順：順6 で、last_active_range 以外を作った。last_active_range は【仕上げ】の順16 で足した
 
 **形D：企業から見た、募集ごとのやりとりの状態**（㉓の job_postings の要素（㉓ ではこれに comparison を加える）。㉔・㉖〜㉚の返事）
 
@@ -725,7 +728,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - アイコンの保存に失敗しても、登録は取り消さない。画面は「アイコンを保存できませんでした。あとで会社情報から登録してください」と［募集一覧へ進む］を出す（PR229。本書6-5 C9）
 - 裏側のジョブ：なし
 - 段階タグ：【コア】（terms_agreed の確認は【仕上げ】）
-- 作る順：順8 で、terms_agreed 以外を作った。terms_agreed は【仕上げ】で受け取る項目に足す
+- 作る順：順8 で、terms_agreed 以外を作った。terms_agreed は【仕上げ】だが、同意チェックの画面と一緒に、今回の開発では作らない（議事録28。PR333。⑥ も同じ）
 
 **⑥ POST /api/student_registrations（学生の新規登録）**
 
@@ -782,7 +785,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 作る順：順8 で、今ある列とテーブルの項目（⑯と同じ）を作った
   - personality_ の5つは、列を作った順9 で足した（⑯ の `PERMITTED_PARAMS` に足したので、この窓口も受け取る。S9 のステップ6 もそのとき差し込んだ。PR225）
   - interested_industry_ids は、表を順10 で前倒しして作ったときに足した（⑯ の `PERMITTED_PARAMS` に足したので、この窓口も受け取る。PR254）
-  - job_hunting_prefecture_ids、links、certifications は、表を作る【仕上げ】で足す。terms_agreed も【仕上げ】
+  - job_hunting_prefecture_ids、links、certifications は、表を作る【仕上げ】（順17）で足す。terms_agreed は今回の開発では作らない（⑤ と同じ）
   - 推薦の集計の行を作る処理は順12 で足した（書き込みの `StudentProfile#write_profile!` の中。⑯ の保存と同じ場所）
 
 **⑦ GET /api/options（選択肢とマスタ）**
@@ -849,6 +852,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 順1〜順4：人数・業界・事業形態、募集に使うもの（職種・技術・都道府県・稼働条件の数値・募集状態・勤務形態・技術の区分）、学生プロフィールに使うもの（学年・活動状況・プログラミング歴のレベル・大学・学部と学科）
   - 順5（応募 → 企業がマッチ）：candidacy_reason（12個。画面に出す順）、my_status（4つ）、candidacy_tag（6つ）。candidacy_status は、状態そのものを表示する画面ができたときに足す
   - 順9（性格・カルチャー・工程の入力）：culture_axes（5軸）、masters の work_processes（番号と名前だけ。上流 → 下流の表示順）
+  - 順16（【仕上げ】）：last_active_range（4つ。値の一覧は `StudentProfile::LAST_ACTIVE_RANGE_VALUES`、表示名は `config/locales/ja.yml` の `enums.student_profile.last_active_range`）
 - culture_axes
   - 軸の並びは、Rails の検証と同じ定数（`app/models/concerns/culture_axes.rb` の `CultureAxes::AXES`）から作る。軸の名前・両端の短い名前・説明の文言は `config/locales/ja.yml` の `culture_axes`（本書5-5 の文をそのまま）
   - 学生の働き方の好み（S1・S9）と、募集のカルチャーグラフ（C3・S6）で共通。画面側は軸ごとの文言を持たない
@@ -931,7 +935,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 1社の募集は多くても数十件で、C4・C5・C6 でも全件の名前が必要なため、ページ分けしない
 - 段階タグ：【コア】（pending_application_count は【仕上げ】）
   - title、status、published_at、updated_at は【コア】で返す（Phase 6 の順2）。列をそのまま返すだけで手間がかからず、状態が見えないとどれが掲載中か分からず一覧として使えないため
-  - pending_application_count は、やりとり（candidacies）のテーブルができる順5 より後、【仕上げ】で足す
+  - pending_application_count は、【仕上げ】の順16 で足した。数え方は `Candidacy.pending_application`（形D・㉑ の tag の `pending_application` と同じ条件）。全募集ぶんを募集の番号ごとに1回の問い合わせで数え、0件の募集は 0 を返す
 
 **⑫ GET /api/company/job_postings/:id（自社の募集1件）**
 
@@ -973,7 +977,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - about・business_description が空欄なら、null のまま返す。画面側は、⑧の企業プロフィールの値を薄く表示する
 - industry_ids・business_type_ids：この募集の業界・事業形態（任意）。企業プロフィールの値とは別に持つ（本書5-8）
 - culture_ の5つ：カルチャーグラフ。−2〜2 の数値（空欄にはならない）
-- 作る順：工程・業界・事業形態・カルチャーは順9 で足した。目的・求める人材は【仕上げ】
+- 作る順：工程・業界・事業形態・カルチャーは順9 で足した。目的・求める人材は【仕上げ】だが、今回の開発では作らない（議事録28。PR333）
 - 求める人材（学生には見せない）
   - target_grades：求める学年。grade の選択肢の名前の配列（複数選択、任意）
   - target_graduation_year_from／target_graduation_year_to：求める卒業年度の範囲。片方だけの指定もできる（本書17-3-4）
@@ -1055,7 +1059,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 | industry_ids[] | 数値の配列 | ④ 業界 | 募集の業界のどれか1つが一致（企業プロフィールの値は使わない。本書5-8） |
 | business_type_ids[] | 数値の配列 | ④ 事業形態 | 募集の事業形態のどれか1つが一致（同上） |
 | job_major_category_ids[] | 数値の配列 | ④ 職種（大分類だけ選んだとき） | その大分類に属する中分類を、主・関連のどちらかに持つ募集 |
-| job_middle_category_ids[] | 数値の配列 | ④ 職種（中分類） | 主・関連のどれか1つが一致。フロントエンド・バックエンドを選んだときは、フルスタックの募集も含める |
+| job_middle_category_ids[] | 数値の配列 | ④ 職種（中分類） | 主・関連のどれか1つが一致。フロントエンド・バックエンドを選んだときは、フルスタックの募集も含める（【仕上げ】。今回の開発では作らない。PR333） |
 | technology_ids[] | 数値の配列 | ④ 使用技術 | 選んだ技術の**どれか1つ**を使用技術に持つ募集。フリーワードでは拾えない表記の揺れ（「JS」と「JavaScript」など）を、マスタから選んで探せるようにするため |
 | work_process_ids[] | 数値の配列 | ④ 工程 | 選んだ工程の**どれか1つ**を、メインか関われるのどちらかに持つ募集（使用技術と同じ形。PR251）。「設計から関わりたい」のように、関わりたい段階で探せるようにする（職種から SE を外し、工程で表すことにしたため。本書5-8） |
 | sort | `recommended`／`newest` | 並び順 | 省略時は recommended |
@@ -1088,7 +1092,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
     - 変わるのは下書きだけで、「検索する」を押すまで結果は変わらない（PR192）
   - ボタンの選択肢は、稼働条件の共通形式（本書5-6）と同じ
 - 返すもの：200。items は形B に `matched`（真偽値）を加えたもの、pagination に matched_count あり（16-1-11）
-- 段階タグ：【コア】（おすすめ順の本物の点数と「自分の稼働条件で選ぶ」、工程は【強み】。フルスタックのルールは【仕上げ】）
+- 段階タグ：【コア】（おすすめ順の本物の点数と「自分の稼働条件で選ぶ」、工程は【強み】。フルスタックのルールは【仕上げ】だが、今回の開発では作らない。議事録28。PR333）
   - 順4 で作ったもの：q、prefecture_ids、職種、technology_ids、稼働条件（手動の選択）と土日OK、sort（おすすめ順は仮の点数）、page。稼働条件の手動の選択と土日OK は【仕上げ】から前倒しした
   - 順9 で作ったもの：work_process_ids、応募済み・マッチ済みの募集の除外（PR253）
   - 順13 で作ったもの：おすすめ順の本物の計算と通り道の作り替え（PR295）、「自分の稼働条件で選ぶ」（PR302・PR304）、industry_ids・business_type_ids（【仕上げ】から前倒し。PR299）
@@ -1203,11 +1207,13 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 画面が status から「マッチ以降か」を組み立てると、メッセージを送れるかの判定（17-2-3）と同じ判定が2か所になるため、Rails が返す（16-1-9）。判定は `Candidacy#after_match?`（絞り込みの `after_match` と同じ状態の一覧を使う）
 - unreplied（Rails が計算する）：マッチ以降で、スレッドの最後の送信者が学生なら true
   - 状態とは別の軸（返事をしたかどうか）なので、tag に混ぜず項目を分ける
+  - スレッドは企業×学生で1本なので、同じ学生のマッチ以降の行が2つあれば両方に付く。メッセージがまだないスレッドは false
+  - 1ページ分の学生について、スレッドごとの最後のメッセージを PostgreSQL の DISTINCT ON で1回で取り出して判定する（`MessageThread.awaiting_reply_student_ids`。行ごとに問い合わせない）。同じ日時のメッセージは、番号の大きい方を最後とみなす
 - 理由：行には「誰が、どの段階か」が分かる最低限を載せる。並び順は単純で予想しやすい形にし、「対応が必要なものを上に並べる」は、タグで見分けられるので作らない
 - job_posting_id は、自社の募集の中から探す。他社の募集や存在しない番号なら 404（16-1-10）
 - 段階タグ：【コア】（show_all は【強み】、unreplied は【仕上げ】）。行の学生情報と並び順は【仕上げ】だったが、順5 で前倒しして作った。名前がないと誰の行か分からず、【コア】の段階でも画面が使えないため（PR207）
 - show_all（順11）：`"true"` や `"1"` を true として読む（⑱ の weekend_ok と同じ読み方）。true でなければ、状態が未マッチ・マッチのやりとりだけを返す（`Candidacy.listed_in_company_candidacies`）。絞り込みはデータベースで行うので、pagination の件数も隠したあとの行で数える
-- 作る順：順5 で、show_all・unreplied・after_match 以外を作った。after_match は、メッセージのボタンを作る順7 で足した（PR224）。show_all は順11（見送りの扱い）で足した。unreplied は、メッセージのテーブルができた順7 より後の【仕上げ】
+- 作る順：順5 で、show_all・unreplied・after_match 以外を作った。after_match は、メッセージのボタンを作る順7 で足した（PR224）。show_all は順11（見送りの扱い）で足した。unreplied は【仕上げ】の順16 で足した
 
 **㉒ GET /api/company/students（学生検索）**
 
@@ -1261,7 +1267,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 順6（スカウト → 学生がマッチ）：上の送るもの・返すものすべてと、除外（PR216・PR220）。フリーワードの資格名を除く
     - おすすめ順は、通り道と仮の点数で作った（PR214）
   - 順13：おすすめ順の本物の計算と通り道の作り替え（PR295）。推薦検索（稼働条件のポップアップの「この募集の稼働条件で選ぶ」。PR294・PR302）
-  - 資格名は、資格の表を作る【仕上げ】で足す。最終活動の目安（形C の last_active_range）は【仕上げ】
+  - 資格名は、資格の表を作る【仕上げ】で足す。最終活動の目安（形C の last_active_range）は【仕上げ】の順16 で足した
 
 **㉓ GET /api/company/students/:id（学生詳細）**
 
@@ -1306,7 +1312,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 }
 ```
 
-- student：学生のプロフィールの全項目（マッチ前でもすべて見せる）
+- student：学生のプロフィールの全項目（マッチ前でもすべて見せる）に、最終活動の目安（last_active_range）を加えたもの
+  - last_active_range は形C と同じ値。この窓口だけ `over_30_days` も返り、一度もログインしていない学生は null（PR335）
 - has_message_thread：**その学生とのスレッドがあるか**。募集ごとではなく学生ごとの値なので、job_postings の中ではなく外に置く
   - true なら、どの募集を選んでいても「この学生とのメッセージ」のボタンを出す（本書17-2-3、6-5 C6）
   - 送れるかどうか（can_send）とは別。自分が送ったスカウト文を読み直せるようにするため
@@ -1330,7 +1337,8 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 作る順：⑲と同じく、項目は元になるものができる順で足していく
   - 順5（応募 → 企業がマッチ）：student、job_postings（形D の candidacy のうち reasons 以外と、available_actions）。available_actions は、窓口ができている操作だけを返す（順5 は match だけ。scout は順6、decline・undo_decline・pass・fail は順11 で足した）
   - 順6（スカウト → 学生がマッチ）：has_message_thread。スレッドは順5 のマッチでもできるが、⑲⑳の has_message_thread と同じ順でそろえる。available_actions に scout を足す。「この学生とのメッセージ」のボタンは、行き先の C7 ができた順7 で画面に足した（PR213）
-  - 順10（比較の表示）：comparison、candidacy.reasons。【仕上げ】：last_active_range
+  - 順10（比較の表示）：comparison、candidacy.reasons
+  - 順16（【仕上げ】）：last_active_range
 
 **状態を変える操作（㉔・㉖〜㉜）の共通の決まり**
 
@@ -1411,7 +1419,7 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
 - 送るもの：status（`applied` か `matched`。省略するとすべて）、page
 - 返すもの：200。items は形B に candidacy_id と my_status（`applied`／`matched`）を加えたもの、pagination あり
 - 並び順：やりとりが始まった日の新しい順
-- 段階タグ：【コア】（status での絞り込みは【仕上げ】）
+- 段階タグ：【コア】（status での絞り込みは【仕上げ】。今回の開発では作らない。議事録28。PR333）
 
 **㉟ GET /api/student/scouts（スカウト管理）**
 
@@ -1489,9 +1497,11 @@ HTTP ステータス（返事の最初に付く3桁の番号）の使い分け
   - 企業側（㊲）には返さない
 - matched_job_postings：その相手とマッチしている募集（マッチ・合格・不合格のもの）。学生側にも同じ形で返し、合格・不合格の区別は見せない
   - 画面の上部に名前を並べるだけで、**そこから学生詳細・募集詳細へ飛ぶ導線は作らない**（本書6-5 C7・6-6 S5）
+  - 並びはマッチした日の古い順（同じなら番号の順）。まだマッチしていなければ空の配列
+  - 取り出しは `MessageThread#matched_job_postings`（送れるかの判定 can_send? と同じ「マッチ以降」の絞り込み `Candidacy.after_match` を使う）
 - スレッドは、自社・自分のスレッドの中から相手の番号で探す。主なエラー：404（相手が存在しない、まだスレッドがない、ほかの企業・学生とその相手のスレッドしかない）
 - 段階タグ：【コア】（matched_job_postings は【仕上げ】）
-- 作る順：順7 で、matched_job_postings 以外を作った。matched_job_postings は【仕上げ】（仮の値は返さない）
+- 作る順：順7 で、matched_job_postings 以外を作った。matched_job_postings は【仕上げ】の順16 で足した
 
 **㊳ POST /api/company/students/:id/message_thread/messages・㊶ POST /api/student/companies/:id/message_thread/messages（送信）**
 

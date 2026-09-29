@@ -96,7 +96,10 @@ RSpec.describe "新規登録（/api/company_registrations・/api/student_registr
                              interested_job_middle_category_ids: [ middle.id ],
                              interested_industry_ids: [ industry.id ],
                              commutable_prefecture_ids: [ prefecture.id ],
-                             skills: [ { technology_id: technology.id, other_name: nil, years: 1.5, level: "v2" } ]))
+                             job_hunting_prefecture_ids: [ prefecture.id ],
+                             skills: [ { technology_id: technology.id, other_name: nil, years: 1.5, level: "v2" } ],
+                             links: [ { url: "https://github.com/example", title: "GitHub" } ],
+                             certifications: [ "基本情報技術者" ]))
 
       expect(response).to have_http_status(:created)
       expect(response.parsed_body).to include("role" => "student", "name" => "山田 太郎")
@@ -106,6 +109,10 @@ RSpec.describe "新規登録（/api/company_registrations・/api/student_registr
       expect(profile.interested_industries).to eq([ industry ])
       expect(profile.commutable_prefectures).to eq([ prefecture ])
       expect(profile.student_skills.sole).to have_attributes(technology_id: technology.id, level: "v2")
+      # 外部リンク・資格・就活希望エリア（順17）。マイページと同じ受け取る項目の一覧（PERMITTED_PARAMS）を使う
+      expect(profile.job_hunting_prefectures).to eq([ prefecture ])
+      expect(profile.student_links.sole).to have_attributes(url: "https://github.com/example", title: "GitHub")
+      expect(profile.student_certifications.sole.name).to eq("基本情報技術者")
 
       get "/api/me"
       expect(response.parsed_body["role"]).to eq("student")

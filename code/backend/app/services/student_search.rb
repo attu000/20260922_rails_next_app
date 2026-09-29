@@ -162,7 +162,7 @@ class StudentSearch
   end
 
   # フリーワード：空白（全角の空白も）で区切ったすべての語が、次のどこかに含まれる学生（16-3 ㉒）。
-  #   自己PRの3つ、プログラミング歴の「その他」の名前。大文字と小文字は区別しない（ILIKE）
+  #   自己PRの3つ、資格名、プログラミング歴の「その他」の名前。大文字と小文字は区別しない（ILIKE）
   def keyword_condition
     words = @params[:q].to_s.split(/[[:space:]]+/).compact_blank
     return nil if words.empty?
@@ -171,8 +171,8 @@ class StudentSearch
   end
 
   # 1つの語について、対象のどれかに含まれる学生。
-  # プログラミング歴は、表を結合せず「番号がこの一覧に入っているか」（サブクエリ）で探す。
-  # 結合すると、プログラミング歴を3行持つ学生が3行に増え、件数が狂うため
+  # 資格とプログラミング歴は、表を結合せず「番号がこの一覧に入っているか」（サブクエリ）で探す。
+  # 結合すると、資格を3行持つ学生が3行に増え、件数が狂うため
   def keyword_word_condition(word)
     # 語の中の % や _ を、「何でも」の意味ではなく、ただの文字として扱う
     pattern = "%#{StudentProfile.sanitize_sql_like(word)}%"
@@ -181,10 +181,13 @@ class StudentSearch
       KEYWORD_COLUMNS.map { |column| "student_profiles.#{column} ILIKE :pattern" }.join(" OR "),
       pattern: pattern
     )
+    certification_names = StudentProfile.where(
+      id: StudentCertification.where("student_certifications.name ILIKE ?", pattern).select(:student_profile_id)
+    )
     other_skill_names = StudentProfile.where(
       id: StudentSkill.where("student_skills.other_name ILIKE ?", pattern).select(:student_profile_id)
     )
-    in_columns.or(other_skill_names)
+    in_columns.or(certification_names).or(other_skill_names)
   end
 
   # 稼働条件の数値（週の日数・1日の時間・継続期間）：学生の上限が、企業が選んだ値以上なら合う

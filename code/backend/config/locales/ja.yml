@@ -56,7 +56,10 @@ ja:
         commutable_prefecture_ids: 出社できる都道府県
         interested_job_middle_category_ids: 興味のある職種
         interested_industry_ids: 興味のある業界
+        job_hunting_prefecture_ids: 就活希望エリア
         skills: プログラミング歴
+        links: 外部リンク
+        certifications: 資格
         icon: アイコン
         # 性格の5軸。画面での呼び名は「働き方の好み」（PR233）
         personality_pace: 働き方の好み（進め方）
@@ -70,6 +73,12 @@ ja:
         other_name: その他の名前
         years: 年数
         level: レベル
+      # 外部リンク・資格の1行。行のエラー（links[0].url・certifications[0].name）の項目名にも使う
+      student_link:
+        url: URL
+        title: 表示名
+      student_certification:
+        name: 資格名
       job_posting:
         status: 募集状態
         title: 募集タイトル
@@ -256,5 +265,7 @@ ja:
       half_step: は0.5刻みで入力してください
       # 件数の上限。「プログラミング歴は50件までにしてください」になる
       too_many: は%{count}件までにしてください
+      # 外部リンクの URL の形（権限_バリデーション.md の 17-3-4。PR338）。「URLはhttp://かhttps://で始まる形で入力してください」になる
+      http_url: はhttp://かhttps://で始まる形で入力してください
       # 学科が、選んだ学部のものでない。「学科は、選んだ学部の中から選んでください」になる
       not_in_selected_faculty: は、選んだ学部の中から選んでください
